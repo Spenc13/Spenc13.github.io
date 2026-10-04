@@ -16,7 +16,8 @@ here and grow over time.
   Third-party skills installed with `npx skills add <owner/repo> -a claude-code --copy`
   are tracked in `skills-lock.json`; update them with `npx skills update`.
   Installed: `Leonxlnx/taste-skill` (design-taste-frontend, minimalist-ui,
-  high-end-visual-design, redesign-existing-projects, and others).
+  high-end-visual-design, redesign-existing-projects, and others) and
+  `vercel-labs/agent-skills` → web-design-guidelines (UI/accessibility review).
 
 ## Conventions for sites
 
