@@ -1,0 +1,3 @@
+# playwright-cli local config and output
+.playwright/
+.playwright-cli/

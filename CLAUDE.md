@@ -22,7 +22,8 @@ here and grow over time.
   are tracked in `skills-lock.json`; update them with `npx skills update`.
   Installed: `Leonxlnx/taste-skill` (design-taste-frontend, minimalist-ui,
   high-end-visual-design, redesign-existing-projects, and others) and
-  `vercel-labs/agent-skills` → web-design-guidelines (UI/accessibility review).
+  `vercel-labs/agent-skills` → web-design-guidelines (UI/accessibility review), and
+  `microsoft/playwright-cli` → playwright-cli (browser automation).
 
 ## Conventions for sites
 
@@ -32,6 +33,22 @@ here and grow over time.
 - Mobile-friendly layouts, no horizontal scroll at phone width.
 - Use relative links inside a site so it works under `/sites/<site-name>/`.
 - Keep assets for a site inside that site's folder.
+
+## Testing sites in a browser
+
+Use the `playwright-cli` skill. Serve the repo first, then open the page:
+
+```bash
+python3 -m http.server 8765 &   # from the repo root
+playwright-cli open http://localhost:8765/sites/<site-name>/            # desktop
+playwright-cli open http://localhost:8765/sites/<site-name>/ --mobile   # phone
+playwright-cli screenshot
+playwright-cli close
+```
+
+In cloud sessions, `.claude/hooks/session-start.sh` installs `playwright-cli` and writes
+`.playwright/cli.config.json` so it uses the container's Chromium. Browser output goes to
+`.playwright-cli/`; both folders are git-ignored.
 
 ## Adding a skill
 
