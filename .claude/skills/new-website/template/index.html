@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<style>
+:root{
+  --bg:#ffffff; --fg:#1b1b1a; --muted:#5c5a55; --accent:#8a6a2f; --surface:#f5f3ef;
+  --max:960px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#141412; --fg:#e8e2d6; --muted:#c9c2b4; --accent:#d9b77f; --surface:#1f1e1b; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6}
+a{color:var(--accent)}
+header,main,footer{max-width:var(--max);margin:0 auto;padding:24px 16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+nav a{margin-left:16px;text-decoration:none}
+.hero{padding:48px 0}
+.hero h1{font-size:clamp(2rem,6vw,3.25rem);line-height:1.15;margin:0 0 12px}
+.hero p{color:var(--muted);font-size:1.15rem;max-width:40em}
+.card{background:var(--surface);border-radius:12px;padding:20px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+footer{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<header>
+  <strong>{{TITLE}}</strong>
+  <nav><a href="#about">About</a><a href="#contact">Contact</a></nav>
+</header>
+<main>
+  <section class="hero">
+    <h1>{{TITLE}}</h1>
+    <p>{{DESCRIPTION}}</p>
+  </section>
+  <section id="about" class="grid">
+    <div class="card"><h2>One</h2><p>Describe something here.</p></div>
+    <div class="card"><h2>Two</h2><p>Describe something here.</p></div>
+    <div class="card"><h2>Three</h2><p>Describe something here.</p></div>
+  </section>
+  <section id="contact"><h2>Contact</h2><p>Add contact details here.</p></section>
+</main>
+<footer>&copy; {{TITLE}}</footer>
+</body>
+</html>
