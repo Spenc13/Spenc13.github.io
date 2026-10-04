@@ -11,7 +11,7 @@ here and grow over time.
   do not move, rename, or delete them, and change their content only when asked.
 - `sites/<site-name>/` — one folder per website. Each is served at
   `https://spenc13.github.io/sites/<site-name>/`.
-- `design-md/<brand>/DESIGN.md` — 73 reference design systems (Apple, Stripe, Linear,
+- `design-md/<brand>/DESIGN.md` — 74 reference design systems (Apple, Stripe, Linear,
   Notion, …) from VoltAgent/awesome-design-md. When the user asks for a site "like X",
   read the matching DESIGN.md and follow its tokens and rules.
 - `_config.yml` — excludes workspace files (design-md, CLAUDE.md, skills-lock.json) from
