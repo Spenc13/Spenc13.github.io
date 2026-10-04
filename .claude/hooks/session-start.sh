@@ -17,6 +17,11 @@ if ! command -v dataforseo-mcp-server >/dev/null 2>&1; then
   npm install -g dataforseo-mcp-server >/dev/null 2>&1
 fi
 
+# Pre-install the DataForSEO MCP server so it starts fast in later sessions.
+if ! command -v dataforseo-mcp-server >/dev/null 2>&1; then
+  npm install -g dataforseo-mcp-server >/dev/null 2>&1 || true
+fi
+
 # The cloud container ships Chromium (not Google Chrome), so point playwright-cli at it.
 if [ -x /opt/pw-browsers/chromium ]; then
   mkdir -p "$CLAUDE_PROJECT_DIR/.playwright"

@@ -56,7 +56,8 @@ In cloud sessions, `.claude/hooks/session-start.sh` installs `playwright-cli` an
 on-page audits, backlinks). It reads `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD`
 from the cloud environment's variables — never put credentials in the repo. The
 environment's network access must allow `api.dataforseo.com`. Every request spends
-account balance, so keep queries targeted.
+account balance, so keep queries targeted. The session-start hook pre-installs the
+server, and `MCP_TIMEOUT` in `.claude/settings.json` gives it time to start.
 
 ## Adding a skill
 
