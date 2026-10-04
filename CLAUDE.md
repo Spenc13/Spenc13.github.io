@@ -50,6 +50,14 @@ In cloud sessions, `.claude/hooks/session-start.sh` installs `playwright-cli` an
 `.playwright/cli.config.json` so it uses the container's Chromium. Browser output goes to
 `.playwright-cli/`; both folders are git-ignored.
 
+## SEO data (DataForSEO)
+
+`.mcp.json` connects the `dataforseo` MCP server (keyword research, SERP results,
+on-page audits, backlinks). It reads `DATAFORSEO_USERNAME` and `DATAFORSEO_PASSWORD`
+from the cloud environment's variables — never put credentials in the repo. The
+environment's network access must allow `api.dataforseo.com`. Every request spends
+account balance, so keep queries targeted.
+
 ## Adding a skill
 
 Create `.claude/skills/<skill-name>/SKILL.md` with frontmatter:
