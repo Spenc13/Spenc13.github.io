@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Faircloth Roofing</title>
+<meta name="description" content="Residential and commercial roofing in Fayetteville, NC and every town within 50 miles. Shingle, metal, slate, tile, TPO, EPDM, storm damage and insurance claims. Demo site.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a storm-purple hero band with a live storm-to-sunshine scene, then alternating
+   light/tinted bands of tools (tabs, estimator, radar map) built from the Hornets palette. */
+:root{
+  --teal:#00788C; --purple:#1D1160; --gray:#A1A1A4; --white:#FFFFFF;
+  --bg:#F5F6FA; --bg-2:#EBEDF5; --surface:#FFFFFF; --fg:#17122F; --muted:#54536A; --line:#D8DAE6;
+  --accent:#00788C; --accent-ink:#FFFFFF; --accent-2:#1D1160; --accent-2-ink:#FFFFFF; --band:#1D1160; --accent-2-soft:#E8E4F8; --teal-soft:#DCF0F2;
+  --glow:rgba(0,120,140,.30); --shadow:0 18px 40px -22px rgba(29,17,96,.45);
+  --demo:#8A4F00; --demo-bg:#FFF3DF;
+  --hero-1:#1D1160; --hero-2:#0A0622; --on-hero:#FFFFFF; --on-hero-muted:#CBC6EA; --hero-teal:#3FD6E3; --hero-violet:#8F7BFF;
+  --font-display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --font-body:"Manrope","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --max:1180px; --radius:18px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C0920; --bg-2:#120E2C; --surface:#18133B; --fg:#F2F0FA; --muted:#ADAAC6; --line:#2D2659;
+    --accent:#22C1D1; --accent-ink:#04131A; --accent-2:#A291FF; --accent-2-ink:#0C0920; --band:#160F44; --accent-2-soft:#241B55; --teal-soft:#0C2D3A;
+    --glow:rgba(34,193,209,.32); --shadow:0 18px 40px -20px rgba(0,0,0,.7);
+    --demo:#FFC870; --demo-bg:#2E2208;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C0920; --bg-2:#120E2C; --surface:#18133B; --fg:#F2F0FA; --muted:#ADAAC6; --line:#2D2659;
+  --accent:#22C1D1; --accent-ink:#04131A; --accent-2:#A291FF; --accent-2-ink:#0C0920; --band:#160F44; --accent-2-soft:#241B55; --teal-soft:#0C2D3A;
+  --glow:rgba(34,193,209,.32); --shadow:0 18px 40px -20px rgba(0,0,0,.7);
+  --demo:#FFC870; --demo-bg:#2E2208;
+  color-scheme:dark;
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:1rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,svg{max-width:100%}
+a{color:var(--accent)}
+h1,h2,h3,h4{font-family:var(--font-display);line-height:1.08;margin:0;text-wrap:balance;letter-spacing:-.02em}
+h2{font-size:clamp(2rem,4.6vw,3.2rem);font-weight:800}
+h3{font-size:1.2rem;font-weight:700;letter-spacing:-.01em}
+p{margin:0}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:6px}
+.wrap{max-width:var(--max);margin-inline:auto;padding-inline:16px}
+@media (min-width:720px){.wrap{padding-inline:28px}}
+section{padding-block:clamp(64px,9vw,112px)}
+.eyebrow{font-family:var(--font-mono);font-size:.78rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.lede{color:var(--muted);font-size:1.1rem;max-width:62ch}
+.sec-head{display:grid;gap:14px;margin-bottom:40px;max-width:780px}
+.demo{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:.62rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--demo);background:var(--demo-bg);border:1px dashed currentColor;border-radius:999px;padding:1px 7px;vertical-align:middle;white-space:nowrap;line-height:1.6}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font:700 1rem/1 var(--font-body);padding:16px 22px;border-radius:999px;border:0;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s,background .2s}
+.btn-primary{background:linear-gradient(120deg,var(--teal),#00A3B5);color:#fff;box-shadow:0 10px 30px -10px rgba(0,163,181,.75)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 16px 36px -10px rgba(0,163,181,.9)}
+.btn-ghost{background:transparent;color:inherit;box-shadow:inset 0 0 0 2px currentColor}
+.btn-ghost:hover{transform:translateY(-2px)}
+
+/* Top strip + header */
+.strip{background:var(--purple);color:#fff;font-size:.85rem}
+.strip .wrap{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;justify-content:space-between;padding-block:8px}
+.strip b{color:var(--hero-teal)}
+.strip .short{display:none}
+@media (max-width:640px){.strip .long,.strip .promo{display:none}.strip .short{display:inline}}
+.strip .demo{color:#FFD488;background:rgba(255,200,112,.12)}
+header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-bottom:1px solid var(--line)}
+header.site .wrap{display:flex;align-items:center;gap:16px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--fg);font-family:var(--font-display);font-weight:800;font-size:1.25rem;letter-spacing:-.02em;margin-right:auto}
+.brand small{display:block;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.18em;color:var(--accent);font-weight:600;text-transform:uppercase}
+.brand svg{width:40px;height:40px;flex:none}
+nav.main{display:none;gap:4px}
+nav.main a{color:var(--fg);text-decoration:none;font-weight:600;font-size:.93rem;padding:8px 12px;border-radius:999px;transition:background .2s}
+nav.main a:hover{background:var(--accent-2-soft)}
+.icon-btn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);display:grid;place-items:center;cursor:pointer;flex:none}
+.icon-btn svg{width:20px;height:20px}
+.hdr-cta{display:none;padding:12px 18px;font-size:.92rem}
+.menu{position:relative}
+.menu summary{list-style:none}
+.menu summary::-webkit-details-marker{display:none}
+.menu .panel{position:absolute;right:0;top:52px;width:min(78vw,280px);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:10px;display:grid}
+.menu .panel a{padding:12px 14px;border-radius:10px;color:var(--fg);text-decoration:none;font-weight:600}
+.menu .panel a:hover{background:var(--accent-2-soft)}
+@media (min-width:1080px){nav.main{display:flex}.menu{display:none}.hdr-cta{display:inline-flex}}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;color:var(--on-hero);background:radial-gradient(120% 90% at 85% 10%,#2B1A86 0%,transparent 55%),linear-gradient(160deg,var(--hero-1) 0%,var(--hero-2) 75%);padding-block:clamp(22px,5vw,72px) clamp(48px,7vw,96px)}
+.hero .blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.55;pointer-events:none}
+.hero .b1{width:420px;height:420px;background:var(--teal);left:-120px;top:-140px}
+.hero .b2{width:360px;height:360px;background:#5B3FD9;right:-80px;bottom:-160px}
+.hero .grid-lines{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(80% 70% at 50% 30%,#000 30%,transparent 80%);-webkit-mask-image:radial-gradient(80% 70% at 50% 30%,#000 30%,transparent 80%);pointer-events:none}
+.hero-grid{position:relative;display:grid;gap:18px;grid-template-areas:"eyebrow" "title" "scene" "copy" "ctas" "chips"}
+.hero .eyebrow{grid-area:eyebrow;color:var(--hero-teal);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hero .eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--hero-teal);box-shadow:0 0 0 4px rgba(63,214,227,.2)}
+.hero h1{grid-area:title;font-size:clamp(2.4rem,8.4vw,5.4rem);font-weight:800;letter-spacing:-.035em;line-height:.98}
+.shine{background:linear-gradient(100deg,var(--hero-teal) 0%,#fff 35%,var(--hero-violet) 65%,var(--hero-teal) 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .copy{grid-area:copy;color:var(--on-hero-muted);font-size:1.12rem;max-width:52ch}
+.hero .ctas{grid-area:ctas;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.hero .btn-ghost{color:#fff}
+.hero .chips{grid-area:chips;display:flex;flex-wrap:wrap;gap:10px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:.88rem;font-weight:600;backdrop-filter:blur(6px)}
+.chip .demo{color:#FFD488;background:rgba(255,200,112,.12)}
+.chip svg{width:16px;height:16px;color:var(--hero-teal)}
+.scene-wrap{grid-area:scene;position:relative;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.12);background:#120C3C;aspect-ratio:4/3;max-width:100%}
+.scene-wrap>svg{display:block;width:100%;height:100%}
+.scene-wrap .replay{position:absolute;right:12px;bottom:12px}
+.replay{display:inline-flex;align-items:center;gap:6px;font:700 .82rem/1 var(--font-body);color:#fff;background:rgba(10,6,34,.7);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:9px 14px;cursor:pointer;backdrop-filter:blur(6px)}
+.replay:hover{background:rgba(0,120,140,.8)}
+.replay svg{width:14px;height:14px}
+.scene-cap{position:absolute;left:12px;bottom:12px;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.85);background:rgba(10,6,34,.55);padding:6px 10px;border-radius:999px}
+#scene .tf{transform-box:fill-box;transform-origin:center}
+@media (min-width:900px){
+  .hero-grid{grid-template-columns:1.05fr 1fr;column-gap:56px;row-gap:22px;align-items:center;grid-template-areas:"eyebrow scene" "title scene" "copy scene" "ctas scene" "chips scene"}
+  .scene-wrap{align-self:center}
+}
+@media (max-width:899px){.hero .copy{font-size:1.02rem}}
+
+/* Marquee */
+.marquee{background:var(--band);color:#fff;overflow:hidden;padding-block:14px;border-block:1px solid rgba(255,255,255,.1)}
+.marquee .track{display:flex;width:max-content;gap:0}
+.marquee .set{display:flex;gap:34px;padding-right:34px;align-items:center;font-family:var(--font-display);font-weight:700;font-size:1.15rem;white-space:nowrap}
+.marquee .set span::after{content:"";display:inline-block;width:8px;height:8px;margin-left:34px;border-radius:2px;background:var(--hero-teal);transform:rotate(45deg) translateY(-3px)}
+.marquee.static{overflow-x:auto}
+
+/* Stats */
+.stats{padding-block:48px;background:var(--bg-2)}
+.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (min-width:820px){.stat-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;display:grid;gap:6px;align-content:start}
+.stat .num{font-family:var(--font-display);font-weight:800;font-size:clamp(2.2rem,5vw,3.2rem);line-height:1;letter-spacing:-.03em;background:linear-gradient(120deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.stat .lbl{color:var(--muted);font-weight:600;font-size:.92rem}
+
+/* Services tabs */
+.tabs{display:inline-flex;flex-wrap:wrap;gap:6px;padding:6px;border-radius:999px;background:var(--surface);border:1px solid var(--line);margin-bottom:28px;max-width:100%}
+.tab{font:700 .95rem/1 var(--font-body);padding:13px 20px;border-radius:999px;border:0;background:transparent;color:var(--fg);cursor:pointer;transition:background .25s,color .25s}
+.tab[aria-selected="true"]{background:linear-gradient(120deg,var(--teal),#00A3B5);color:#fff;box-shadow:0 8px 22px -10px rgba(0,163,181,.9)}
+.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:grid;grid-template-rows:auto 1fr;transition:transform .3s,box-shadow .3s,border-color .3s}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow),0 0 0 1px var(--accent);border-color:transparent}
+.card .sw{height:110px;position:relative}
+.card .sw .tag{position:absolute;left:12px;top:12px;font-family:var(--font-mono);font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:rgba(10,6,34,.72);color:#fff;padding:4px 9px;border-radius:999px}
+.card .body{padding:18px 20px 20px;display:grid;gap:10px;align-content:start}
+.card p{color:var(--muted);font-size:.95rem}
+.spec{display:flex;flex-wrap:wrap;gap:6px}
+.spec span{font-family:var(--font-mono);font-size:.72rem;font-weight:500;padding:4px 9px;border-radius:8px;background:var(--teal-soft);color:var(--fg)}
+.card.cta-card{background:linear-gradient(150deg,var(--purple),#3A22A8);color:#fff;border:0}
+.card.cta-card .body{align-content:center;padding:28px}
+.card.cta-card p{color:#D9D4F5}
+.card .ico{height:110px;display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,var(--teal-soft),var(--accent-2-soft))}
+.card .ico svg{width:48px;height:48px;color:var(--accent)}
+.note{color:var(--muted);font-size:.86rem;margin-top:18px}
+/* material swatches */
+.sw-arch{background:repeating-linear-gradient(90deg,transparent 0 30px,rgba(0,0,0,.45) 30px 32px),repeating-linear-gradient(180deg,#3a3f48 0 14px,#2b2f36 14px 16px,#4a505a 16px 30px,#22252b 30px 32px)}
+.sw-3tab{background:repeating-linear-gradient(90deg,transparent 0 34px,rgba(0,0,0,.5) 34px 36px),repeating-linear-gradient(180deg,#5b5f66 0 16px,#3b3e44 16px 18px)}
+.sw-seam{background:repeating-linear-gradient(90deg,#2f4a5a 0 34px,#9fc0cf 34px 36px,#1c3240 36px 40px)}
+.sw-exposed{background:radial-gradient(circle,#c9d3da 1.6px,transparent 2px) 0 0/40px 28px,repeating-linear-gradient(90deg,#76848f 0 8px,#b0bcc5 8px 13px,#5c6873 13px 20px)}
+.sw-synslate{background:repeating-linear-gradient(90deg,transparent 0 26px,rgba(0,0,0,.4) 26px 28px),repeating-linear-gradient(180deg,#46506a 0 20px,#2c3346 20px 22px)}
+.sw-slate{background:repeating-linear-gradient(90deg,transparent 0 22px,rgba(0,0,0,.45) 22px 24px),repeating-linear-gradient(180deg,#30384a 0 18px,#3d4a5c 18px 19px,#262c3a 19px 22px),linear-gradient(90deg,#3a4458,#2a3142)}
+.sw-shake{background:repeating-linear-gradient(90deg,transparent 0 14px,rgba(40,20,5,.5) 14px 15px,transparent 15px 31px,rgba(40,20,5,.5) 31px 32px),repeating-linear-gradient(180deg,#9b6a3e 0 22px,#6d4527 22px 24px),linear-gradient(90deg,#a87444,#7f5432)}
+.sw-tile{background:repeating-linear-gradient(180deg,transparent 0 28px,rgba(60,15,0,.45) 28px 30px),repeating-linear-gradient(90deg,#9c3f1f 0 6px,#d9774a 6px 16px,#b8552c 16px 22px,#7a2f16 22px 26px)}
+.sw-tpo{background:repeating-linear-gradient(90deg,transparent 0 70px,#c8d6dc 70px 72px),linear-gradient(160deg,#ffffff,#e6edf0)}
+.sw-epdm{background:repeating-linear-gradient(90deg,transparent 0 90px,#3b3b40 90px 92px),radial-gradient(circle at 30% 30%,#2a2a2f,#121214)}
+.sw-pvc{background:repeating-linear-gradient(90deg,transparent 0 60px,#a4b2bd 60px 62px),linear-gradient(160deg,#dfe6ec,#bfcbd4)}
+.sw-modbit{background:radial-gradient(circle,#6b6f77 1px,transparent 1.5px) 0 0/6px 6px,repeating-linear-gradient(180deg,#3a3d44 0 36px,#24262b 36px 39px)}
+.sw-bur{background:radial-gradient(circle,#d8c3a0 2px,transparent 2.6px) 0 0/9px 9px,radial-gradient(circle,#8f7b5e 2px,transparent 2.6px) 4px 5px/9px 9px,#6b5c48}
+.sw-cmetal{background:repeating-linear-gradient(90deg,#9aa6ae 0 4px,#cfd8de 4px 10px,#9aa6ae 10px 14px,#b7c1c8 14px 36px)}
+.sw-coat{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.75) 45%,transparent 60%),linear-gradient(160deg,#f4f8fa,#cfe7ec)}
+
+/* Anatomy */
+.anatomy{background:var(--bg-2)}
+.anat-grid{display:grid;gap:28px;align-items:center}
+@media (min-width:900px){.anat-grid{grid-template-columns:1fr 1fr;gap:48px}}
+.anat-stage{position:relative;background:radial-gradient(circle at 50% 40%,var(--teal-soft),var(--surface) 70%);border:1px solid var(--line);border-radius:24px;padding:12px}
+.anat-stage>svg{display:block;width:100%;height:auto}
+.anat-stage .replay{position:absolute;right:12px;bottom:12px}
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--surface);border:1px solid var(--line)}
+.seg button{font:700 .88rem/1 var(--font-body);padding:10px 16px;border-radius:999px;border:0;background:transparent;color:var(--fg);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-2);color:var(--accent-2-ink)}
+.layers{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:8px;counter-reset:l}
+.layers li{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);transition:border-color .3s,box-shadow .3s}
+.layers li.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+.layers .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:600 .78rem var(--font-mono);color:#fff}
+.layers b{display:block}
+.layers span.d{color:var(--muted);font-size:.9rem}
+
+/* Estimator */
+.est{display:grid;gap:22px}
+@media (min-width:960px){.est{grid-template-columns:1.1fr .9fr;gap:28px}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:24px;padding:clamp(20px,3vw,32px)}
+.est form{display:grid;gap:20px}
+.field{display:grid;gap:8px;min-width:0}
+.field>label,.field legend{font-weight:700;font-size:.92rem;padding:0}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pills label{position:relative}
+.pills input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.pills span{display:inline-block;padding:10px 16px;border-radius:999px;border:1px solid var(--line);font-weight:600;font-size:.9rem;background:var(--bg);transition:all .2s}
+.pills input:checked+span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pills input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+select,input[type=text],input[type=email],input[type=tel],textarea{width:100%;font:500 1rem var(--font-body);padding:13px 14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+input[type=range]{width:100%;accent-color:var(--teal)}
+.range-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.range-row output{font:600 1rem var(--font-mono);color:var(--accent)}
+.check{display:flex;gap:10px;align-items:center;font-weight:600;font-size:.92rem}
+.check input{width:20px;height:20px;accent-color:var(--teal)}
+.result{position:relative;overflow:hidden;color:#fff;background:linear-gradient(155deg,var(--purple),#0B0726 70%);border:0;display:grid;gap:16px;align-content:start}
+.result::before{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:var(--teal);filter:blur(80px);opacity:.45;right:-120px;top:-120px;pointer-events:none}
+.result>*{position:relative}
+.result .eyebrow{color:var(--hero-teal)}
+.price{font-family:var(--font-display);font-weight:800;font-size:clamp(2.2rem,6vw,3.6rem);line-height:1;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.price small{display:block;font-size:.95rem;font-family:var(--font-body);font-weight:600;color:#CBC6EA;letter-spacing:0;margin-top:8px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:.92rem;color:#D9D4F5;border-top:1px solid rgba(255,255,255,.14);padding-top:14px}
+.kv b{color:#fff;font-family:var(--font-mono);font-weight:600;text-align:right}
+.result .demo{color:#FFD488;background:rgba(255,200,112,.12)}
+.result .fine{font-size:.82rem;color:#B9B3DE}
+
+/* Storm & insurance */
+.storm{background:linear-gradient(180deg,var(--bg) 0%,var(--accent-2-soft) 100%)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;display:grid;gap:8px;position:relative;overflow:hidden}
+.steps li::after{content:attr(data-n);position:absolute;right:14px;top:-4px;font:800 4.4rem/1 var(--font-display);color:var(--accent);opacity:.12}
+.steps p{color:var(--muted);font-size:.95rem}
+.table-wrap{overflow-x:auto;margin-top:36px;border-radius:var(--radius);border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:.94rem}
+th,td{text-align:left;padding:14px 18px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--bg-2)}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-size:.78rem;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pill.yes{background:var(--teal-soft);color:var(--accent)}
+.pill.maybe{background:var(--accent-2-soft);color:var(--accent-2)}
+.pill.no{background:var(--bg-2);color:var(--muted)}
+
+/* Trust */
+.badges{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));margin-bottom:28px}
+.badge{display:flex;gap:14px;align-items:center;padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.badge .seal{width:48px;height:48px;flex:none;border-radius:50%;display:grid;place-items:center;background:conic-gradient(from 210deg,var(--teal),var(--accent-2),var(--gray),var(--teal));color:#fff;font:800 .8rem var(--font-display)}
+.badge .seal i{width:40px;height:40px;border-radius:50%;background:var(--purple);display:grid;place-items:center;font-style:normal}
+.badge b{display:block;font-size:.95rem;line-height:1.3}
+.badge span{font-size:.82rem;color:var(--muted)}
+.warranties{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.warranty{border-radius:22px;padding:26px;background:var(--surface);border:1px solid var(--line);display:grid;gap:10px;align-content:start;position:relative;overflow:hidden}
+.warranty .yrs{font:800 3.6rem/1 var(--font-display);letter-spacing:-.04em;color:var(--accent)}
+.warranty .yrs sub{font-size:1rem;letter-spacing:0;vertical-align:baseline;margin-left:4px;color:var(--muted)}
+.warranty p{color:var(--muted);font-size:.95rem}
+.warranty.feat{background:linear-gradient(150deg,var(--teal),#005766);color:#fff;border:0}
+.warranty.feat .yrs,.warranty.feat .yrs sub,.warranty.feat p{color:#fff}
+.warranty.feat .demo{color:#FFE2B0;background:rgba(0,0,0,.25)}
+
+/* Military */
+.military{position:relative;overflow:hidden;color:#fff;background:linear-gradient(120deg,#0A0622,var(--purple) 55%,#004C59);padding-block:clamp(56px,8vw,96px)}
+.military .stripes{position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 18px,transparent 18px 44px);pointer-events:none}
+.mil-grid{position:relative;display:grid;gap:28px;align-items:center}
+@media (min-width:880px){.mil-grid{grid-template-columns:auto 1fr auto}}
+.mil-big{font:800 clamp(5rem,16vw,9rem)/.85 var(--font-display);letter-spacing:-.05em;background:linear-gradient(180deg,#fff,var(--hero-teal));-webkit-background-clip:text;background-clip:text;color:transparent}
+.mil-big sup{font-size:.4em;vertical-align:top}
+.military h2{color:#fff}
+.military p{color:#D3CEF0;max-width:56ch;margin-top:12px}
+.military .demo{color:#FFD488;background:rgba(255,200,112,.12)}
+.military ul{margin:14px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px}
+.military li{padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.1);font-weight:600;font-size:.88rem}
+
+/* Areas */
+.area-grid{display:grid;gap:28px;align-items:start}
+@media (min-width:960px){.area-grid{grid-template-columns:1.05fr .95fr;gap:44px}}
+.radar{position:relative;border-radius:50%;max-width:560px;width:100%;margin-inline:auto;aspect-ratio:1;background:radial-gradient(circle,#1B1260 0%,#0A0622 72%);box-shadow:0 30px 80px -30px rgba(29,17,96,.8),inset 0 0 0 1px rgba(63,214,227,.25);overflow:hidden}
+.radar>svg{display:block;width:100%;height:100%}
+.radar .sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(63,214,227,.0) 0deg,rgba(63,214,227,.0) 300deg,rgba(63,214,227,.35) 360deg);pointer-events:none}
+#map text{font-family:var(--font-body);font-weight:700;fill:#E9E6FF;paint-order:stroke;stroke:#0A0622;stroke-width:3px}
+#map .ring{fill:none;stroke:rgba(63,214,227,.35);stroke-dasharray:3 6}
+#map .ringlbl{font-family:var(--font-mono);font-size:11px;fill:var(--hero-teal);font-weight:600}
+#map .town{fill:var(--hero-teal);cursor:pointer;transition:r .2s}
+#map .town.hot{fill:#fff}
+#map g.t.sel .town{fill:#fff}
+#map g.t .halo{fill:none;stroke:#fff;stroke-width:2;opacity:0}
+#map g.t.sel .halo{opacity:1}
+#map g.t .lbl{opacity:0;transition:opacity .2s}
+#map g.t.show .lbl,#map g.t.sel .lbl{opacity:1}
+.counties{display:grid;gap:14px}
+.county h3{font-size:.8rem;font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+.towns{display:flex;flex-wrap:wrap;gap:6px}
+.towns button{font:600 .88rem var(--font-body);padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;transition:all .2s}
+.towns button:hover,.towns button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.towns button small{font-family:var(--font-mono);font-size:.7rem;opacity:.75;margin-left:4px}
+.map-read{margin-top:14px;text-align:center;font-weight:700;min-height:1.6em;color:var(--fg)}
+.map-read span{color:var(--accent)}
+
+/* Reviews */
+.reviews{background:var(--bg-2)}
+.rev-track{display:grid;grid-auto-flow:column;grid-auto-columns:min(86%,370px);gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:14px;scrollbar-width:thin}
+.rev{scroll-snap-align:start;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:24px;display:grid;gap:14px;align-content:start}
+.stars{color:#F5B301;letter-spacing:2px;font-size:1.05rem}
+.rev blockquote{margin:0;font-size:1.02rem}
+.rev footer{display:flex;align-items:center;gap:12px;font-size:.9rem}
+.rev .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font:800 .95rem var(--font-display);color:#fff;background:linear-gradient(135deg,var(--teal),var(--purple));flex:none}
+.rev footer .where{color:var(--muted);display:block;font-size:.82rem}
+.rev-nav{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+
+/* FAQ */
+.faq-grid{display:grid;gap:28px}
+@media (min-width:900px){.faq-grid{grid-template-columns:.8fr 1.2fr;gap:56px}}
+details.q{border-bottom:1px solid var(--line);padding-block:4px}
+details.q summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center;padding:18px 0;font-weight:700;font-size:1.06rem}
+details.q summary::-webkit-details-marker{display:none}
+details.q summary::after{content:"+";font:500 1.6rem/1 var(--font-display);color:var(--accent);transition:transform .25s;flex:none}
+details.q[open] summary::after{transform:rotate(45deg)}
+details.q p{color:var(--muted);padding:0 0 18px;max-width:65ch}
+
+/* Contact */
+.contact{background:radial-gradient(90% 80% at 0% 0%,var(--teal-soft),transparent 60%),var(--bg)}
+.contact-grid{display:grid;gap:22px}
+@media (min-width:960px){.contact-grid{grid-template-columns:.9fr 1.1fr;gap:32px}}
+.info{display:grid;gap:16px;align-content:start}
+.info-row{display:flex;gap:14px;align-items:flex-start}
+.info-row .ic{width:44px;height:44px;flex:none;border-radius:12px;display:grid;place-items:center;background:var(--accent-2-soft);color:var(--accent-2)}
+.info-row .ic svg{width:22px;height:22px}
+.info-row b{display:block;font-size:.8rem;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.info-row .v{font-weight:700;font-size:1.06rem;user-select:all;word-break:break-word}
+.copy-btn{font:600 .78rem var(--font-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:4px 10px;cursor:pointer;margin-left:6px}
+.form-grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:620px){.form-grid{grid-template-columns:1fr 1fr}.form-grid .full{grid-column:1/-1}}
+textarea{min-height:110px;resize:vertical}
+.form-msg{margin-top:12px;font-weight:700;color:var(--accent)}
+
+footer.site{background:#0A0622;color:#CBC6EA;padding-block:48px 32px;font-size:.92rem}
+footer.site .wrap{display:grid;gap:28px}
+@media (min-width:820px){footer.site .wrap{grid-template-columns:1.4fr 1fr 1fr}}
+footer.site a{color:#fff;text-decoration:none}
+footer.site a:hover{color:var(--hero-teal)}
+footer.site h4{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--hero-teal);margin-bottom:12px}
+footer.site ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+footer.site .legal{grid-column:1/-1;border-top:1px solid rgba(255,255,255,.12);padding-top:20px;font-size:.82rem;color:#9C97C2}
+footer.site .demo{color:#FFD488;background:rgba(255,200,112,.12)}
+.brand.light{color:#fff}
+</style>
+</head>
+<body>
+
+<div class="strip">
+  <div class="wrap">
+    <span><span class="demo">Demo site</span> <span class="long">Phone, email, reviews, certifications and numbers marked DEMO are placeholders.</span><span class="short">Items marked DEMO are placeholders.</span></span>
+    <span class="promo">Free inspections · <b>Military families save 12%</b> <span class="demo">demo</span></span>
+  </div>
+</div>
+
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Faircloth Roofing home">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00A3B5"/><stop offset="1" stop-color="#1D1160"/></linearGradient></defs><rect width="48" height="48" rx="14" fill="url(#lg)"/><path d="M8 27 24 13l16 14" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 30 24 21.5 34 30" fill="none" stroke="#A1A1A4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 36h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+      <span>Faircloth Roofing<small>Fayetteville · NC</small></span>
+    </a>
+    <nav class="main" aria-label="Main">
+      <a href="#services">Services</a><a href="#estimate">Estimate</a><a href="#storm">Storm &amp; insurance</a><a href="#areas">Areas</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a>
+    </nav>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="Color theme: system">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>
+    </button>
+    <a class="btn btn-primary hdr-cta" href="#contact">Free inspection</a>
+    <details class="menu">
+      <summary class="icon-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></summary>
+      <div class="panel">
+        <a href="#services">Services</a><a href="#estimate">Instant estimate</a><a href="#storm">Storm &amp; insurance</a><a href="#trust">Warranties</a><a href="#areas">Service area</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a><a href="#contact">Free inspection</a>
+      </div>
+    </details>
+  </div>
+</header>
+
+<main id="top">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="grid-lines"></div>
+  <div class="wrap hero-grid">
+    <p class="eyebrow"><span class="dot"></span><span>Fayetteville, NC · Residential + Commercial</span></p>
+    <h1 id="hero-title">Roofs built for <span class="shine">Sandhills storms.</span></h1>
+    <div class="scene-wrap">
+      <svg id="scene" viewBox="0 0 480 360" role="img" aria-label="Animation: a storm rolls in over a house, a new roof goes on row by row, the rain runs off and the sun comes out.">
+        <defs>
+          <linearGradient id="skySun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E8FA3"/><stop offset=".65" stop-color="#7FD3DD"/><stop offset="1" stop-color="#D9F3F6"/></linearGradient>
+          <linearGradient id="skyStorm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0622"/><stop offset="1" stop-color="#2A1C78"/></linearGradient>
+          <radialGradient id="sunGlow"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".45" stop-color="#FFF6D6"/><stop offset="1" stop-color="#FFF6D6" stop-opacity="0"/></radialGradient>
+          <clipPath id="roofClip"><path d="M58 232 L140 120 L340 120 L422 232 Z"/></clipPath>
+          <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F2F6"/><stop offset="1" stop-color="#CFD2DC"/></linearGradient>
+        </defs>
+        <rect width="480" height="360" fill="url(#skySun)"/>
+        <g id="sun" class="tf"><circle cx="404" cy="70" r="62" fill="url(#sunGlow)"/><circle cx="404" cy="70" r="26" fill="#FFFDF2"/></g>
+        <g id="fairClouds" fill="#fff" opacity=".9"><ellipse cx="96" cy="64" rx="44" ry="14"/><ellipse cx="124" cy="56" rx="28" ry="14"/><ellipse cx="270" cy="44" rx="34" ry="10"/></g>
+        <rect id="stormSky" width="480" height="360" fill="url(#skyStorm)" opacity="0"/>
+        <g id="stormClouds" opacity="0" fill="#3C2E86">
+          <ellipse cx="80" cy="50" rx="110" ry="36"/><ellipse cx="220" cy="34" rx="120" ry="40"/><ellipse cx="370" cy="48" rx="130" ry="40"/>
+          <ellipse cx="150" cy="70" rx="90" ry="24" fill="#2A1F66"/><ellipse cx="320" cy="74" rx="110" ry="26" fill="#2A1F66"/>
+        </g>
+        <polygon id="bolt" points="300,70 276,128 296,128 268,196 318,116 296,116 318,70" fill="#E8FDFF" opacity="0"/>
+        <!-- ground -->
+        <rect x="0" y="318" width="480" height="42" fill="#5F8F62"/>
+        <rect x="0" y="318" width="480" height="5" fill="#76A878"/>
+        <!-- house -->
+        <rect x="300" y="138" width="26" height="46" fill="#7A3B2A"/><rect x="296" y="132" width="34" height="8" fill="#5A2A1D"/>
+        <rect x="84" y="226" width="312" height="94" fill="url(#wall)"/>
+        <rect x="112" y="248" width="56" height="44" rx="3" fill="#FFE7A8"/><path d="M140 248v44M112 270h56" stroke="#CFD2DC" stroke-width="4"/>
+        <rect x="312" y="248" width="56" height="44" rx="3" fill="#FFE7A8"/><path d="M340 248v44M312 270h56" stroke="#CFD2DC" stroke-width="4"/>
+        <rect x="216" y="252" width="48" height="68" rx="4" fill="#1D1160"/><circle cx="254" cy="288" r="3" fill="#3FD6E3"/>
+        <!-- decking (visible before shingles land) -->
+        <path d="M58 232 L140 120 L340 120 L422 232 Z" fill="#C9A46B"/>
+        <g clip-path="url(#roofClip)"><path d="M58 232 L140 120 L340 120 L422 232 Z" fill="none" stroke="#A9864F" stroke-width="1"/><g id="deckLines" stroke="#B08B55" stroke-width="1.5"></g></g>
+        <g id="shingles" clip-path="url(#roofClip)"></g>
+        <rect id="ridge" class="tf" x="136" y="114" width="208" height="10" rx="3" fill="#00788C"/>
+        <path d="M50 236 L430 236" stroke="#9AA0AE" stroke-width="5" stroke-linecap="round"/>
+        <g id="rain" opacity="0" stroke="#BFEFFF" stroke-width="2" stroke-linecap="round"></g>
+        <g id="splash" opacity="0" fill="#E2FAFF"></g>
+        <rect id="flash" width="480" height="360" fill="#fff" opacity="0"/>
+        <g id="badge" class="tf">
+          <rect x="16" y="16" width="148" height="38" rx="19" fill="#1D1160"/>
+          <circle cx="36" cy="35" r="11" fill="#00A3B5"/><path d="M31 35l4 4 7-8" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="54" y="40" fill="#fff" font-family="IBM Plex Mono, monospace" font-weight="600" font-size="13" letter-spacing="1">STORM-READY</text>
+        </g>
+      </svg>
+      <span class="scene-cap" aria-hidden="true">Storm → new roof → sunshine</span>
+      <button class="replay" id="sceneReplay" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Replay</button>
+    </div>
+    <p class="copy">Faircloth Roofing installs, repairs and restores residential and commercial roofs across Fayetteville and every town within 50 miles. Architectural shingles to standing-seam metal, TPO to built-up. When a storm hits, we inspect for free and handle the insurance paperwork with you.</p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="#estimate">Get my instant estimate
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a class="btn btn-ghost" href="#contact">(910) 555-0142 <span class="demo">demo</span></a>
+    </div>
+    <div class="chips">
+      <span class="chip"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 2 3 6.6 7 .7-5.3 4.8 1.6 7L12 17.5 5.7 21l1.6-7L2 9.3l7-.7z"/></svg>4.9 average · 600+ reviews <span class="demo">demo</span></span>
+      <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/></svg>Licensed &amp; insured <span class="demo">demo</span></span>
+      <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>25+ years <span class="demo">demo</span></span>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" id="marquee" aria-label="Roof systems we install">
+  <div class="track">
+    <div class="set"><span>Architectural shingle</span><span>3-tab shingle</span><span>Standing-seam metal</span><span>Exposed-fastener metal</span><span>Synthetic slate</span><span>Natural slate</span><span>Cedar shake</span><span>Clay &amp; concrete tile</span><span>TPO</span><span>EPDM</span><span>PVC</span><span>Modified bitumen</span><span>Built-up (BUR)</span><span>Roof coatings</span><span>Seamless gutters</span></div>
+  </div>
+</div>
+
+<section class="stats" aria-label="Company at a glance">
+  <div class="wrap stat-grid">
+    <div class="stat"><span class="num" data-count="25" data-suffix="+">25+</span><span class="lbl">Years roofing the Sandhills <span class="demo">demo</span></span></div>
+    <div class="stat"><span class="num" data-count="4800" data-suffix="+">4,800+</span><span class="lbl">Roofs installed <span class="demo">demo</span></span></div>
+    <div class="stat"><span class="num" data-count="50" data-suffix=" mi">50 mi</span><span class="lbl">Service radius from Fayetteville</span></div>
+    <div class="stat"><span class="num" data-count="24" data-suffix="/7">24/7</span><span class="lbl">Emergency tarping after storms <span class="demo">demo</span></span></div>
+  </div>
+</section>
+
+<section id="services" aria-labelledby="svc-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Our solutions</p>
+      <h2 id="svc-title">Every roof type, homes and businesses.</h2>
+      <p class="lede">Pick a category to see the systems we install. Lifespans and wind ratings are typical manufacturer ranges; your inspection tells us what fits your building and budget.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Service categories">
+      <button class="tab" role="tab" id="t-res" aria-controls="p-res" aria-selected="true">Residential</button>
+      <button class="tab" role="tab" id="t-com" aria-controls="p-com" aria-selected="false" tabindex="-1">Commercial</button>
+      <button class="tab" role="tab" id="t-rep" aria-controls="p-rep" aria-selected="false" tabindex="-1">Repairs &amp; storm</button>
+    </div>
+
+    <div class="cards" role="tabpanel" id="p-res" aria-labelledby="t-res">
+      <article class="card"><div class="sw sw-arch"><span class="tag">Most popular</span></div><div class="body"><h3>Architectural asphalt shingle</h3><p>Thick, laminated dimensional shingles that cast real shadow lines. The best value for most Fayetteville homes.</p><div class="spec"><span>25–30 yr life</span><span>110–130 mph wind</span></div></div></article>
+      <article class="card"><div class="sw sw-3tab"><span class="tag">Budget</span></div><div class="body"><h3>3-tab asphalt shingle</h3><p>Flat, single-layer shingles with a clean, uniform look. Common on rentals and for matching older roofs.</p><div class="spec"><span>15–20 yr life</span><span>60–70 mph wind</span></div></div></article>
+      <article class="card"><div class="sw sw-seam"><span class="tag">Premium metal</span></div><div class="body"><h3>Standing-seam metal</h3><p>Raised interlocking seams with hidden fasteners. Sheds heavy rain fast and shrugs off hurricane-force gusts.</p><div class="spec"><span>40–70 yr life</span><span>140+ mph wind</span></div></div></article>
+      <article class="card"><div class="sw sw-exposed"><span class="tag">Value metal</span></div><div class="body"><h3>Exposed-fastener metal</h3><p>Screw-down R-panel and 5V crimp. Great for farmhouses, barns, porches and shops on a budget.</p><div class="spec"><span>25–40 yr life</span><span>Screw checkups</span></div></div></article>
+      <article class="card"><div class="sw sw-synslate"><span class="tag">Composite</span></div><div class="body"><h3>Synthetic slate</h3><p>Polymer tiles with the look of slate at a fraction of the weight. Class 4 impact options for hail country.</p><div class="spec"><span>40–50 yr life</span><span>Class 4 options</span></div></div></article>
+      <article class="card"><div class="sw sw-slate"><span class="tag">Heirloom</span></div><div class="body"><h3>Natural slate</h3><p>Quarried stone hung with copper nails. We check your framing first, then build a roof your grandkids inherit.</p><div class="spec"><span>75–100+ yr life</span><span>Structural check</span></div></div></article>
+      <article class="card"><div class="sw sw-shake"><span class="tag">Natural wood</span></div><div class="body"><h3>Cedar shake</h3><p>Split western red cedar that weathers to silver-gray. Treated and ventilated properly for our humid summers.</p><div class="spec"><span>25–35 yr life</span><span>Breathable install</span></div></div></article>
+      <article class="card"><div class="sw sw-tile"><span class="tag">Clay &amp; concrete</span></div><div class="body"><h3>Tile</h3><p>Barrel and flat profiles in clay or concrete. Heavy, fireproof and nearly maintenance-free.</p><div class="spec"><span>50+ yr life</span><span>Fire rated</span></div></div></article>
+    </div>
+
+    <div class="cards" role="tabpanel" id="p-com" aria-labelledby="t-com" hidden>
+      <article class="card"><div class="sw sw-tpo"><span class="tag">Single-ply</span></div><div class="body"><h3>TPO</h3><p>White, heat-welded membrane that reflects summer sun. The go-to for warehouses, offices and retail.</p><div class="spec"><span>20–30 yr life</span><span>Energy Star options</span></div></div></article>
+      <article class="card"><div class="sw sw-epdm"><span class="tag">Rubber</span></div><div class="body"><h3>EPDM</h3><p>Synthetic rubber with decades of track record. Flexible through hot summers and cold snaps.</p><div class="spec"><span>25–30+ yr life</span><span>Easy to patch</span></div></div></article>
+      <article class="card"><div class="sw sw-pvc"><span class="tag">Single-ply</span></div><div class="body"><h3>PVC</h3><p>Chemical- and grease-resistant membrane. The right call for restaurants and buildings with rooftop exhaust.</p><div class="spec"><span>20–30 yr life</span><span>Grease resistant</span></div></div></article>
+      <article class="card"><div class="sw sw-modbit"><span class="tag">Multi-ply</span></div><div class="body"><h3>Modified bitumen</h3><p>Rubberized asphalt sheets, torch-down or self-adhered. Tough enough for roofs that get foot traffic.</p><div class="spec"><span>15–25 yr life</span><span>Walkable</span></div></div></article>
+      <article class="card"><div class="sw sw-bur"><span class="tag">Tar &amp; gravel</span></div><div class="body"><h3>Built-up roofing (BUR)</h3><p>Alternating layers of bitumen and felt topped with gravel. Redundant plies mean redundant protection.</p><div class="spec"><span>20–30 yr life</span><span>3–5 plies</span></div></div></article>
+      <article class="card"><div class="sw sw-cmetal"><span class="tag">Metal</span></div><div class="body"><h3>Commercial metal</h3><p>Standing seam and R-panel for warehouses, churches and shops, including retrofits over old metal roofs.</p><div class="spec"><span>40+ yr life</span><span>Retrofit ready</span></div></div></article>
+      <article class="card"><div class="sw sw-coat"><span class="tag">Restoration</span></div><div class="body"><h3>Roof coatings</h3><p>Silicone and acrylic coatings over a sound roof. Adds years of life without the cost of a tear-off.</p><div class="spec"><span>+10–15 yrs</span><span>No tear-off</span></div></div></article>
+      <article class="card cta-card"><div class="body"><h3>Not sure what's up there?</h3><p>We core-sample flat roofs, check for wet insulation and give you repair, restore and replace options side by side.</p><a class="btn btn-primary" href="#contact">Book a roof survey</a></div></article>
+    </div>
+
+    <div class="cards" role="tabpanel" id="p-rep" aria-labelledby="t-rep" hidden>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg></div><div class="body"><h3>Leak repair</h3><p>We trace the water to its source, whether that's flashing, pipe boots, valleys or nail pops, and fix the cause rather than the stain.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 16a4 4 0 0 0-1-7.9A6 6 0 0 0 4.3 10 4 4 0 0 0 6 18h1"/><path d="m13 12-3 5h4l-3 5"/></svg></div><div class="body"><h3>Storm &amp; hail damage</h3><p>Wind-lifted shingles, hail bruising, fallen limbs. We document every hit with photos for your claim.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></div><div class="body"><h3>Insurance claims</h3><p>We meet your adjuster on the roof, match line items to what we find and supplement anything they missed.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><div class="body"><h3>Inspections</h3><p>Drone photos, attic moisture checks and a written report. Useful for buying, selling or after any big storm.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18l-2 5H5z"/><path d="M17 11v7a2 2 0 0 0 2 2"/></svg></div><div class="body"><h3>Seamless gutters</h3><p>5" and 6" seamless aluminum formed on site, plus downspouts and leaf guards in colors to match your trim.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M5 20V10l7-6 7 6v10"/><path d="M3 12 12 4l9 8"/></svg></div><div class="body"><h3>Emergency tarping</h3><p>Tree on the roof or a hole after a hurricane? We tarp and secure it fast to stop more interior damage.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14l2.5 2.5L16 12"/></svg></div><div class="body"><h3>Maintenance plans</h3><p>Spring and fall checkups, gutter cleaning and sealant touch-ups. Commercial plans keep warranties valid.</p></div></article>
+      <article class="card"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M5 12h14M12 3v18"/></svg></div><div class="body"><h3>Skylights &amp; flashing</h3><p>Re-flash chimneys, walls and skylights, or swap a leaky old skylight for a new curb-mounted unit.</p></div></article>
+    </div>
+  </div>
+</section>
+
+<section class="anatomy" id="anatomy" aria-labelledby="anat-title">
+  <div class="wrap anat-grid">
+    <div class="anat-stage">
+      <svg id="anat" viewBox="0 0 400 390" role="img" aria-label="Exploded view of the roof layers listed beside it"></svg>
+      <button class="replay" id="anatReplay" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Replay</button>
+    </div>
+    <div>
+      <div class="sec-head" style="margin-bottom:20px">
+        <p class="eyebrow">Anatomy of a Faircloth roof</p>
+        <h2 id="anat-title">What goes under the part you see.</h2>
+        <p class="lede">A roof is a system, built from the deck up. Every layer below gets installed to the manufacturer's spec so the warranty holds.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Roof system">
+        <button type="button" data-sys="res" aria-pressed="true">Shingle home</button>
+        <button type="button" data-sys="com" aria-pressed="false">TPO flat roof</button>
+      </div>
+      <ol class="layers" id="layerList"></ol>
+    </div>
+  </div>
+</section>
+
+<section id="estimate" aria-labelledby="est-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Instant roof estimate</p>
+      <h2 id="est-title">A ballpark price in about 20 seconds.</h2>
+      <p class="lede">Move the sliders and pick a material. You'll get a working range now; a free inspection turns it into a firm quote.</p>
+    </div>
+    <div class="est">
+      <div class="panel">
+        <form id="estForm">
+          <fieldset class="field"><legend>Property type</legend>
+            <div class="pills">
+              <label><input type="radio" name="ptype" id="pt-res" value="res" checked><span>Home</span></label>
+              <label><input type="radio" name="ptype" id="pt-com" value="com"><span>Commercial building</span></label>
+            </div>
+          </fieldset>
+          <div class="field"><label for="mat">Roof material</label><select id="mat"></select></div>
+          <div class="field">
+            <div class="range-row"><label for="area" id="areaLbl">Home footprint (sq ft)</label><output id="areaOut" for="area">2,000</output></div>
+            <input type="range" id="area" min="800" max="6000" step="50" value="2000">
+          </div>
+          <fieldset class="field" id="pitchField"><legend>Roof steepness</legend>
+            <div class="pills">
+              <label><input type="radio" name="pitch" id="pi-low" value="1.06"><span>Low</span></label>
+              <label><input type="radio" name="pitch" id="pi-med" value="1.15" checked><span>Walkable</span></label>
+              <label><input type="radio" name="pitch" id="pi-steep" value="1.35"><span>Steep</span></label>
+            </div>
+          </fieldset>
+          <label class="check" for="tear"><input type="checkbox" id="tear" checked>Remove the existing roof (tear-off)</label>
+        </form>
+      </div>
+      <div class="panel result" aria-live="polite">
+        <p class="eyebrow">Estimated installed price <span class="demo">demo math</span></p>
+        <div class="price"><span id="pLow">$0</span> – <span id="pHigh">$0</span><small id="pMat">Architectural asphalt shingle</small></div>
+        <div class="kv">
+          <span>Roof area</span><b id="kSq">0 squares</b>
+          <span>Material, installed</span><b id="kRate">$0–$0 / sq</b>
+          <span>Tear-off &amp; disposal</span><b id="kTear">Included</b>
+          <span>Military discount</span><b>12% off <span class="demo">demo</span></b>
+        </div>
+        <a class="btn btn-primary" href="#contact">Lock in a free inspection</a>
+        <p class="fine">Demo pricing for illustration only. Real prices depend on decking condition, layers, ventilation, flashing and access. One square = 100 sq ft of roof surface.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="storm" id="storm" aria-labelledby="storm-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Storm restoration &amp; insurance claims</p>
+      <h2 id="storm-title">Hurricane season runs June through November. We'll be ready.</h2>
+      <p class="lede">Cumberland County sits in the path of Atlantic hurricanes and spring hail. Matthew and Florence flooded this region in 2016 and 2018. If a storm finds your roof, here's how a claim goes with us.</p>
+    </div>
+    <ol class="steps">
+      <li data-n="1"><h3>Free storm inspection</h3><p>We walk the roof, gutters, siding and attic and photograph every bit of wind or hail damage.</p></li>
+      <li data-n="2"><h3>Emergency protection</h3><p>If water is getting in, we tarp it the same day so your policy's "prevent further damage" clause is covered.</p></li>
+      <li data-n="3"><h3>You file, we document</h3><p>You open the claim with your insurer. We give you a photo report and a line-item scope to send along.</p></li>
+      <li data-n="4"><h3>Adjuster meeting</h3><p>We meet the adjuster on site and point out everything we found so nothing gets missed.</p></li>
+      <li data-n="5"><h3>Build day</h3><p>Most homes are finished in one to two days. Magnetic sweeps pick up nails from your yard and driveway.</p></li>
+      <li data-n="6"><h3>Close-out</h3><p>Final photos, warranty registration and any supplements so you get every dollar your policy owes.</p></li>
+    </ol>
+    <div class="table-wrap">
+      <table>
+        <caption class="note" style="caption-side:bottom;text-align:left;padding:12px 18px">General guidance only. Coverage depends on your policy and your insurer's findings.</caption>
+        <thead><tr><th scope="col">Damage</th><th scope="col">What it looks like</th><th scope="col">Usually covered?</th></tr></thead>
+        <tbody>
+          <tr><td><b>Hail</b></td><td>Dark bruises where granules are knocked off; dents on vents, gutters and metal flashing</td><td><span class="pill yes">Often</span></td></tr>
+          <tr><td><b>Wind</b></td><td>Creased, lifted or missing shingles; exposed nail heads; ridge cap blown off</td><td><span class="pill yes">Often</span></td></tr>
+          <tr><td><b>Fallen trees &amp; limbs</b></td><td>Punctured decking, cracked rafters, crushed gutters</td><td><span class="pill yes">Often</span></td></tr>
+          <tr><td><b>Hurricane</b></td><td>Widespread wind damage plus driven-rain leaks; a separate hurricane deductible may apply</td><td><span class="pill maybe">Check deductible</span></td></tr>
+          <tr><td><b>Age &amp; wear</b></td><td>Curling, cracking, granule loss across the whole roof, moss</td><td><span class="pill no">Rarely</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="trust" aria-labelledby="trust-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Credentials &amp; warranties</p>
+      <h2 id="trust-title">Certified by the brands whose warranties we register.</h2>
+      <p class="lede">Every certification below is a demo placeholder. Swap in the real list before launch.</p>
+    </div>
+    <div class="badges">
+      <div class="badge"><span class="seal"><i>GAF</i></span><div><b>GAF Master Elite</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>OC</i></span><div><b>Owens Corning Platinum Preferred</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>CT</i></span><div><b>CertainTeed SELECT ShingleMaster</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>CS</i></span><div><b>Carlisle SynTec Authorized Applicator</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>FS</i></span><div><b>Firestone / Elevate Licensed Applicator</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>A+</i></span><div><b>BBB A+ rating</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>NC</i></span><div><b>NC Licensed General Contractor #00000</b><span class="demo">demo</span></div></div>
+      <div class="badge"><span class="seal"><i>$2M</i></span><div><b>Fully insured, $2M liability + workers' comp</b><span class="demo">demo</span></div></div>
+    </div>
+    <div class="warranties">
+      <div class="warranty feat"><div class="yrs">25<sub>yr</sub></div><h3>Workmanship warranty <span class="demo">demo</span></h3><p>If a leak traces back to how we installed it, we fix it free. Transfers once if you sell your home.</p></div>
+      <div class="warranty"><div class="yrs">50<sub>yr</sub></div><h3>Manufacturer system warranty</h3><p>Top-tier shingle systems can carry up to 50-year, non-prorated material coverage when installed by a certified contractor. We register it for you.</p></div>
+      <div class="warranty"><div class="yrs">30<sub>yr</sub></div><h3>Commercial NDL warranty</h3><p>No-dollar-limit warranties for TPO, EPDM and PVC systems run 15 to 30 years, backed by the membrane manufacturer.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="military" id="military" aria-labelledby="mil-title">
+  <div class="stripes"></div>
+  <div class="wrap mil-grid">
+    <div class="mil-big" aria-hidden="true">12<sup>%</sup></div>
+    <div>
+      <p class="eyebrow" style="color:var(--hero-teal)">Military &amp; veterans discount <span class="demo">demo</span></p>
+      <h2 id="mil-title">Thank you for your service, Fort Bragg.</h2>
+      <p>Active-duty, veterans, Guard, Reserve and Gold Star families save 12% on any full roof replacement. PCS orders coming up? We can inspect, repair or replace before you list your home.</p>
+      <ul><li>Active duty</li><li>Veterans</li><li>Guard &amp; Reserve</li><li>Military spouses</li><li>Gold Star families</li></ul>
+    </div>
+    <a class="btn btn-primary" href="#contact">Claim the discount</a>
+  </div>
+</section>
+
+<section id="areas" aria-labelledby="area-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">Service area</p>
+      <h2 id="area-title">Fayetteville plus 50 miles in every direction.</h2>
+      <p class="lede">From Sanford to Lumberton, Southern Pines to Clinton. Tap a town to find it on the radar and see how far it is from our shop.</p>
+    </div>
+    <div class="area-grid">
+      <div>
+        <div class="radar"><div class="sweep" id="sweep"></div><svg id="map" viewBox="0 0 520 520" role="img" aria-label="Map of towns within 50 miles of Fayetteville"></svg></div>
+        <p class="map-read" id="mapRead" aria-live="polite">Tap a town to measure the distance.</p>
+      </div>
+      <div class="counties" id="counties"></div>
+    </div>
+  </div>
+</section>
+
+<section class="reviews" id="reviews" aria-labelledby="rev-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">What neighbors are saying</p>
+      <h2 id="rev-title">Five stars from Spring Lake to St. Pauls.</h2>
+      <p class="lede">These are demo placeholder reviews written for this mockup. Replace them with real Google reviews before launch.</p>
+    </div>
+    <div class="rev-track" id="revTrack" tabindex="0" aria-label="Demo reviews, scroll sideways">
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"Hail hit our neighborhood in April. They met the adjuster, got the whole roof approved, and had new architectural shingles on in a day."</blockquote><footer><span class="av">TR</span><div><b>Tasha R.</b> <span class="demo">demo review</span><span class="where">Hope Mills · Shingle replacement</span></div></footer></article>
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"We PCS'd in six weeks and needed the roof done before listing. The military discount was a nice bonus and the crew was spotless."</blockquote><footer><span class="av">MJ</span><div><b>Marcus J.</b> <span class="demo">demo review</span><span class="where">Spring Lake · Full replacement</span></div></footer></article>
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"Our warehouse TPO roof was leaking at every seam. They core-sampled it, showed us the wet spots and re-roofed over a long weekend."</blockquote><footer><span class="av">DL</span><div><b>Dana L.</b> <span class="demo">demo review</span><span class="where">Fayetteville · Commercial TPO</span></div></footer></article>
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"Standing-seam metal on our farmhouse. It looks incredible and it's dead quiet in the rain, which surprised me."</blockquote><footer><span class="av">GW</span><div><b>Glenn W.</b> <span class="demo">demo review</span><span class="where">Raeford · Standing-seam metal</span></div></footer></article>
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"A limb came through our roof during a tropical storm. They had a tarp on it the same evening and handled the claim from there."</blockquote><footer><span class="av">KP</span><div><b>Keisha P.</b> <span class="demo">demo review</span><span class="where">Lumberton · Storm repair</span></div></footer></article>
+      <article class="rev"><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>"They coated our church's old metal roof instead of tearing it off. Saved us thousands and the leaks are gone."</blockquote><footer><span class="av">RB</span><div><b>Rev. B.</b> <span class="demo">demo review</span><span class="where">Dunn · Roof coating</span></div></footer></article>
+    </div>
+    <div class="rev-nav">
+      <button class="icon-btn" type="button" id="revPrev" aria-label="Previous reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="icon-btn" type="button" id="revNext" aria-label="Next reviews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+  </div>
+</section>
+
+<section id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <div class="sec-head">
+      <p class="eyebrow">FAQ</p>
+      <h2 id="faq-title">Questions we hear every week.</h2>
+      <p class="lede">Don't see yours? Call or send a note and a real roofer will answer.</p>
+    </div>
+    <div>
+      <details class="q"><summary>How do I know if hail damaged my roof?</summary><p>From the ground, look for dents on gutters, downspouts and the metal vents on your roof. Those usually mean the shingles took hits too. Hail bruises are hard to spot without getting on the roof, so book a free inspection after any storm with hail bigger than a quarter.</p></details>
+      <details class="q"><summary>Do you work with my insurance company?</summary><p>Yes. We work with all major carriers. You file the claim, and we provide photos, a line-item scope and meet the adjuster on site. We never ask you to sign over your claim.</p></details>
+      <details class="q"><summary>How long does a roof replacement take?</summary><p>Most homes take one to two days. Larger, steeper or slate and tile roofs can take a week. Commercial projects are scheduled around your business hours.</p></details>
+      <details class="q"><summary>Should I choose shingles or metal?</summary><p>Architectural shingles cost less up front and suit most homes. Standing-seam metal costs roughly two to three times more but can last twice as long and handles hurricane winds better. The estimator above shows both side by side.</p></details>
+      <details class="q"><summary>Do you repair commercial flat roofs?</summary><p>Yes. We repair, coat and replace TPO, EPDM, PVC, modified bitumen and built-up roofs, and offer maintenance plans that keep your manufacturer warranty valid.</p></details>
+      <details class="q"><summary>Do you offer financing?</summary><p>Financing with low monthly payments is available on approved credit. <span class="demo">demo</span> Terms and a lender partner are placeholders for this mockup.</p></details>
+      <details class="q"><summary>Who qualifies for the military discount?</summary><p>Active-duty service members, veterans, Guard and Reserve, military spouses and Gold Star families. Bring a military ID or DD-214 to the inspection. <span class="demo">demo</span></p></details>
+    </div>
+  </div>
+</section>
+
+<section class="contact" id="contact" aria-labelledby="contact-title">
+  <div class="wrap contact-grid">
+    <div class="info">
+      <p class="eyebrow">Reach out now</p>
+      <h2 id="contact-title">Book your free inspection.</h2>
+      <p class="lede">Tell us what's going on and we'll call to set a time, usually within one business day.</p>
+      <div class="info-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg></span><div><b>Phone <span class="demo">demo</span></b><span class="v" id="phoneV">(910) 555-0142</span><button class="copy-btn" type="button" data-copy="phoneV">Copy</button></div></div>
+      <div class="info-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg></span><div><b>Email <span class="demo">demo</span></b><span class="v" id="emailV">hello@fairclothroofing.example</span><button class="copy-btn" type="button" data-copy="emailV">Copy</button></div></div>
+      <div class="info-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg></span><div><b>Find us</b><span class="v">Fayetteville, NC</span> <span class="demo">street address TBD</span></div></div>
+      <div class="info-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div><b>Hours <span class="demo">demo</span></b><span class="v">Mon–Fri 7am–6pm · Sat 8am–2pm</span><br><span style="color:var(--muted);font-size:.9rem">Storm emergencies answered 24/7</span></div></div>
+    </div>
+    <div class="panel">
+      <form id="contactForm" novalidate>
+        <div class="form-grid">
+          <div class="field"><label for="cName">Name</label><input type="text" id="cName" autocomplete="name" required></div>
+          <div class="field"><label for="cPhone">Phone</label><input type="tel" id="cPhone" autocomplete="tel" required></div>
+          <div class="field full"><label for="cEmail">Email</label><input type="email" id="cEmail" autocomplete="email"></div>
+          <div class="field"><label for="cTown">Town</label><select id="cTown"></select></div>
+          <div class="field"><label for="cNeed">I need</label><select id="cNeed"><option>Free inspection</option><option>Storm / hail damage</option><option>Leak repair</option><option>Full replacement</option><option>Commercial roof</option><option>Gutters</option></select></div>
+          <div class="field full"><label for="cMsg">What's going on?</label><textarea id="cMsg" placeholder="Example: water stain on the bedroom ceiling after last week's storm"></textarea></div>
+          <label class="check full" for="cMil"><input type="checkbox" id="cMil">I'm active duty, a veteran or a military family member</label>
+          <div class="full"><button class="btn btn-primary" type="submit" style="width:100%">Request my free inspection</button></div>
+        </div>
+        <p class="form-msg" id="formMsg" role="status"></p>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div>
+      <a class="brand light" href="#top"><svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="14" fill="#00788C"/><path d="M8 27 24 13l16 14" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 30 24 21.5 34 30" fill="none" stroke="#A1A1A4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Faircloth Roofing</span></a>
+      <p style="margin-top:14px;max-width:40ch">Residential and commercial roofing for Fayetteville, Fort Bragg and the Sandhills.</p>
+    </div>
+    <div><h4>Explore</h4><ul><li><a href="#services">Services</a></li><li><a href="#estimate">Instant estimate</a></li><li><a href="#storm">Storm &amp; insurance</a></li><li><a href="#areas">Service area</a></li><li><a href="#faq">FAQ</a></li></ul></div>
+    <div><h4>Contact <span class="demo">demo</span></h4><ul><li>(910) 555-0142</li><li>hello@fairclothroofing.example</li><li>Fayetteville, NC</li></ul></div>
+    <p class="legal">© <span id="yr">2026</span> Faircloth Roofing. Demo website: phone, email, reviews, ratings, certifications, discounts and company figures are placeholders.</p>
+  </div>
+</footer>
+
+<script>
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const NS = 'http://www.w3.org/2000/svg';
+const $ = s => document.querySelector(s);
+const svgEl = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+// Theme toggle: system -> light -> dark
+(function () {
+  const btn = $('#themeBtn'), root = document.documentElement, modes = ['system', 'light', 'dark'];
+  let mode = 'system';
+  try { mode = localStorage.getItem('fr-theme') || 'system'; } catch (e) {}
+  const apply = () => {
+    if (mode === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', mode);
+    btn.setAttribute('aria-label', 'Color theme: ' + mode + '. Click to change.');
+    btn.title = 'Theme: ' + mode;
+  };
+  if (mode !== 'system') apply(); else btn.setAttribute('aria-label', 'Color theme: system. Click to change.');
+  btn.addEventListener('click', () => {
+    mode = modes[(modes.indexOf(mode) + 1) % 3];
+    try { localStorage.setItem('fr-theme', mode); } catch (e) {}
+    apply();
+  });
+})();
+
+// Close the mobile menu after picking a link
+document.querySelectorAll('.menu .panel a').forEach(a => a.addEventListener('click', () => a.closest('details').open = false));
+
+// ---------- Hero storm scene ----------
+// Uses the Web Animations API so the Replay button plays it even when the
+// visitor's system asks for reduced motion. Autoplay is skipped in that case.
+// Every animation ends on the resting (sunny, finished) state.
+(function () {
+  const TOTAL = 6400;
+  const shingles = $('#shingles'), rain = $('#rain'), splash = $('#splash'), deck = $('#deckLines');
+  const tones = ['#2E3240', '#363B4A', '#2A2D39', '#3E4352', '#323645'];
+  const eave = 232, ridge = 122, rowH = 13, tab = 24;
+  for (let x = 40; x < 440; x += 40) svgEl('line', { x1: x, y1: 110, x2: x, y2: 240 }, deck);
+  const rows = [];
+  for (let i = 0; i * rowH < eave - ridge; i++) {
+    const g = svgEl('g', {}, shingles), y = eave - rowH * (i + 1), off = i % 2 ? tab / 2 : 0;
+    for (let x = 50 - off; x < 430; x += tab) {
+      svgEl('rect', { x, y, width: tab - 1.6, height: rowH + 3, rx: 1, fill: tones[(i * 7 + Math.round(x / tab) * 3) % tones.length] }, g);
+    }
+    svgEl('rect', { x: 40, y: y + rowH + 1, width: 400, height: 1.4, fill: '#1A1C25', opacity: .7 }, g);
+    rows.push(g);
+  }
+  const drops = [];
+  for (let i = 0; i < 46; i++) {
+    const x = Math.random() * 520 - 20;
+    drops.push(svgEl('line', { x1: x, y1: -30, x2: x - 5, y2: -12 }, rain));
+  }
+  const dots = [];
+  for (let i = 0; i < 18; i++) {
+    const t = Math.random(), y = 120 + (232 - 120) * t;
+    const xMin = 140 - 82 * t, xMax = 340 + 82 * t;
+    dots.push(svgEl('circle', { cx: xMin + Math.random() * (xMax - xMin), cy: y - 2, r: 2.2 }, splash));
+  }
+  const el = id => document.getElementById(id);
+  const sky = el('stormSky'), clouds = el('stormClouds'), bolt = el('bolt'), flash = el('flash'),
+        sun = el('sun'), fair = el('fairClouds'), badge = el('badge'), ridgeCap = el('ridge');
+  const all = [sky, clouds, bolt, flash, sun, fair, badge, ridgeCap, rain, splash, ...rows, ...drops, ...dots];
+  const at = ms => ms / TOTAL;
+
+  function play() {
+    all.forEach(n => n.getAnimations().forEach(a => a.cancel()));
+    const whole = { duration: TOTAL, easing: 'linear' };
+    sky.animate([{ opacity: 1 }, { opacity: 1, offset: at(4400) }, { opacity: 0, offset: at(5600) }, { opacity: 0 }], whole);
+    clouds.animate([{ opacity: 0, transform: 'translateY(-40px)' }, { opacity: 1, transform: 'translateY(0)', offset: at(700) },
+      { opacity: 1, transform: 'translateX(0)', offset: at(4300) }, { opacity: 0, transform: 'translateX(140px)', offset: at(5500) }, { opacity: 0 }], whole);
+    fair.animate([{ opacity: 0 }, { opacity: 0, offset: at(5000) }, { opacity: .9 }], whole);
+    rain.animate([{ opacity: 0 }, { opacity: 1, offset: at(500) }, { opacity: 1, offset: at(4300) }, { opacity: 0, offset: at(5000) }, { opacity: 0 }], whole);
+    drops.forEach(d => {
+      const dur = 520 + Math.random() * 260;
+      d.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-34px,400px)' }],
+        { duration: dur, delay: Math.random() * dur, iterations: Math.floor(4800 / dur) });
+    });
+    // Two lightning strikes in one keyframe list (separate full-length animations would override each other).
+    const strikes = (peak) => {
+      const k = [{ opacity: 0 }];
+      [[900, 1], [2600, .75]].forEach(([t0, s]) => k.push(
+        { opacity: 0, offset: at(t0) }, { opacity: peak * s, offset: at(t0 + 60) }, { opacity: peak * s * .15, offset: at(t0 + 160) },
+        { opacity: peak * s * .7, offset: at(t0 + 230) }, { opacity: 0, offset: at(t0 + 420) }));
+      k.push({ opacity: 0 }); return k;
+    };
+    flash.animate(strikes(.5), whole);
+    bolt.animate(strikes(1), whole);
+    rows.forEach((r, i) => r.animate(
+      [{ opacity: 0, transform: 'translateY(-22px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: 420, delay: 1100 + i * 260, easing: 'cubic-bezier(.2,.9,.25,1.2)', fill: 'backwards' }));
+    ridgeCap.animate([{ opacity: 0, transform: 'scaleX(0)' }, { opacity: 1, transform: 'scaleX(1)' }],
+      { duration: 500, delay: 1100 + rows.length * 260, easing: 'cubic-bezier(.2,.9,.25,1)', fill: 'backwards' });
+    splash.animate([{ opacity: 0 }, { opacity: 0, offset: at(3500) }, { opacity: 1, offset: at(3600) }, { opacity: 1, offset: at(4400) }, { opacity: 0, offset: at(4800) }, { opacity: 0 }], whole);
+    dots.forEach(d => d.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${(Math.random() - .5) * 26}px,-14px) scale(.3)`, opacity: 0 }],
+      { duration: 380, delay: 3500 + Math.random() * 400, iterations: 2 }));
+    sun.animate([{ opacity: 0, transform: 'translateY(60px) scale(.6)' }, { opacity: 0, transform: 'translateY(60px) scale(.6)', offset: at(4700) },
+      { opacity: 1, transform: 'translateY(0) scale(1)' }], { duration: TOTAL, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    badge.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1.12)', offset: .7 }, { opacity: 1, transform: 'scale(1)' }],
+      { duration: 600, delay: 5400, easing: 'ease-out', fill: 'backwards' });
+  }
+  $('#sceneReplay').addEventListener('click', play);
+  if (!reduce) play();
+})();
+
+// Shimmer on the hero headline (ambient, skipped for reduced motion)
+if (!reduce) document.querySelector('.shine').animate([{ backgroundPosition: '0% 0' }, { backgroundPosition: '220% 0' }], { duration: 7000, iterations: Infinity });
+if (!reduce) {
+  $('.hero .b1').animate([{ transform: 'translate(0,0)' }, { transform: 'translate(120px,80px)' }], { duration: 11000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+  $('.hero .b2').animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-140px,-60px)' }], { duration: 13000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+}
+
+// ---------- Marquee ----------
+(function () {
+  const m = $('#marquee'), track = m.querySelector('.track'), set = track.querySelector('.set');
+  if (reduce) { m.classList.add('static'); return; }
+  const clone = set.cloneNode(true); clone.setAttribute('aria-hidden', 'true'); track.appendChild(clone);
+  track.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 38000, iterations: Infinity });
+})();
+
+// ---------- Stat counters ----------
+(function () {
+  const nums = document.querySelectorAll('.stat .num');
+  if (reduce || !('IntersectionObserver' in window)) return;
+  const fmt = n => n.toLocaleString('en-US');
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return; io.unobserve(e.target);
+    const el = e.target, end = +el.dataset.count, suf = el.dataset.suffix || '', t0 = performance.now();
+    const step = now => { const p = Math.min((now - t0) / 1400, 1), v = Math.round(end * (1 - Math.pow(1 - p, 3))); el.textContent = fmt(v) + suf; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }), { threshold: .6 });
+  nums.forEach(n => io.observe(n));
+})();
+
+// ---------- Service tabs ----------
+(function () {
+  const tabs = [...document.querySelectorAll('.tab')];
+  const select = t => {
+    tabs.forEach(x => { const on = x === t; x.setAttribute('aria-selected', on); x.tabIndex = on ? 0 : -1; document.getElementById(x.getAttribute('aria-controls')).hidden = !on; });
+    const panel = document.getElementById(t.getAttribute('aria-controls'));
+    if (!reduce) [...panel.children].forEach((c, i) => c.animate([{ opacity: 0, transform: 'translateY(16px) scale(.98)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: i * 50, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => select(t));
+    t.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length]; n.focus(); select(n);
+    });
+  });
+})();
+
+// ---------- Roof anatomy (exploded layers) ----------
+(function () {
+  const SYS = {
+    res: [
+      ['Roof deck', 'Solid OSB or plywood. We replace any soft or rotted sheets before anything goes on top.', '#C9A46B', '#A9864F'],
+      ['Drip edge', 'Metal edging that steers water into the gutter and away from fascia boards.', '#9AA3AE', '#6F7884'],
+      ['Ice & water shield', 'Self-sealing membrane in valleys, at eaves and around chimneys where leaks start.', '#2B2F3A', '#1A1D25'],
+      ['Synthetic underlayment', 'A tear-resistant backup layer that sheds water if a shingle is ever lost.', '#7FB7C2', '#4F8C98'],
+      ['Starter strip', 'Pre-glued first course that locks the bottom edge down against wind uplift.', '#5A5F6E', '#3B3F4B'],
+      ['Architectural shingles', 'Six nails per shingle, sealed and staggered to the manufacturer pattern.', '#353A48', '#20232C'],
+      ['Ridge vent & cap', 'Lets hot attic air escape so shingles last longer and AC works less.', '#00788C', '#005766']
+    ],
+    com: [
+      ['Structural deck', 'Steel, concrete or wood deck inspected and fastened before the system goes on.', '#8C96A1', '#66707B'],
+      ['Vapor barrier', 'Keeps building moisture out of the insulation above it.', '#3F4656', '#2A303C'],
+      ['Polyiso insulation', 'Rigid boards, tapered where needed so water drains instead of ponding.', '#E7D9A8', '#BFAF79'],
+      ['Cover board', 'A tough layer that protects insulation from foot traffic and hail.', '#B6B1A8', '#8F8A80'],
+      ['TPO membrane', 'White single-ply sheets with every seam heat-welded into one watertight skin.', '#F4F7F8', '#C8D4D9'],
+      ['Edge metal & flashing', 'Coping and terminations that lock the system down at every edge.', '#00788C', '#005766']
+    ]
+  };
+  const svg = $('#anat'), list = $('#layerList');
+  let groups = [], items = [], cur = 'res';
+  function build() {
+    svg.textContent = ''; list.textContent = '';
+    const L = SYS[cur], gap = cur === 'res' ? 40 : 46, base = 318, cx = 200, hw = 150, hh = 56, th = 12;
+    groups = L.map(([name, desc, top, side], i) => {
+      const y = base - i * gap, g = svgEl('g', {}, svg);
+      svgEl('polygon', { points: `${cx - hw},${y} ${cx},${y + hh} ${cx},${y + hh + th} ${cx - hw},${y + th}`, fill: side }, g);
+      svgEl('polygon', { points: `${cx + hw},${y} ${cx},${y + hh} ${cx},${y + hh + th} ${cx + hw},${y + th}`, fill: side, opacity: .8 }, g);
+      svgEl('polygon', { points: `${cx},${y - hh} ${cx + hw},${y} ${cx},${y + hh} ${cx - hw},${y}`, fill: top, stroke: 'rgba(0,0,0,.18)' }, g);
+      if (/shingle/i.test(name)) for (let k = 1; k < 6; k++) { const f = k / 6; svgEl('line', { x1: cx - hw + hw * f, y1: y - hh * f, x2: cx + hw * f, y2: y + hh - hh * f, stroke: 'rgba(0,0,0,.45)', 'stroke-width': 1.5 }, g); }
+      if (/TPO/.test(name)) for (let k = 1; k < 4; k++) { const f = k / 4; svgEl('line', { x1: cx - hw + hw * f, y1: y - hh * f, x2: cx + hw * f, y2: y + hh - hh * f, stroke: '#AFC0C7', 'stroke-width': 2 }, g); }
+      const c = svgEl('circle', { cx: cx - hw - 4, cy: y + 4, r: 13, fill: '#1D1160', stroke: '#fff', 'stroke-width': 2 }, g);
+      const t = svgEl('text', { x: cx - hw - 4, y: y + 8.5, 'text-anchor': 'middle', fill: '#fff', 'font-size': 12, 'font-weight': 700, 'font-family': 'IBM Plex Mono, monospace' }, g); t.textContent = i + 1;
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="n" style="background:${side}">${i + 1}</span><div><b></b><span class="d"></span></div>`;
+      li.querySelector('b').textContent = name; li.querySelector('.d').textContent = desc;
+      list.appendChild(li);
+      return g;
+    });
+    items = [...list.children];
+  }
+  function play() {
+    groups.forEach((g, i) => {
+      g.getAnimations().forEach(a => a.cancel());
+      g.animate([{ opacity: 0, transform: 'translateY(-70px)' }, { opacity: 1, transform: 'translateY(6px)', offset: .75 }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 650, delay: 150 + i * 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      const li = items[i];
+      setTimeout(() => { li.classList.add('on'); setTimeout(() => li.classList.remove('on'), 650); }, 450 + i * 380);
+    });
+  }
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+    cur = b.dataset.sys;
+    document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    build(); if (!reduce) play();
+  }));
+  $('#anatReplay').addEventListener('click', play);
+  build();
+  if (!reduce && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { io.disconnect(); play(); } }, { threshold: .45 });
+    io.observe(svg);
+  }
+})();
+
+// ---------- Instant estimate (demo math) ----------
+(function () {
+  const MATS = {
+    res: [['Architectural asphalt shingle', 480, 700], ['3-tab asphalt shingle', 380, 520], ['Standing-seam metal', 1100, 1600], ['Exposed-fastener metal', 650, 950],
+          ['Synthetic slate', 1000, 1500], ['Natural slate', 1800, 3000], ['Cedar shake', 900, 1400], ['Clay or concrete tile', 1100, 1900]],
+    com: [['TPO', 650, 1000], ['EPDM', 550, 900], ['PVC', 750, 1200], ['Modified bitumen', 550, 850], ['Built-up (BUR)', 600, 950], ['Commercial metal', 900, 1500], ['Roof coating (restoration)', 250, 450]]
+  };
+  const form = $('#estForm'), mat = $('#mat'), area = $('#area'), areaOut = $('#areaOut'), tear = $('#tear'), pitchField = $('#pitchField');
+  const pLow = $('#pLow'), pHigh = $('#pHigh');
+  let type = 'res', shown = [0, 0];
+  const money = n => '$' + Math.round(n).toLocaleString('en-US');
+  function fillMats() {
+    mat.textContent = '';
+    MATS[type].forEach(([n], i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; mat.appendChild(o); });
+    if (type === 'res') { area.min = 800; area.max = 6000; area.step = 50; area.value = 2000; $('#areaLbl').textContent = 'Home footprint (sq ft)'; }
+    else { area.min = 2000; area.max = 60000; area.step = 500; area.value = 12000; $('#areaLbl').textContent = 'Roof area (sq ft)'; }
+    pitchField.hidden = type === 'com';
+  }
+  const show = v => { pLow.textContent = money(Math.round(v[0] / 100) * 100); pHigh.textContent = money(Math.round(v[1] / 100) * 100); };
+  let raf = 0;
+  function tween(to, from) {
+    cancelAnimationFrame(raf);
+    if (reduce) { shown = to; show(to); return; }
+    from = from || shown.slice();
+    const t0 = performance.now();
+    const step = now => {
+      const p = Math.min((now - t0) / 450, 1), e = 1 - Math.pow(1 - p, 3);
+      shown = [from[0] + (to[0] - from[0]) * e, from[1] + (to[1] - from[1]) * e];
+      show(shown);
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+  function compute() {
+    const [name, lo, hi] = MATS[type][+mat.value || 0];
+    const ft = +area.value;
+    areaOut.textContent = ft.toLocaleString('en-US');
+    const pitch = type === 'res' ? +form.querySelector('input[name=pitch]:checked').value : 1.03;
+    const waste = type === 'res' ? 1.1 : 1.05;
+    const sq = ft * pitch * waste / 100;
+    const steep = type === 'res' && pitch > 1.3 ? 1.12 : 1;
+    const tLo = tear.checked ? 90 : 0, tHi = tear.checked ? 150 : 0;
+    $('#pMat').textContent = name + (type === 'res' ? ' · home' : ' · commercial');
+    $('#kSq').textContent = sq.toFixed(1) + ' squares';
+    $('#kRate').textContent = money(lo * steep) + '–' + money(hi * steep) + ' / sq';
+    $('#kTear').textContent = tear.checked ? money(tLo) + '–' + money(tHi) + ' / sq' : 'Not included';
+    return [sq * (lo * steep + tLo), sq * (hi * steep + tHi)];
+  }
+  form.addEventListener('input', e => {
+    if (e.target.name === 'ptype') { type = e.target.value; fillMats(); }
+    tween(compute());
+  });
+  form.addEventListener('submit', e => e.preventDefault());
+  fillMats();
+  // Real numbers at rest; the count-up from $0 plays once when the panel scrolls into view.
+  const start = compute(); shown = start; show(start);
+  if (!reduce && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { io.disconnect(); tween(compute(), [0, 0]); } }, { threshold: .5 });
+    io.observe($('.result'));
+  }
+})();
+
+// ---------- Service area radar ----------
+(function () {
+  const HQ = [35.0527, -78.8784], C = 260, K = 4.4;
+  const T = [
+    ['Cumberland', [['Fayetteville', 35.0527, -78.8784, 1], ['Hope Mills', 34.9704, -78.9453, 'r'], ['Spring Lake', 35.1679, -78.9728, 'a'], ['Fort Bragg', 35.139, -79.006, 0], ['Eastover', 35.0938, -78.7814, 0], ['Stedman', 35.0129, -78.6936, 0], ['Wade', 35.1610, -78.7350, 0], ['Godwin', 35.2157, -78.6806, 0], ['Linden', 35.2546, -78.7486, 0]]],
+    ['Harnett', [['Lillington', 35.3993, -78.8158, 1], ['Dunn', 35.3063, -78.6089, 1], ['Erwin', 35.3268, -78.6761, 0], ['Angier', 35.5071, -78.7392, 1]]],
+    ['Hoke', [['Raeford', 34.9810, -79.2242, 1]]],
+    ['Robeson', [['Lumberton', 34.6182, -79.0086, 1], ['St. Pauls', 34.8065, -78.9711, 0], ['Parkton', 34.9024, -79.0117, 0], ['Red Springs', 34.8152, -79.1831, 1], ['Pembroke', 34.6810, -79.1950, 0]]],
+    ['Sampson', [['Clinton', 34.9979, -78.3233, 1], ['Roseboro', 34.9535, -78.5106, 1], ['Autryville', 34.9985, -78.6406, 0], ['Salemburg', 35.0157, -78.5003, 0]]],
+    ['Moore', [['Southern Pines', 35.1740, -79.3923, 1], ['Aberdeen', 35.1315, -79.4295, 0], ['Pinehurst', 35.1954, -79.4695, 0], ['Vass', 35.2546, -79.2814, 0]]],
+    ['Lee', [['Sanford', 35.4799, -79.1803, 1], ['Broadway', 35.4582, -79.0531, 0]]],
+    ['Johnston', [['Benson', 35.3821, -78.5486, 0], ['Smithfield', 35.5085, -78.3394, 1]]],
+    ['Bladen', [['Elizabethtown', 34.6293, -78.6053, 1]]],
+    ['Scotland', [['Laurinburg', 34.7740, -79.4628, 'b']]]
+  ];
+  const map = $('#map'), read = $('#mapRead'), wrap = $('#counties');
+  [[10, 'rgba(63,214,227,.10)'], [25, 'rgba(63,214,227,.06)'], [50, 'rgba(63,214,227,.04)']].forEach(([mi, f]) => {
+    svgEl('circle', { cx: C, cy: C, r: mi * K, class: 'ring', style: 'fill:' + f }, map);
+    const t = svgEl('text', { x: C + 6, y: C + mi * K + 13, class: 'ringlbl' }, map); t.textContent = mi + ' mi';
+  });
+  svgEl('path', { d: `M${C} ${C - 50 * K}V${C + 50 * K}M${C - 50 * K} ${C}H${C + 50 * K}`, stroke: 'rgba(63,214,227,.18)', 'stroke-width': 1 }, map);
+  const hq = svgEl('circle', { cx: C, cy: C, r: 10, fill: 'none', stroke: '#3FD6E3', 'stroke-width': 2 }, map);
+  const groups = {};
+  const btns = {};
+  T.forEach(([county, towns]) => {
+    const box = document.createElement('div'); box.className = 'county';
+    box.innerHTML = `<h3>${county} County</h3><div class="towns"></div>`;
+    const tw = box.querySelector('.towns');
+    towns.forEach(([name, la, lo, lab]) => {
+      const dy = (la - HQ[0]) * 69, dx = (lo - HQ[1]) * 69.17 * Math.cos(HQ[0] * Math.PI / 180);
+      const mi = Math.hypot(dx, dy), x = C + dx * K, y = C - dy * K;
+      const side = typeof lab === 'string' ? lab : (x < C - 4 ? 'l' : 'r');
+      const g = svgEl('g', { class: 't' + (lab ? ' show' : '') }, map);
+      svgEl('circle', { cx: x, cy: y, r: 9, class: 'halo' }, g);
+      const dot = svgEl('circle', { cx: x, cy: y, r: name === 'Fayetteville' ? 6 : 4.5, class: 'town' }, g);
+      const pos = { l: [x - 9, y + 4, 'end'], r: [x + 9, y + 4, 'start'], a: [x, y - 10, 'middle'], b: [x, y + 20, 'middle'] }[side];
+      const t = svgEl('text', { x: pos[0], y: pos[1], 'text-anchor': pos[2], 'font-size': name === 'Fayetteville' ? 15 : 12.5, class: 'lbl' }, g);
+      t.textContent = name;
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+      b.innerHTML = `${name}<small>${mi < 1 ? 'HQ' : Math.round(mi) + ' mi'}</small>`;
+      tw.appendChild(b);
+      const pick = () => {
+        Object.values(groups).forEach(o => o.g.classList.remove('sel'));
+        Object.values(btns).forEach(o => o.setAttribute('aria-pressed', 'false'));
+        g.classList.add('sel'); b.setAttribute('aria-pressed', 'true');
+        map.appendChild(g);
+        read.innerHTML = mi < 1 ? '<span>Fayetteville</span> is home base.' : `<span>${name}</span> is about ${Math.round(mi)} miles from our Fayetteville shop.`;
+        if (!reduce) dot.animate([{ r: 4 }, { r: 11 }, { r: 5.5 }], { duration: 500, easing: 'ease-out' });
+      };
+      b.addEventListener('click', pick); g.addEventListener('click', pick);
+      groups[name] = { g }; btns[name] = b;
+    });
+    wrap.appendChild(box);
+  });
+  const opts = document.getElementById('cTown');
+  T.flatMap(([, ts]) => ts.map(t => t[0])).sort().forEach(n => { const o = document.createElement('option'); o.textContent = n; opts.appendChild(o); });
+  const other = document.createElement('option'); other.textContent = 'Somewhere else nearby'; opts.appendChild(other);
+  opts.value = 'Fayetteville';
+  if (!reduce) {
+    $('#sweep').animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 5200, iterations: Infinity });
+    hq.animate([{ r: 8, opacity: 1 }, { r: 30, opacity: 0 }], { duration: 1800, iterations: Infinity });
+  } else { $('#sweep').hidden = true; }
+})();
+
+// ---------- Reviews carousel ----------
+(function () {
+  const tr = $('#revTrack');
+  const go = d => { const c = tr.querySelector('.rev'); tr.scrollBy({ left: d * (c.offsetWidth + 16), behavior: reduce ? 'auto' : 'smooth' }); };
+  $('#revPrev').addEventListener('click', () => go(-1));
+  $('#revNext').addEventListener('click', () => go(1));
+})();
+
+// ---------- Copy buttons ----------
+document.querySelectorAll('.copy-btn').forEach(b => b.addEventListener('click', () => {
+  const el = document.getElementById(b.dataset.copy), txt = el.textContent;
+  const done = () => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1500); };
+  const sel = () => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'Selected'; setTimeout(() => b.textContent = 'Copy', 1500); };
+  try { navigator.clipboard.writeText(txt).then(done, sel); } catch (e) { sel(); }
+}));
+
+// ---------- Demo contact form ----------
+$('#contactForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const msg = $('#formMsg'), name = $('#cName'), phone = $('#cPhone');
+  if (!name.value.trim() || !phone.value.trim()) { msg.textContent = 'Add your name and phone number so we can call you back.'; (name.value.trim() ? phone : name).focus(); return; }
+  msg.textContent = 'Demo form: nothing was sent. On the live site this would go to the office and we would call you within one business day.';
+});
+
+// ---------- Scroll reveal (from a visible resting state; skipped for reduced motion) ----------
+if (!reduce && 'IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return; io.unobserve(e.target);
+    e.target.animate([{ opacity: 0, transform: 'translateY(28px)' }, { opacity: 1, transform: 'none' }], { duration: 700, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }), { threshold: .15, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.sec-head, .steps li, .badge, .warranty, .stat, .table-wrap, .mil-grid > *').forEach(n => io.observe(n));
+}
+</script>
+</body>
+</html>
