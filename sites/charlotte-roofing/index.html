@@ -91,10 +91,15 @@ section{padding:88px 0}
 .trust svg{width:20px;height:20px;color:var(--accent);flex:none}
 .scene{background:var(--sky);border-radius:28px;overflow:hidden;aspect-ratio:6/5;position:relative}
 .scene svg{width:100%;height:100%}
-.shingle-row{opacity:0;transform:translateY(-16px);animation:lay .5s cubic-bezier(.2,.8,.2,1) forwards}
+.scene{cursor:pointer}
+.shingle-row{opacity:0;transform:translateY(-16px)}
+.scene.play .shingle-row{animation:lay .5s cubic-bezier(.2,.8,.2,1) forwards}
+.replay{position:absolute;left:16px;top:16px;background:var(--surface);color:var(--fg);border:0;border-radius:999px;padding:8px 14px;font:600 .85rem var(--body);box-shadow:0 6px 18px rgba(0,0,0,.12);cursor:pointer;min-height:40px}
+@media (max-width:919px){.scene{order:-1;aspect-ratio:4/3}.hero{padding-top:20px}}
 @keyframes lay{to{opacity:1;transform:none}}
 .badge-float{position:absolute;right:16px;bottom:16px;background:var(--surface);color:var(--fg);border-radius:14px;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.15);font-size:.88rem;font-weight:600;display:flex;gap:10px;align-items:center;max-width:calc(100% - 32px)}
 .badge-float b{font:800 1.5rem var(--display);color:var(--accent)}
+@media (max-width:600px){.badge-float{right:10px;bottom:10px;padding:6px 10px;font-size:.72rem;gap:7px}.badge-float b{font-size:1.05rem}.replay{left:10px;top:10px;min-height:34px;padding:4px 11px;font-size:.78rem}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.shingle-row{opacity:1;transform:none}}
 
 /* services */
@@ -267,7 +272,7 @@ section[id]{scroll-margin-top:80px}
         </ul>
       </div>
 
-      <div class="scene">
+      <div class="scene" title="Tap to watch the roof go on again">
         <svg viewBox="0 0 480 400" role="img" aria-label="Illustration of a house getting a new roof, row by row, in front of the Charlotte skyline">
           <defs>
             <clipPath id="roofClip"><polygon points="240,88 418,232 62,232"/></clipPath>
@@ -310,6 +315,7 @@ section[id]{scroll-margin-top:80px}
           <!-- ridge + drip edge -->
           <path d="M56 236 240 86 424 236" fill="none" stroke="#c98a52" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <button class="replay" type="button" aria-label="Replay roof animation">↻ Replay</button>
         <div class="badge-float"><b>1 day</b><span>typical full<br>replacement</span></div>
       </div>
     </div>
@@ -571,6 +577,13 @@ nav.addEventListener('click', e => { if (e.target.closest('a')) { nav.classList.
     }
     g.appendChild(row);
   }
+  // Start when the scene is on screen; tap or Replay to run it again
+  const scene = g.closest('.scene');
+  const play = () => { scene.classList.remove('play'); void scene.offsetWidth; scene.classList.add('play'); };
+  new IntersectionObserver((entries, obs) => {
+    if (entries[0].isIntersecting) { play(); obs.disconnect(); }
+  }, { threshold: 0.4 }).observe(scene);
+  scene.addEventListener('click', play);
 })();
 
 // Roof age check
