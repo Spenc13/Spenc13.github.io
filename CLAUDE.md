@@ -13,6 +13,10 @@ here and grow over time.
   `https://spenc13.github.io/sites/<site-name>/`.
 - `.claude/skills/<skill-name>/SKILL.md` — Claude Code skills for web work.
   Add a new folder per skill (see "Adding a skill" below).
+  Third-party skills installed with `npx skills add <owner/repo> -a claude-code --copy`
+  are tracked in `skills-lock.json`; update them with `npx skills update`.
+  Installed: `Leonxlnx/taste-skill` (design-taste-frontend, minimalist-ui,
+  high-end-visual-design, redesign-existing-projects, and others).
 
 ## Conventions for sites
 
