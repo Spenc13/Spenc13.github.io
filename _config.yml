@@ -1,0 +1,5 @@
+# Keep workspace files out of the published GitHub Pages site.
+exclude:
+  - design-md
+  - CLAUDE.md
+  - skills-lock.json

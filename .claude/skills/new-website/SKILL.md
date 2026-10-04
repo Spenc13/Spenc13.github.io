@@ -12,6 +12,8 @@ description: Scaffold a new website in this repo under sites/<site-name>/ from t
 3. Replace the placeholders in the copy:
    - `{{TITLE}}` — the site title
    - `{{DESCRIPTION}}` — the one-line description
+   If the user wants the site to look like a known brand, read
+   `design-md/<brand>/DESIGN.md` and apply its colors, type, and component rules.
 4. Fill in the content the user asked for, keeping the color tokens in `:root`
    and the dark-mode block so the page works in both themes.
 5. Check the page at phone width (no horizontal scroll) and that links are relative.
