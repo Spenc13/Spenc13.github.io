@@ -11,6 +11,12 @@ if ! command -v playwright-cli >/dev/null 2>&1; then
   npm install -g @playwright/cli@latest >/dev/null 2>&1
 fi
 
+# Preinstall the DataForSEO MCP server so `npx` in .mcp.json starts it instantly;
+# downloading it on demand can exceed Claude Code's 30s MCP connect timeout.
+if ! command -v dataforseo-mcp-server >/dev/null 2>&1; then
+  npm install -g dataforseo-mcp-server >/dev/null 2>&1
+fi
+
 # The cloud container ships Chromium (not Google Chrome), so point playwright-cli at it.
 if [ -x /opt/pw-browsers/chromium ]; then
   mkdir -p "$CLAUDE_PROJECT_DIR/.playwright"
