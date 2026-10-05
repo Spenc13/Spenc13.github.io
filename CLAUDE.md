@@ -33,6 +33,10 @@ here and grow over time.
 - Mobile-friendly layouts, no horizontal scroll at phone width.
 - Use relative links inside a site so it works under `/sites/<site-name>/`.
 - Keep assets for a site inside that site's folder.
+- Generated pages: a site can keep a page generator in `sites/<site-name>/_build/` (the
+  leading `_` keeps it unpublished). Edit its data, re-run it with `node`, and commit the
+  output. Never hand-edit generated HTML. `faircloth-roofing` builds its service pages
+  this way: `node sites/faircloth-roofing/_build/build.mjs`.
 
 ## Testing sites in a browser
 
