@@ -108,3 +108,10 @@ nav.main .dd-panel a{font-family:var(--font-body);font-weight:600;font-size:1rem
 nav.main .dd-panel .svc-dd a{padding:9px 12px}
 nav.main .dd-panel a.all{font-family:var(--font-head);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 nav.main .dd-areas a{padding:4px 12px;font-size:.95rem}
+/* seven service cards: the odd one out spans the row */
+@media (min-width:1020px){.svc-grid .svc:last-child:nth-child(3n+1){grid-column:1/-1;flex-direction:row}
+  .svc-grid .svc:last-child:nth-child(3n+1) figure{flex:0 0 calc((100% - 44px)/3);aspect-ratio:auto;min-height:240px}}
+@media (min-width:680px) and (max-width:1019px){.svc-grid .svc:last-child:nth-child(odd){grid-column:1/-1}}
+.svc h2{font-size:1.45rem;font-weight:700;letter-spacing:.01em;text-transform:none}
+.svc h2 a{color:inherit;text-decoration:none}
+.svc h2 a:hover{color:var(--accent)}

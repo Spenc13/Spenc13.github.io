@@ -22,7 +22,7 @@ IMG = {
     "bundles-on-roof": (1000, 664), "crew-work": (1600, 1063), "flat-roof": (1000, 667),
     "gutters": (1000, 667), "hero-crew": (1920, 1285), "metal-seam": (1000, 750),
     "shingles-new": (1400, 933), "shingles-worn": (1400, 1050), "tarp-crew": (1000, 695),
-    "tarp-damaged-roof": (1000, 665),
+    "tarp-damaged-roof": (1000, 665), "siding": (1400, 949),
 }
 
 # --------------------------------------------------------------------------- services
@@ -318,6 +318,57 @@ SERVICES = [
             ("Do guards work with pine needles?", "Fine stainless mesh guards do. Basic screens and foam inserts tend to trap needles, so we don't recommend them under pines."),
             ("Should I replace gutters with my roof?", "If they're more than 15 years old or the roof is getting new drip edge, it's the cheapest time to do it. We can quote both together."),
             ("Do you clean gutters?", "We clean them as part of inspections and maintenance plans, and we can add guards so you don't have to."),
+        ],
+    ),
+    dict(
+        slug="siding", name="Siding", nav="Vinyl, fiber cement, soffit and fascia",
+        img="siding", alt="A two-story building clad in white vinyl lap siding under storm clouds", tag="Storm repair",
+        card="Vinyl, fiber cement and engineered wood siding, plus soffit, fascia and trim. Full replacements and storm repairs matched to the existing walls.",
+        chips=["Vinyl", "Fiber cement", "Soffit &amp; fascia"],
+        h1='Siding <span>installation &amp; repair</span>', need="Siding",
+        title="Siding Installation & Repair in Fayetteville, NC",
+        desc="Vinyl and fiber cement siding installation, replacement and storm repair in Fayetteville, NC. House wrap, trim and soffit included. Free inspections.",
+        sub="Vinyl, fiber cement and engineered wood siding, plus soffit, fascia and trim. Full replacements, storm repairs and color matching for one damaged wall.",
+        intro=[
+            "Siding is the other half of your home's weather shell. When it cracks, warps or comes loose, rain gets behind it and soaks the sheathing and framing, and in our humidity that turns into rot and mold faster than most people expect. Hail and wind that damage a roof usually damage the siding on the same side of the house, too.",
+            "Every replacement goes down to the sheathing, so we can fix soft spots and put on new house wrap and flashing before the new siding goes up. Hail that cracks vinyl usually means the roof took hits too, so we inspect both and document everything for a single insurance claim.",
+        ],
+        included=[
+            ("Full removal and sheathing check.", "Rotten boards replaced at a price we quote up front."),
+            ("New house wrap.", "Lapped and taped so water that gets behind the siding drains out instead of in."),
+            ("Flashing at every opening.", "Including kick-out flashing where a roof meets a wall, where most hidden rot starts."),
+            ("New trim, corners and J-channel", "in a matching or contrasting color."),
+            ("Soffit and fascia", "wrapped or replaced so the eaves match the new walls and stay vented."),
+            ("Haul-off and cleanup", "with a magnetic sweep around the whole house."),
+        ],
+        options_title="Siding options",
+        options=[
+            ("Standard vinyl", "Low cost and low upkeep. Never needs paint. Can crack in hail or warp near a reflective window.", ["20–30 yr", "$450–$750 / sq demo"]),
+            ("Insulated vinyl", "Foam-backed panels that stand straighter, resist dents better and add some insulation.", ["30–40 yr", "$700–$1,100 / sq demo"]),
+            ("Fiber cement", "Resists fire, rot, termites and hail. Factory-painted finishes hold color 15+ years.", ["30–50 yr", "$900–$1,400 / sq demo"]),
+            ("Engineered wood", "Real wood look, lighter than fiber cement, treated against rot and termites.", ["25–30 yr", "$750–$1,150 / sq demo"]),
+            ("Board &amp; batten", "Vertical profile in vinyl or fiber cement, popular on farmhouse styles and accent gables.", ["25–50 yr", "$700–$1,300 / sq demo"]),
+            ("Soffit &amp; fascia wrap", "Vented vinyl or aluminum soffit and aluminum-wrapped fascia. No more painting eaves.", ["25–40 yr", "$12–$24 / ft demo"]),
+        ],
+        steps=[
+            ("Free inspection", "We check every wall, press-test the areas that rot first, and photograph any storm damage."),
+            ("Material &amp; color", "Full-size samples so you see colors and profiles against your roof, brick and trim in daylight."),
+            ("Written quote", "Price per square, trim, soffit and fascia, and sheathing repair listed separately."),
+            ("Strip, repair, wrap", "One or two walls at a time, so the house is never left open overnight."),
+            ("Install &amp; walkthrough", "Siding, trim and soffit go up, then a final walkthrough and a magnetic sweep."),
+        ],
+        signs_title="Signs your siding needs attention",
+        signs=[
+            ("Cracked, holed or missing panels,", "often on the side that faced the last hailstorm."),
+            ("Warped or buckled panels.", "Vinyl nailed too tight can't expand in summer heat."),
+            ("Soft spots when you press on the wall,", "especially below windows and at roof lines."),
+            ("Peeling paint or swelling", "on wood or hardboard siding."),
+        ],
+        faqs=[
+            ("Can you replace just the damaged panels?", "Usually. For storm damage on one or two walls, we match the profile and color. If the original has faded or been discontinued, we show you the closest match before any work starts."),
+            ("Vinyl or fiber cement?", "Vinyl costs less and never needs paint. Fiber cement costs more but stands up to hail, fire and termites and looks closer to painted wood."),
+            ("Does insurance cover hail-damaged siding?", "Often, when the damage is from a covered storm. We photograph every crack and dent, write a line-item scope and meet the adjuster at the house."),
+            ("How long does a siding job take?", "About three to seven days for a typical one- or two-story home, depending on size, trim and sheathing repair."),
         ],
     ),
 ]
@@ -664,7 +715,7 @@ def service_page(s):
         f'<div><h3>{label.replace("&", "&amp;")}</h3><ul class="chips">' + "".join(
             f'<li><a href="{R}areas/{t["slug"]}/">{t["name"]}</a></li>' for t in towns_in(g)) + "</ul></div>"
         for g, label in COUNTIES)
-    est = "" if s["slug"] in ("gutters", "roof-repair", "storm-damage-repair") else \
+    est = "" if s["slug"] in ("siding", "gutters", "roof-repair", "storm-damage-repair") else \
         f'<a class="btn btn-purple" href="{R}#estimate">Price it in 20 seconds</a>'
     body = f'''{phero(R, crumbs, "Faircloth Roofing services", s["h1"], s["sub"], s["img"], q, s["alt"])}
 
@@ -733,7 +784,7 @@ def service_page(s):
 def services_hub():
     R = "../"
     crumbs = [("Home", ""), ("Services", "services/")]
-    body = f'''{phero(R, crumbs, "What we do", 'Roofing <span>services</span>', "Replacements, storm repair, metal, commercial, leak repair and gutters for homes and businesses across Fayetteville and the Sandhills.", "crew-work", "", "A roofing crew re-roofing a brick ranch house")}
+    body = f'''{phero(R, crumbs, "What we do", 'Roofing <span>services</span>', "Replacements, storm repair, metal, commercial, leak repair, gutters and siding for homes and businesses across Fayetteville and the Sandhills.", "crew-work", "", "A roofing crew re-roofing a brick ranch house")}
 
 <section aria-labelledby="svc-title">
   <div class="wrap">
@@ -756,7 +807,7 @@ def services_hub():
 
 {cta_band(R, "")}'''
     return page("services/", "Roofing Services in Fayetteville, NC",
-                "Roof replacement, storm and hail repair, metal roofing, commercial flat roofs, leak repair and gutters in Fayetteville, NC and 50 miles around.",
+                "Roof replacement, storm and hail repair, metal, commercial flat roofs, leak repair, gutters and siding in Fayetteville, NC and 50 miles around.",
                 R, body, crumbs)
 
 
@@ -890,6 +941,22 @@ def sync_index():
     p.write_text(s)
 
 
+# services/roofing/ was published briefly; send it to the replacement page.
+REDIRECT = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roof replacement | Faircloth Roofing</title>
+<link rel="canonical" href="{url}">
+<meta http-equiv="refresh" content="0; url={to}">
+<meta name="robots" content="noindex">
+</head>
+<body><p>This page moved to <a href="{to}">Roof replacement</a>.</p></body>
+</html>
+"""
+
+
 def main():
     (SITE / "site.css").write_text((SRC / "base.css").read_text() + (SRC / "pages.css").read_text())
     (SITE / "services").mkdir(exist_ok=True)
@@ -904,6 +971,12 @@ def main():
         d = SITE / "areas" / t["slug"]
         d.mkdir(exist_ok=True)
         (d / "index.html").write_text(town_page(t))
+    d = SITE / "services" / "roofing"
+    d.mkdir(exist_ok=True)
+    (d / "index.html").write_text(REDIRECT.format(to="../roof-replacement/", url=BASE_URL + "services/roof-replacement/"))
+    urls = ["", "services/", "areas/"] + [f'services/{x["slug"]}/' for x in SERVICES] + [f'areas/{t["slug"]}/' for t in T]
+    (SITE / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                                      + "".join(f"  <url><loc>{BASE_URL}{u}</loc></url>\n" for u in urls) + "</urlset>\n")
     sync_index()
     print(f"Built {len(SERVICES)} service pages and {len(T)} town pages.")
 

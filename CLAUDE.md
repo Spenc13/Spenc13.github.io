@@ -33,6 +33,11 @@ here and grow over time.
 - Mobile-friendly layouts, no horizontal scroll at phone width.
 - Use relative links inside a site so it works under `/sites/<site-name>/`.
 - Keep assets for a site inside that site's folder.
+- Generated pages: a site can keep a page generator in an `_`-prefixed folder such as
+  `sites/<site-name>/_src/` (the leading `_` keeps it unpublished). Edit its data, re-run
+  it, and commit the output. Never hand-edit generated HTML. `faircloth-roofing` builds its
+  service pages, town pages, sitemap and the shared parts of its home page this way:
+  `python3 sites/faircloth-roofing/_src/build.py`.
 
 ## Testing sites in a browser
 
