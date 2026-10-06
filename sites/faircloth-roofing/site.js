@@ -26,6 +26,17 @@
     if (dd) { dd.querySelector('a').focus(); dd.querySelector('a').blur(); }
   });
 
+  // Open every page at the top. Some viewers (and embedded previews) carry the
+  // previous page's scroll position over; Back/Forward and #section links keep theirs.
+  const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+  const toTop = () => {
+    if (location.hash || (nav && nav.type === 'back_forward')) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  };
+  toTop();
+  addEventListener('load', toTop, { once: true });
+  addEventListener('pageshow', e => { if (!e.persisted) toTop(); });
+
   const yr = document.getElementById('yr');
   if (yr) yr.textContent = new Date().getFullYear();
 })();
