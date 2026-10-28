@@ -1,0 +1,227 @@
+<title>Roast Room</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a single council table, read top to bottom. Brief, then the scoreboard, then each advisor's card, then the open fights. */
+:root{
+  --bg:#f6f4f8; --surface:#ffffff; --surface-2:#efecf3; --line:#dcd7e3;
+  --fg:#1c1a24; --soft:#4a4657; --mute:#76717f;
+  --accent:#7a3e9d; --accent-soft:#efe4f5;
+  --win:#1f8a5b; --win-soft:#e1f3ea; --warn:#a6620f;
+  --display:"Fraunces",Georgia,"Times New Roman",serif;
+  --body:"Figtree","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141219; --surface:#1d1a24; --surface-2:#26222f; --line:#363142;
+  --fg:#f1eef6; --soft:#c9c3d4; --mute:#9a93a7;
+  --accent:#c99be6; --accent-soft:#2f2439;
+  --win:#5fd39c; --win-soft:#17301f; --warn:#e7a84c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141219; --surface:#1d1a24; --surface-2:#26222f; --line:#363142;
+  --fg:#f1eef6; --soft:#c9c3d4; --mute:#9a93a7;
+  --accent:#c99be6; --accent-soft:#2f2439;
+  --win:#5fd39c; --win-soft:#17301f; --warn:#e7a84c; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--soft);font:400 16px/1.6 var(--body)}
+.wrap{max-width:960px;margin:0 auto;padding-block:40px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:48px}
+h1,h2,h3{color:var(--fg);text-wrap:balance;margin:0}
+h1{font:700 clamp(30px,5vw,46px)/1.1 var(--display);letter-spacing:-.01em}
+h2{font:600 26px/1.2 var(--display)}
+h3{font:600 19px/1.25 var(--body)}
+p{margin:0;max-width:68ch}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+header{display:grid;gap:16px}
+.lede{font-size:18px;color:var(--soft)}
+.progress{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.step{font:500 13px/1 var(--body);padding:8px 12px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+.step.done{background:var(--win-soft);border-color:transparent;color:var(--win)}
+.step.next{border-color:var(--accent);color:var(--accent)}
+section{display:grid;gap:20px}
+.options{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.opt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:6px;align-content:start}
+.opt .id{font:600 13px/1 var(--mono);color:var(--mute)}
+.opt b{color:var(--fg);font-weight:600}
+.opt.win{border-color:var(--win);box-shadow:0 0 0 1px var(--win) inset}
+.opt.win .id{color:var(--win)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 24px;font-size:15px}
+.facts div{display:grid;gap:2px}
+.facts dt{font:500 12px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.facts dd{margin:0;color:var(--fg)}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:560px;font-variant-numeric:tabular-nums}
+th,td{padding:12px 14px;text-align:center;border-bottom:1px solid var(--line)}
+th{font:500 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+td:first-child,th:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+tfoot td{background:var(--surface-2);font-weight:700;color:var(--fg)}
+.cell{display:inline-grid;place-items:center;min-width:34px;height:30px;border-radius:8px;font:600 15px/1 var(--body);color:var(--fg)}
+.who{display:flex;align-items:center;gap:10px;color:var(--fg);font-weight:600}
+.dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font:700 11px/1 var(--body);flex:none}
+.wt{font:500 12px/1 var(--mono);color:var(--mute)}
+.note{font-size:14px;color:var(--mute)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;align-content:start;min-width:0}
+.card-top{display:flex;align-items:center;gap:12px}
+.card-top .dot{width:42px;height:42px;font-size:14px}
+.card-top .meta{display:grid;gap:2px}
+.card-top .pillar{font-size:13px;color:var(--mute)}
+.stance{margin-left:auto;font:600 12px/1 var(--body);padding:6px 10px;border-radius:999px;background:var(--win-soft);color:var(--win);white-space:nowrap}
+.call{font:600 17px/1.45 var(--body);color:var(--fg)}
+.kv{display:grid;gap:4px}
+.kv span{font:500 11px/1.3 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.kv p{font-size:15px}
+ol{margin:0;padding-left:20px;display:grid;gap:8px;font-size:15px}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font:600 14px/1.3 var(--body);color:var(--accent)}
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+details[open] summary{margin-bottom:12px}
+details .inner{display:grid;gap:12px}
+.fights{display:grid;gap:12px}
+.fight{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:12px}
+.sides{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.side{background:var(--surface-2);border-radius:10px;padding:12px;display:grid;gap:6px;font-size:15px}
+.side b{color:var(--fg)}
+.side small{color:var(--mute);font-size:13px}
+.ask{background:var(--accent-soft);border-radius:14px;padding:22px;display:grid;gap:10px}
+.ask h2{font-size:22px}
+footer{font-size:13px;color:var(--mute);border-top:1px solid var(--line);padding-top:20px;display:grid;gap:6px}
+@media (max-width:480px){.stance{display:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Roast Room council · {{DATE}}</div>
+    <h1>{{QUESTION}}</h1>
+    <p class="lede">{{ONE-LINE SITUATION}}. Six advisors argued it out.</p>
+    <div class="progress" aria-label="Council progress">
+      <span class="step done">Brief</span>
+      <span class="step done">Round 1: Opening positions</span>
+      <span class="step next">Round 2: Debate (waiting on you)</span>
+      <span class="step">Round 3: Vote</span>
+      <span class="step">Verdict</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">The options on the table</div>
+    <div class="options" id="options"></div>
+    <dl class="facts">
+      <div><dt>Stage</dt><dd>{{STAGE}}</dd></div>
+      <div><dt>{{FACT}}</dt><dd>{{VALUE}}</dd></div>
+      <div><dt>Assumed</dt><dd>{{ASSUMPTIONS}}</dd></div>
+    </dl>
+  </section>
+
+  <section>
+    <div class="eyebrow">Round 1 scoreboard</div>
+    <h2>{{HEADLINE: what the weighted scores say}}</h2>
+    <div class="tablebox"><table>
+      <thead><tr id="scorehead"><th>Advisor</th></tr></thead>
+      <tbody id="scores"></tbody>
+      <tfoot><tr id="avg"></tr></tfoot>
+    </table></div>
+    <p class="note">Scores are out of 10. The bottom row is weighted by how much each advisor's area matters to this decision ({{WHO}} count triple, the rest double). Numbers in the cards are the advisors' own assumptions unless marked as yours.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Opening positions</div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Where they disagree</div>
+    <h2>{{FIGHTS HEADLINE}}</h2>
+    <div class="fights" id="fights"></div>
+  </section>
+
+  <div class="ask">
+    <div class="eyebrow">Before Round 2</div>
+    <h2>{{ONE QUESTION FOR THE FOUNDERS}}</h2>
+    <p>{{Why the answer changes the debate.}}</p>
+  </div>
+
+  <footer>
+    <p>These advisors are simulations based on each person's public work. They are not the people, do not speak for them, and none of them is affiliated with this council. Nothing here is legal, tax or investment advice.</p>
+  </footer>
+</div>
+
+<script>
+// Fill one entry per advisor. `scores` and `why` drive the table and the card.
+const CARDS = [
+  {"name":"Hormozi","STANCE":"Strong yes","OPTION SCORES":"A 0/10 · B 0/10 · C 0/10 · D 0/10","PILLAR SCORE":"0/10","CONFIDENCE":"0/5","RUIN RISK":"none","DOOR":"two-way",
+   "THE CALL":"…","THE RISK I SEE":"…","WHAT WOULD CHANGE MY MIND":"…","WHAT I'D DO THIS WEEK":"…","QUESTION FOR THE FOUNDER":"…",
+   "scores":[0,0,0,0],"why":["…","…"]}
+];
+// w = weight in the scoreboard. Re-weight per question (see SKILL.md).
+const META = {
+  "Hormozi":{full:"Alex Hormozi",pillar:"Offers, pricing and sales",color:"#d94a6a",init:"AH",w:3},
+  "Buffett":{full:"Warren Buffett",pillar:"Money and capital",color:"#4c6a92",init:"WB",w:3},
+  "Graham":{full:"Paul Graham",pillar:"Product and startups",color:"#e05a2c",init:"PG",w:2},
+  "Gary V":{full:"Gary Vaynerchuk",pillar:"Marketing and attention",color:"#9b5de5",init:"GV",w:2},
+  "Codie":{full:"Codie Sanchez",pillar:"Buying and owning small businesses",color:"#c2427f",init:"CS",w:2},
+  "Sara":{full:"Sara Blakely",pillar:"Consumer product and brand from zero",color:"#a8861a",init:"SB",w:2}
+};
+const OPTIONS=[
+  ["A","…","…"],
+  ["B","…","…"],
+  ["C","…","…"],
+  ["D","…","…"]
+];
+const FIGHTS=[
+  {q:"…?",sides:[["…","Advisor, Advisor"],["…","Advisor"]]}
+];
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.textContent=h;return e};
+const dot=(n)=>{const d=el("div","dot",META[n].init);d.style.background=META[n].color;return d};
+
+// options + weighted averages
+const tot=OPTIONS.map(()=>0);let wsum=0;
+CARDS.forEach(c=>{const w=META[c.name].w;wsum+=w;c.scores.forEach((s,i)=>tot[i]+=w*s)});
+const avgN=tot.map(t=>wsum?t/wsum:0);
+const best=avgN.indexOf(Math.max(...avgN));
+const optBox=document.getElementById("options");
+OPTIONS.forEach(([id,label,desc],i)=>{
+  const o=el("div","opt"+(i===best?" win":""));
+  o.append(el("span","id",`Option ${id} · ${avgN[i].toFixed(1)}/10`),el("b",null,label),el("span",null,desc));
+  optBox.append(o);
+});
+
+// score table
+const head=document.getElementById("scorehead");
+OPTIONS.forEach(([id,label])=>head.append(el("th",null,`${id} · ${label}`)));
+const heat=(s)=>{const a=Math.max(.08,s/10*.55);return `color-mix(in srgb, var(--win) ${Math.round(a*100)}%, transparent)`};
+const tb=document.getElementById("scores");
+CARDS.forEach(c=>{
+  const tr=el("tr");const td=el("td");const who=el("div","who");
+  who.append(dot(c.name),el("span",null,META[c.name].full),el("span","wt",`×${META[c.name].w}`));td.append(who);tr.append(td);
+  c.scores.forEach(s=>{const t=el("td");const b=el("span","cell",s);b.style.background=heat(s);t.append(b);tr.append(t)});
+  tb.append(tr);
+});
+const ar=document.getElementById("avg");ar.append(el("td",null,"Weighted score"));avgN.forEach(a=>ar.append(el("td",null,a.toFixed(1))));
+
+// cards
+const cardBox=document.getElementById("cards");
+const kv=(label,text)=>{const d=el("div","kv");d.append(el("span",null,label),el("p",null,text));return d};
+CARDS.forEach(c=>{
+  const m=META[c.name];const card=el("article","card");
+  const top=el("div","card-top");const meta=el("div","meta");
+  meta.append(el("h3",null,m.full),el("span","pillar",m.pillar));
+  top.append(dot(c.name),meta,el("span","stance",c.STANCE.split(" (")[0]));
+  card.append(top,el("p","call",c["THE CALL"]));
+  card.append(kv("What I'd do this week",c["WHAT I'D DO THIS WEEK"]));
+  card.append(kv("Question for you",c["QUESTION FOR THE FOUNDER"]));
+  const det=el("details");det.append(el("summary",null,"Full reasoning"));
+  const inner=el("div","inner");
+  const ol=el("ol");c.why.forEach(w=>ol.append(el("li",null,w)));
+  const why=el("div","kv");why.append(el("span",null,"Why"),ol);
+  inner.append(why,kv("The risk I see",c["THE RISK I SEE"]),kv("What would change my mind",c["WHAT WOULD CHANGE MY MIND"]),
+    kv("Scores",`${c["OPTION SCORES"]} · Confidence ${c.CONFIDENCE} · Ruin risk: ${c["RUIN RISK"]} · ${c.DOOR} door`));
+  det.append(inner);card.append(det);cardBox.append(card);
+});
+
+// fights
+const fb=document.getElementById("fights");
+FIGHTS.forEach(f=>{const d=el("div","fight");d.append(el("h3",null,f.q));const s=el("div","sides");
+  f.sides.forEach(([p,w])=>{const x=el("div","side");x.append(el("b",null,p),el("small",null,w));s.append(x)});d.append(s);fb.append(d)});
+</script>
