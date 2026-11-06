@@ -1,0 +1,11 @@
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production DB_PATH=/data/home-dojo.sqlite PORT=3000
+COPY package.json index.js ./
+COPY src ./src
+COPY public ./public
+RUN mkdir -p /data && chown node:node /data
+USER node
+VOLUME /data
+EXPOSE 3000
+CMD ["npm", "start"]

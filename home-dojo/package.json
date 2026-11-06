@@ -1,0 +1,13 @@
+{
+  "name": "home-dojo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Family behavior points app: installable web app with one shared SQLite database.",
+  "main": "index.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --watch index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}
