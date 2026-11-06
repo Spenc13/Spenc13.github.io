@@ -79,12 +79,10 @@ h1, h2, h3, p { margin: 0; }
 .keys .ghost { background: transparent; box-shadow: none; font-size: 20px; }
 .back-link { border: 0; background: none; font-size: 20px; font-weight: 800; color: var(--muted); padding: 12px 20px; min-height: 52px; }
 
-/* ---------- stars + progress ---------- */
-.stars { display: grid; grid-template-columns: repeat(var(--cols, 10), auto); justify-content: center; gap: 6px; }
+/* ---------- stars + bars ---------- */
 .star { width: var(--star-size, 28px); height: var(--star-size, 28px); }
 .star path { fill: var(--star-empty); }
 .star.on path { fill: var(--star); stroke: #e3a400; stroke-width: 1.2; }
-.star.pop { animation: pop .5s ease-out; }
 .bar { width: 100%; height: var(--bar-h, 18px); background: var(--star-empty); border-radius: 999px; overflow: hidden; }
 .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--star), #ff9f1c); border-radius: 999px; transition: width .6s cubic-bezier(.2,.9,.3,1.2); }
 
@@ -94,24 +92,8 @@ h1, h2, h3, p { margin: 0; }
   gap: clamp(12px, 3vh, 24px); padding: 24px 16px 72px; text-align: center;
   background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--kid) 25%, #fff) 0%, var(--bg) 70%);
 }
-.kid-view .avatar {
-  width: clamp(110px, 22vh, 180px); height: clamp(110px, 22vh, 180px); border-radius: 50%; background: var(--kid);
-  display: grid; place-items: center; font-size: clamp(70px, 13vh, 110px);
-  box-shadow: 0 10px 0 color-mix(in srgb, var(--kid) 70%, #000);
-}
-.kid-view h1 { font-size: clamp(40px, 9vw, 72px); font-weight: 900; color: color-mix(in srgb, var(--kid) 80%, #000); }
-.kid-view .score { font-size: 28px; font-weight: 800; color: var(--muted); }
-.kid-view .score b { font-size: 44px; color: var(--ink); }
-.kid-view .goal { width: min(640px, 100%); background: var(--card); border-radius: 32px; padding: 24px; box-shadow: var(--shadow); display: grid; gap: 18px; --star-max: 48px; --bar-h: 28px; }
-.kid-view .goal .stars { --star-size: min(var(--star-max), calc((100vw - 120px) / var(--cols, 10) - 6px)); }
-.kid-view .goal-label:empty { display: none; }
-.kid-view .goal-label { font-size: 22px; font-weight: 800; color: var(--muted); }
-.kid-view.young .avatar { width: clamp(130px, 26vh, 220px); height: clamp(130px, 26vh, 220px); font-size: clamp(80px, 16vh, 140px); }
-.kid-view.young .goal { --star-max: 72px; --bar-h: 40px; }
-.kid-view.young .score { font-size: 24px; }
-.corner-btn { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); border: 0; background: rgba(255,255,255,.7); border-radius: 999px; padding: 10px 16px; font-size: 15px; font-weight: 700; color: var(--muted); }
-.burst { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 20; }
-.burst span { position: absolute; font-size: 44px; animation: fly 1.4s ease-out forwards; }
+.kid-view { position: relative; }
+.corner-btn { position: absolute; right: 12px; bottom: 12px; border: 0; background: rgba(255,255,255,.7); border-radius: 999px; padding: 10px 16px; font-size: 15px; font-weight: 700; color: var(--muted); }
 
 /* ---------- parent dashboard ---------- */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -129,8 +111,6 @@ h1, h2, h3, p { margin: 0; }
 .score-card .name { font-size: 24px; font-weight: 900; }
 .score-card .pts { font-size: 40px; font-weight: 900; grid-row: span 2; text-align: right; line-height: 1; }
 .score-card .pts small { display: block; font-size: 14px; font-weight: 700; opacity: .85; }
-.score-card .bar { background: rgba(255,255,255,.35); --bar-h: 14px; }
-.score-card .bar > i { background: #fff; }
 .score-card .next { grid-column: 1 / -1; font-size: 14px; font-weight: 700; opacity: .9; }
 .score-card.bump { animation: bump .4s; }
 
@@ -182,9 +162,53 @@ h1, h2, h3, p { margin: 0; }
 
 @keyframes pulse { to { transform: scale(1.2); } }
 @keyframes shake { 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
-@keyframes pop { 0% { transform: scale(.3); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
 @keyframes bump { 50% { transform: scale(1.04); } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes up { from { transform: translateY(100%); } }
-@keyframes fly { from { transform: translate(0, 0) scale(.5); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(1.4) rotate(40deg); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- piggy bank ---------- */
+.kid-head { display: flex; align-items: center; gap: 14px; }
+.kid-head h1 { font-size: clamp(34px, 7vw, 56px); }
+.mini-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--kid); display: grid; place-items: center; font-size: 44px; box-shadow: 0 5px 0 color-mix(in srgb, var(--kid) 70%, #000); }
+.kid-view.young .mini-avatar { width: 88px; height: 88px; font-size: 56px; }
+.piggy-wrap { position: relative; width: min(520px, 88vw, 52vh * 1.28); container-type: inline-size; cursor: pointer; padding-top: 18%; }
+.piggy { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 10px 0 rgba(43,33,64,.08)); }
+.pig-body { fill: color-mix(in srgb, var(--kid) 82%, #fff); }
+.pig-dark { fill: color-mix(in srgb, var(--kid) 80%, #000); }
+.pig-tail { stroke: color-mix(in srgb, var(--kid) 80%, #000); }
+.pig-shine { fill: #fff; opacity: .35; }
+/* the label sits on the pig's belly: body centre is ~59% of the wrap's height (18% top padding + drawing) */
+.pig-label { position: absolute; left: 48%; top: 61.5%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 2cqw; font-weight: 900; color: #fff; text-shadow: 0 .6cqw 0 rgba(0,0,0,.18); line-height: 1; white-space: nowrap; }
+.pig-label .star { width: 15cqw; height: 15cqw; filter: drop-shadow(0 .6cqw 0 rgba(0,0,0,.15)); }
+.pig-label.d1 span, .pig-label.d2 span { font-size: 20cqw; }
+.pig-label.d3 span { font-size: 16cqw; }
+.pig-label.d4 span { font-size: 12cqw; }
+.piggy-wrap.wiggle { animation: wiggle .6s ease-in-out; }
+.drops { position: absolute; left: 50%; top: 0; width: 0; height: 100%; pointer-events: none; }
+.drop { position: absolute; left: -6cqw; top: 0; width: 12cqw; height: 12cqw; opacity: 0; animation: drop .9s cubic-bezier(.5,0,.9,.6) forwards; }
+.drop .star { width: 100%; height: 100%; }
+.piggy-hint { font-size: 22px; font-weight: 800; color: var(--muted); max-width: 560px; }
+.big-btn { border: 0; border-radius: 999px; background: var(--card); padding: 18px 34px; font-size: 26px; font-weight: 900; min-height: 72px; box-shadow: 0 6px 0 var(--line), 0 10px 24px rgba(43,33,64,.08); display: inline-flex; align-items: center; gap: 10px; }
+.big-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--line); }
+.big-btn .dot { background: var(--plus); color: #fff; border-radius: 999px; min-width: 36px; height: 36px; display: inline-grid; place-items: center; font-size: 20px; padding: 0 8px; }
+.kid-view.young .big-btn { font-size: 30px; min-height: 84px; }
+
+/* ---------- kid rewards page ---------- */
+.rewards-view { justify-content: flex-start; }
+.mini-bank { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 999px; padding: 10px 22px; font-size: 32px; box-shadow: var(--shadow); --star-size: 34px; }
+.mini-bank b { font-size: 32px; }
+.rewards-title { font-size: 34px; font-weight: 900; }
+.reward-cards { list-style: none; margin: 0; padding: 0; width: min(640px, 100%); display: grid; gap: 14px; }
+.reward-card { background: var(--card); border-radius: 26px; padding: 18px 20px; box-shadow: var(--shadow); display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; align-items: center; text-align: left; border: 4px solid transparent; }
+.reward-card.ok { border-color: var(--plus); background: var(--helping-soft); }
+.reward-name { font-size: 26px; font-weight: 900; }
+.price { display: flex; align-items: center; gap: 6px; background: #fff4cf; border-radius: 999px; padding: 6px 16px 6px 10px; font-size: 28px; --star-size: 34px; }
+.reward-status { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; font-size: 20px; font-weight: 800; color: var(--muted); }
+.reward-card.ok .reward-status { display: block; color: #168a60; font-size: 22px; }
+.reward-status .bar { --bar-h: 16px; }
+.no-rewards { font-size: 26px; font-weight: 800; color: var(--muted); background: var(--card); border-radius: 26px; padding: 28px 32px; box-shadow: var(--shadow); }
+
+/* the coin slot sits ~2.2 star-heights below the top of the wrap */
+@keyframes drop { 0% { transform: translateY(-30%) scale(.9); opacity: 0; } 15% { opacity: 1; } 80% { transform: translateY(190%) scale(.8); opacity: 1; } 100% { transform: translateY(230%) scale(.2); opacity: 0; } }
+@keyframes wiggle { 20% { transform: rotate(-5deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }

@@ -205,7 +205,7 @@ function createApp(config, db) {
         else throw httpError(401, 'Login required');
         const kid = store.getKid(db, kidId);
         if (!kid) throw httpError(404, 'Unknown daughter');
-        return send(res, 200, { kid: publicKid(kid), rewards: store.getRewards(db), defaultGoal: config.defaultGoal });
+        return send(res, 200, { kid: publicKid(kid), rewards: store.getRewards(db) });
       }
 
       case 'GET /api/dashboard': {
@@ -216,7 +216,6 @@ function createApp(config, db) {
           behaviors: store.getBehaviors(db),
           rewards: store.getRewards(db),
           log: store.getLog(db, 30),
-          defaultGoal: config.defaultGoal,
         });
       }
 
@@ -242,7 +241,7 @@ function createApp(config, db) {
         const n = String(name || '').trim().slice(0, 80);
         const t = Number(threshold);
         if (!n) throw httpError(400, 'Reward needs a name');
-        if (!Number.isInteger(t) || t < 1 || t > 100000) throw httpError(400, 'Points must be a whole number above 0');
+        if (!Number.isInteger(t) || t < 1 || t > 100000) throw httpError(400, 'Stars must be a whole number above 0');
         store.addReward(db, n, t);
         return send(res, 200, { rewards: store.getRewards(db) });
       }
