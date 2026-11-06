@@ -70,6 +70,9 @@ function openDb(dbPath) {
   // Added after launch: the last log entry each girl has watched on her piggy bank.
   const kidCols = db.prepare('PRAGMA table_info(kids)').all().map((c) => c.name);
   if (!kidCols.includes('seen_log_id')) db.exec('ALTER TABLE kids ADD COLUMN seen_log_id INTEGER NOT NULL DEFAULT 0');
+  // Character and room, stored as JSON (NULL until she makes them).
+  if (!kidCols.includes('avatar')) db.exec('ALTER TABLE kids ADD COLUMN avatar TEXT');
+  if (!kidCols.includes('room')) db.exec('ALTER TABLE kids ADD COLUMN room TEXT');
 
   const behaviorCount = db.prepare('SELECT COUNT(*) AS n FROM behaviors').get().n;
   if (behaviorCount === 0) {
@@ -100,14 +103,33 @@ function syncKids(db, kids) {
   for (const k of kids) upsert.run(k.id, k.name, k.color, k.emoji, k.young ? 1 : 0);
 }
 
+const parseJson = (v) => {
+  try { return v ? JSON.parse(v) : null; } catch { return null; }
+};
+const KID_COLS = 'id, name, color, emoji, young, score, avatar, room';
+const rowToKid = (k) => ({ ...k, young: !!k.young, avatar: parseJson(k.avatar), room: parseJson(k.room) });
+
 function getKids(db) {
-  return db.prepare('SELECT id, name, color, emoji, young, score FROM kids ORDER BY id').all()
-    .map((k) => ({ ...k, young: !!k.young }));
+  return db.prepare(`SELECT ${KID_COLS} FROM kids ORDER BY id`).all().map(rowToKid);
 }
 
 function getKid(db, id) {
-  const k = db.prepare('SELECT id, name, color, emoji, young, score FROM kids WHERE id = ?').get(id);
-  return k ? { ...k, young: !!k.young } : null;
+  const k = db.prepare(`SELECT ${KID_COLS} FROM kids WHERE id = ?`).get(id);
+  return k ? rowToKid(k) : null;
+}
+
+/** All stars she has ever been given (cash-ins and minuses don't take unlocks away). */
+function getEarned(db, kidId) {
+  return db.prepare('SELECT COALESCE(SUM(applied_delta), 0) AS n FROM score_log WHERE kid_id = ? AND applied_delta > 0')
+    .get(kidId).n;
+}
+
+function saveAvatar(db, kidId, avatar) {
+  db.prepare('UPDATE kids SET avatar = ? WHERE id = ?').run(JSON.stringify(avatar), kidId);
+}
+
+function saveRoom(db, kidId, room) {
+  db.prepare('UPDATE kids SET room = ? WHERE id = ?').run(JSON.stringify(room), kidId);
 }
 
 function getBehaviors(db) {
@@ -227,6 +249,6 @@ function httpError(status, message) {
 }
 
 module.exports = {
-  openDb, syncKids, getKids, getKid, getBehaviors, getRewards, addReward, deleteReward,
+  openDb, syncKids, getKids, getKid, getEarned, saveAvatar, saveRoom, getBehaviors, getRewards, addReward, deleteReward,
   applyPoints, cashIn, getLog, getUnseen, markSeen, httpError,
 };

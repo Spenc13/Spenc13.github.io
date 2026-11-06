@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const store = require('./db');
+const CATALOG = require('../public/catalog');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const COOKIE = 'dojo_session';
@@ -102,7 +103,46 @@ function createApp(config, db) {
   }
 
   // ---------- helpers ----------
-  const publicKid = (k) => ({ id: k.id, name: k.name, color: k.color, emoji: k.emoji, young: k.young, score: k.score });
+  const publicKid = (k) => ({
+    id: k.id, name: k.name, color: k.color, emoji: k.emoji, young: k.young, score: k.score, avatar: k.avatar,
+  });
+
+  // ---------- character + room validation ----------
+  const ids = (list) => new Set(list.map((o) => o.id));
+  const AVATAR_OPTIONS = Object.fromEntries(Object.entries(CATALOG.avatar).map(([k, v]) => [k, ids(v)]));
+  const WALLS = ids(CATALOG.walls);
+  const FLOORS = ids(CATALOG.floors);
+  const ITEMS = new Map(CATALOG.items.map((i) => [i.id, i]));
+  const pct = (v) => Number.isFinite(v) && v >= 0 && v <= 100;
+  const round1 = (v) => Math.round(v * 10) / 10;
+
+  function cleanAvatar(a) {
+    if (!a || typeof a !== 'object') throw httpError(400, 'Character missing');
+    const out = {};
+    for (const [key, allowed] of Object.entries(AVATAR_OPTIONS)) {
+      if (!allowed.has(a[key])) throw httpError(400, `Unknown ${key}`);
+      out[key] = a[key];
+    }
+    return out;
+  }
+
+  function cleanRoom(r, earned) {
+    if (!r || typeof r !== 'object') throw httpError(400, 'Room missing');
+    if (!WALLS.has(r.wall) || !FLOORS.has(r.floor)) throw httpError(400, 'Unknown paint');
+    if (!Array.isArray(r.items) || r.items.length > CATALOG.items.length) throw httpError(400, 'Bad items');
+    const seen = new Set();
+    const items = r.items.map((it) => {
+      const def = it && ITEMS.get(it.id);
+      if (!def) throw httpError(400, 'Unknown item');
+      if (seen.has(it.id)) throw httpError(400, 'Each item can be placed once');
+      if (def.unlock > earned) throw httpError(403, `${def.name} is still locked`);
+      if (!pct(it.x) || !pct(it.y)) throw httpError(400, 'Item is outside the room');
+      seen.add(it.id);
+      return { id: it.id, x: round1(it.x), y: round1(it.y) };
+    });
+    const me = r.me && pct(r.me.x) && pct(r.me.y) ? { x: round1(r.me.x), y: round1(r.me.y) } : CATALOG.defaultRoom().me;
+    return { wall: r.wall, floor: r.floor, items, me };
+  }
 
   function requireParent(s) {
     if (!s || s.role !== 'parent') throw httpError(401, 'Parent login required');
@@ -161,7 +201,10 @@ function createApp(config, db) {
 
       case 'GET /api/login-options':
         return send(res, 200, {
-          kids: config.kids.map((k) => ({ id: k.id, name: k.name, color: k.color, emoji: k.emoji, young: k.young, needsPin: !!k.pin })),
+          kids: config.kids.map((k) => ({
+            id: k.id, name: k.name, color: k.color, emoji: k.emoji, young: k.young, needsPin: !!k.pin,
+            avatar: store.getKid(db, k.id)?.avatar || null,
+          })),
         });
 
       case 'POST /api/login/parent': {
@@ -205,7 +248,7 @@ function createApp(config, db) {
         else throw httpError(401, 'Login required');
         const kid = store.getKid(db, kidId);
         if (!kid) throw httpError(404, 'Unknown daughter');
-        const out = { kid: publicKid(kid), rewards: store.getRewards(db) };
+        const out = { kid: publicKid(kid), rewards: store.getRewards(db), earned: store.getEarned(db, kid.id) };
         // Only the girl herself gets the replay of changes since she last looked.
         if (s.role === 'kid') out.unseen = store.getUnseen(db, kid.id);
         return send(res, 200, out);
@@ -225,6 +268,37 @@ function createApp(config, db) {
         failures.delete(ip);
         const entry = store.cashIn(db, { kidId: s.kidId, rewardId: Number(rewardId), parent: parent.name });
         return send(res, 200, { entry });
+      }
+
+      case 'GET /api/room': {
+        // Any logged-in girl can visit any room; parents can look too. Only the owner may edit it.
+        if (!s) throw httpError(401, 'Login required');
+        const id = Number(url.searchParams.get('kid')) || (s.role === 'kid' ? s.kidId : 0);
+        const kid = store.getKid(db, id);
+        if (!kid) throw httpError(404, 'Unknown daughter');
+        return send(res, 200, {
+          kid: { ...publicKid(kid), avatar: kid.avatar || CATALOG.defaultAvatar(kid.id, kid.young) },
+          room: kid.room || CATALOG.defaultRoom(),
+          earned: store.getEarned(db, kid.id),
+          mine: s.role === 'kid' && s.kidId === kid.id,
+          madeCharacter: !!kid.avatar,
+        });
+      }
+
+      case 'PUT /api/room': {
+        if (s?.role !== 'kid') throw httpError(401, 'Kid login required');
+        const { room } = await readJson(req);
+        const clean = cleanRoom(room, store.getEarned(db, s.kidId));
+        store.saveRoom(db, s.kidId, clean);
+        return send(res, 200, { room: clean });
+      }
+
+      case 'PUT /api/avatar': {
+        if (s?.role !== 'kid') throw httpError(401, 'Kid login required');
+        const { avatar } = await readJson(req);
+        const clean = cleanAvatar(avatar);
+        store.saveAvatar(db, s.kidId, clean);
+        return send(res, 200, { avatar: clean });
       }
 
       case 'POST /api/kid/seen': {

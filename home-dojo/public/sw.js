@@ -1,7 +1,7 @@
 // Caches the app shell so it opens instantly from the home screen.
 // Scores always come live from the server (API requests are never cached).
-const CACHE = 'home-dojo-v4';
-const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest', '/icons/icon.svg'];
+const CACHE = 'home-dojo-v5';
+const SHELL = ['/', '/index.html', '/styles.css', '/catalog.js', '/play.js', '/app.js', '/manifest.webmanifest', '/icons/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
