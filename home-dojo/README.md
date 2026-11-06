@@ -8,6 +8,13 @@ A family points app for two daughters. It installs to the home screen on iPads a
 - **Scoring:** behaviors are grouped as Kind, Helping and Listening, and each one has a + and a − button. Scores never go below 0. Every tap is logged with the time, behavior, daughter and parent, including a minus at 0 (logged as "already at 0").
 - **Rewards:** the list starts empty. Parents can add a reward with a points threshold on the dashboard. While the list is empty, the progress bar fills every `DEFAULT_GOAL` points (10 by default).
 
+<p>
+  <img src="docs/screenshots/2-parent-dashboard-ipad.png" alt="Parent dashboard on iPad" width="360">
+  <img src="docs/screenshots/5-kid2-view-phone.png" alt="Little Sister's view on a phone" width="200">
+</p>
+
+More screenshots are in [`docs/screenshots/`](docs/screenshots/).
+
 > This folder sits inside a GitHub Pages repo, but GitHub Pages can only serve static files. The app needs a host that runs Node and has a persistent disk (see Deploy below).
 
 ## Run locally
