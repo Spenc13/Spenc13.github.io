@@ -122,7 +122,7 @@ async function showLogin() {
       <div class="kid-cards">
         ${kids.map((k) => `
           <button class="kid-card" data-kid="${k.id}" style="--kid:${esc(k.color)}" aria-label="${esc(k.name)}">
-            <span class="emoji">${esc(k.emoji)}</span><span class="name">${esc(k.name)}</span>
+            ${k.avatar ? `<span class="card-avatar">${avatarSvg(k.avatar)}</span>` : `<span class="emoji">${esc(k.emoji)}</span>`}<span class="name">${esc(k.name)}</span>
           </button>`).join('')}
       </div>
       <button class="grownup-btn" id="grownup">🔒 Grown-ups</button>
@@ -198,6 +198,7 @@ function showPinPad({ title, subtitle = '', submit, onDone = boot, onBack = boot
 }
 
 async function logout() {
+  await flushSave();
   await api('/api/logout', { method: 'POST' });
   boot();
 }
@@ -206,8 +207,13 @@ async function logout() {
 let replaying = false;
 
 async function showKid() {
-  const render = async () => {
+  const render = async (fromPoll = false) => {
     if (replaying) return; // let the piggy finish its show
+    // Room, character maker and visits are hands-on: never redraw them from the background refresh.
+    const h = location.hash;
+    if (h === '#room') return fromPoll ? null : showRoom();
+    if (h === '#me') return fromPoll ? null : showMaker();
+    if (h.startsWith('#visit-')) return fromPoll ? null : showVisit(Number(h.slice(7)));
     const { kid, rewards, unseen = [] } = await api('/api/kid');
     if (location.hash === '#rewards') return renderKidRewards(kid, rewards); // replay waits for the piggy
     if (!unseen.length) return renderPiggy(kid, rewards);
@@ -220,13 +226,17 @@ async function showKid() {
     const cashed = unseen.filter((u) => u.group === 'reward').at(-1);
     if (cashed) celebrateReward(cashed.behavior);
   };
-  window.onhashchange = () => render().catch(handleAuthError);
+  window.onhashchange = async () => {
+    await flushSave(); // never lose a room or character change when switching pages
+    render().catch(handleAuthError);
+  };
   await render();
-  poll(render, 5000);
+  poll(() => render(true), 5000);
 }
 
 function kidHeader(kid) {
-  return `<header class="kid-head"><span class="mini-avatar" aria-hidden="true">${esc(kid.emoji)}</span><h1>${esc(kid.name)}</h1></header>`;
+  const face = kid.avatar ? avatarSvg(kid.avatar, { headOnly: true }) : esc(kid.emoji);
+  return `<header class="kid-head"><span class="mini-avatar" aria-hidden="true">${face}</span><h1>${esc(kid.name)}</h1></header>`;
 }
 
 function renderPiggy(kid, rewards, { hint: showHint = true } = {}) {
@@ -245,11 +255,15 @@ function renderPiggy(kid, rewards, { hint: showHint = true } = {}) {
         ${piggyHtml(kid.score)}
       </div>
       <p class="piggy-hint">${hint && showHint && !kid.young ? hint : ''}</p>
-      <button class="big-btn" id="to-rewards">🎁 Rewards${affordable ? ` <span class="dot">${affordable}</span>` : ''}</button>
+      <div class="play-actions">
+        <button class="big-btn" id="to-rewards">🎁 Rewards${affordable ? ` <span class="dot">${affordable}</span>` : ''}</button>
+        <button class="big-btn" id="to-room">🏠 My room</button>
+      </div>
       <button class="corner-btn" id="switch">Switch</button>
     </section>`;
   document.getElementById('switch').onclick = logout;
   document.getElementById('to-rewards').onclick = () => { location.hash = 'rewards'; };
+  document.getElementById('to-room').onclick = () => { location.hash = 'room'; };
   const piggy = document.getElementById('piggy');
   piggy.onclick = () => (replaying ? (replay.skip = true) : wiggle(piggy));
 }
@@ -403,7 +417,7 @@ function scoreCardHtml(k) {
   else if (next) note = `${next.threshold - k.score} more for ${esc(next.name)}`;
   return `
     <div class="score-card" data-score-kid="${k.id}" style="--kid:${esc(k.color)}">
-      <span class="emoji" aria-hidden="true">${esc(k.emoji)}</span>
+      <span class="emoji" aria-hidden="true">${k.avatar ? avatarSvg(k.avatar, { headOnly: true, cls: 'card-face' }) : esc(k.emoji)}</span>
       <span class="name">${esc(k.name)}</span>
       <span class="pts">${k.score}<small>${k.score === 1 ? 'star' : 'stars'}</small></span>
       <span class="next">🐷 ${note}</span>

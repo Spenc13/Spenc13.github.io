@@ -12,9 +12,11 @@ A family points app for two daughters. It installs to the home screen on iPads a
   <img src="docs/screenshots/2-parent-dashboard-ipad.png" alt="Parent dashboard on iPad" width="360">
   <img src="docs/screenshots/6-kid2-piggy-phone.png" alt="Little Sister's piggy bank on a phone" width="200">
   <img src="docs/screenshots/8-kid2-rewards-phone.png" alt="Little Sister's rewards page on a phone" width="200">
+  <img src="docs/screenshots/12-room-ipad.png" alt="A girl's room with her character" width="300">
 </p>
 
 More screenshots are in [`docs/screenshots/`](docs/screenshots/).
+- **Character and room:** each girl makes her own cartoon character (skin, hair style and color, eyes, mouth, clothes and color, extras like a bow, crown or glasses, or 🎲 Surprise me), which then shows on her login card and screens. She also has her own room: she paints the walls and floor, taps things in a tray to add them (bed, rug, dresser, TV, game system, dolls, bookshelf, pets and more), drags them around, and taps one to take it out. Things unlock as her **all-time stars earned** grow (cashing in or a minus never re-locks them); locked ones show 🔒 and the stars needed. She can visit her sister's room with 👀 to look, but only the owner can change a room. The server enforces both rules. The item list and unlock levels are in `public/catalog.js`.
 
 > This folder sits inside a GitHub Pages repo, but GitHub Pages can only serve static files. The app needs a host that runs Node and has a persistent disk (see Deploy below).
 
@@ -63,6 +65,6 @@ The default behaviors (three per group, 1 point each) are created in the `behavi
 
 ## API (all JSON)
 
-`GET /api/me` · `GET /api/login-options` · `POST /api/login/parent {pin}` · `POST /api/login/kid {kidId, pin?}` · `POST /api/logout` · `GET /api/kid` · kid only: `POST /api/kid/seen {logId}`, `POST /api/kid/cash-in {rewardId, pin}` (pin = a parent's PIN) · parent only: `GET /api/dashboard`, `GET /api/log?limit=`, `POST /api/points {kidId, behaviorId, direction: 1|-1}`, `POST /api/rewards {name, threshold}`, `DELETE /api/rewards/:id`.
+`GET /api/me` · `GET /api/login-options` · `POST /api/login/parent {pin}` · `POST /api/login/kid {kidId, pin?}` · `POST /api/logout` · `GET /api/kid` · any login: `GET /api/room?kid=` · kid only: `PUT /api/room {room}`, `PUT /api/avatar {avatar}`, `POST /api/kid/seen {logId}`, `POST /api/kid/cash-in {rewardId, pin}` (pin = a parent's PIN) · parent only: `GET /api/dashboard`, `GET /api/log?limit=`, `POST /api/points {kidId, behaviorId, direction: 1|-1}`, `POST /api/rewards {name, threshold}`, `DELETE /api/rewards/:id`.
 
 Requests that change data must send the header `X-Requested-With: home-dojo`. After 5 wrong PINs, that device is locked out for 1 minute.

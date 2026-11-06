@@ -158,6 +158,55 @@ test('cashing in needs a grown-up PIN and enough stars, then takes the stars and
   assert.equal((await call('/api/kid', { cookie: kid })).data.unseen.at(-1).emoji, '🎁');
 });
 
+test('each girl edits only her own character and room; sisters can visit', async () => {
+  const CATALOG = require('../public/catalog');
+  const mom = await login('1111');
+  const ava = (await call('/api/login/kid', { method: 'POST', body: { kidId: 1 } })).cookie;
+  const bea = (await call('/api/login/kid', { method: 'POST', body: { kidId: 2 } })).cookie;
+
+  // Defaults before she makes anything.
+  let r = (await call('/api/room', { cookie: ava })).data;
+  assert.equal(r.mine, true);
+  assert.equal(r.madeCharacter, false);
+  assert.deepEqual(r.room, CATALOG.defaultRoom());
+
+  // Character: valid options save, unknown ones are refused.
+  const avatar = { ...CATALOG.defaultAvatar(1, false), hairStyle: 'curly', accessory: 'crown' };
+  assert.equal((await call('/api/avatar', { method: 'PUT', cookie: ava, body: { avatar: { ...avatar, hairStyle: 'mohawk' } } })).status, 400);
+  assert.equal((await call('/api/avatar', { method: 'PUT', cookie: ava, body: { avatar } })).status, 200);
+  assert.equal((await call('/api/avatar', { method: 'PUT', cookie: mom, body: { avatar } })).status, 401);
+  const opts = (await call('/api/login-options')).data.kids;
+  assert.equal(opts.find((k) => k.id === 1).avatar.accessory, 'crown');
+
+  // Room: starter items are free, locked ones are refused until she has earned enough.
+  const earned = (await call('/api/room', { cookie: ava })).data.earned;
+  const lockedTv = CATALOG.items.find((i) => i.id === 'tv');
+  const room = { wall: 'lilac', floor: 'pinkcarpet', items: [{ id: 'bed', x: 20, y: 90 }, { id: 'teddy', x: 40, y: 80 }], me: { x: 50, y: 85 } };
+  assert.equal((await call('/api/room', { method: 'PUT', cookie: ava, body: { room } })).status, 200);
+  const withTv = { ...room, items: [...room.items, { id: 'tv', x: 70, y: 70 }] };
+  const tvRes = await call('/api/room', { method: 'PUT', cookie: ava, body: { room: withTv } });
+  assert.equal(tvRes.status, earned >= lockedTv.unlock ? 200 : 403);
+  assert.equal((await call('/api/room', { method: 'PUT', cookie: ava, body: { room: { ...room, items: [room.items[0], room.items[0]] } } })).status, 400);
+  assert.equal((await call('/api/room', { method: 'PUT', cookie: ava, body: { room: { ...room, wall: 'plaid' } } })).status, 400);
+
+  // Earning stars unlocks the TV.
+  const { data: d } = await call('/api/dashboard', { cookie: mom });
+  for (let i = earned; i < lockedTv.unlock; i++) {
+    await call('/api/points', { method: 'POST', cookie: mom, body: { kidId: 1, behaviorId: d.behaviors[0].id, direction: 1 } });
+  }
+  assert.equal((await call('/api/room', { method: 'PUT', cookie: ava, body: { room: withTv } })).status, 200);
+
+  // Her sister can visit (read-only) but a PUT only ever touches her own room.
+  const visit = (await call('/api/room?kid=1', { cookie: bea })).data;
+  assert.equal(visit.mine, false);
+  assert.equal(visit.room.wall, 'lilac');
+  assert.equal(visit.kid.avatar.accessory, 'crown');
+  await call('/api/room', { method: 'PUT', cookie: bea, body: { room: { ...room, wall: 'mint', items: [] } } });
+  assert.equal((await call('/api/room?kid=1', { cookie: bea })).data.room.wall, 'lilac');
+  assert.equal((await call('/api/room', { cookie: bea })).data.room.wall, 'mint');
+  assert.equal((await call('/api/room?kid=1')).status, 401); // not logged in
+});
+
 test('mutations without the app header are rejected', async () => {
   const r = await call('/api/login/parent', { method: 'POST', body: { pin: '1111' }, csrf: false });
   assert.equal(r.status, 403);
