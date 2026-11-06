@@ -148,12 +148,13 @@ async function showLogin() {
   });
 }
 
-function showPinPad({ title, submit }) {
+function showPinPad({ title, subtitle = '', submit, onDone = boot, onBack = boot }) {
+  stopPolling(); // don't let a background refresh wipe the keypad
   let pin = '';
   const maxLen = 8;
   $app.innerHTML = `
     <section class="login">
-      <div class="brand"><h1 style="font-size:36px">${esc(title)}</h1></div>
+      <div class="brand"><h1 style="font-size:36px">${esc(title)}</h1>${subtitle ? `<p class="pin-sub">${subtitle}</p>` : ''}</div>
       <div class="pinpad">
         <div class="pin-dots" id="dots"></div>
         <div class="pin-error" id="pin-error"></div>
@@ -177,7 +178,7 @@ function showPinPad({ title, submit }) {
     if (pin.length < 4) return;
     try {
       await submit(pin);
-      boot();
+      onDone();
     } catch (err) {
       pin = '';
       draw();
@@ -193,7 +194,7 @@ function showPinPad({ title, submit }) {
   });
   $app.querySelector('[data-del]').onclick = () => { pin = pin.slice(0, -1); draw(); };
   $app.querySelector('[data-go]').onclick = go;
-  document.getElementById('back').onclick = boot;
+  document.getElementById('back').onclick = onBack;
 }
 
 async function logout() {
@@ -216,6 +217,8 @@ async function showKid() {
     await replay(unseen);
     api('/api/kid/seen', { method: 'POST', body: { logId: unseen.at(-1).id } }).catch(() => {});
     if (location.hash !== '#rewards') renderPiggy(kid, rewards);
+    const cashed = unseen.filter((u) => u.group === 'reward').at(-1);
+    if (cashed) celebrateReward(cashed.behavior);
   };
   window.onhashchange = () => render().catch(handleAuthError);
   await render();
@@ -265,7 +268,8 @@ function renderKidRewards(kid, rewards) {
             <span class="reward-name">${esc(r.name)}</span>
             <span class="price">${starSvg('star on')}<b>${r.threshold}</b></span>
             ${ok
-              ? '<span class="reward-status">🎉 You have enough!</span>'
+              ? `<span class="reward-status">🎉 You have enough!</span>
+                 <button class="cash-btn" data-cash="${r.id}">Cash in ${starSvg('star on')}</button>`
               : `<span class="reward-status">${barHtml(kid.score / r.threshold)}<small>${r.threshold - kid.score} more</small></span>`}
           </li>`;
       }).join('')}</ul>`
@@ -274,7 +278,39 @@ function renderKidRewards(kid, rewards) {
       <button class="corner-btn" id="switch">Switch</button>
     </section>`;
   document.getElementById('switch').onclick = logout;
+  $app.querySelectorAll('[data-cash]').forEach((btn) => {
+    btn.onclick = () => askGrownUp(sorted.find((r) => r.id === Number(btn.dataset.cash)));
+  });
   document.getElementById('to-piggy').onclick = () => { history.length > 1 && location.hash ? history.back() : (location.hash = ''); };
+}
+
+/** A grown-up approves a cash-in by typing their PIN on the girl's screen. */
+function askGrownUp(reward) {
+  showPinPad({
+    title: reward.name,
+    subtitle: `${starSvg('star on')} <b>${reward.threshold}</b> stars<br>Ask a grown-up to type their PIN`,
+    submit: (pin) => api('/api/kid/cash-in', { method: 'POST', body: { rewardId: reward.id, pin } }),
+    // back to the piggy bank, where the stars fly out and the party starts
+    onDone: () => { history.replaceState(null, '', location.pathname); boot(); },
+    onBack: () => { location.hash = 'rewards'; boot(); },
+  });
+}
+
+function celebrateReward(name) {
+  const el = document.createElement('div');
+  el.className = 'party';
+  el.innerHTML = `<div class="party-card"><div class="party-gift">🎁</div><p>Enjoy your</p><h2>${esc(name)}!</h2></div>`;
+  for (let i = 0; i < 24; i++) {
+    const c = document.createElement('span');
+    c.className = 'confetti';
+    c.textContent = ['🎉', '⭐', '✨', '🎊'][i % 4];
+    c.style.left = `${(i * 41) % 100}%`;
+    c.style.animationDelay = `${(i % 8) * 0.12}s`;
+    el.appendChild(c);
+  }
+  el.onclick = () => el.remove();
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
 }
 
 function wiggle(el) {
@@ -318,7 +354,7 @@ async function replay(entries) {
       void caption.offsetWidth;
       caption.classList.add('show');
 
-      const n = Math.min(Math.abs(e.applied), 3);
+      const n = Math.min(Math.abs(e.applied), e.group === 'reward' ? 6 : 3);
       for (let i = 0; i < n; i++) {
         const d = document.createElement('span');
         d.className = up ? 'drop' : 'lift';
@@ -449,11 +485,12 @@ function logItemHtml(e) {
   const cls = e.applied > 0 ? 'up' : e.applied < 0 ? 'down' : 'zero';
   const sign = e.applied > 0 ? `+${e.applied}` : e.applied === 0 ? '0' : String(e.applied).replace('-', '−');
   const note = e.applied !== e.requested ? ' (already at 0)' : '';
+  const what = esc(e.behavior);
   return `
     <li>
       <span class="delta ${cls}">${sign}</span>
-      <span class="what">${esc(e.kidName)} · ${esc(e.behavior)}${note}
-        <small>${GROUPS[e.group]?.label || esc(e.group)} · by ${esc(e.parent)} · now ${e.score}</small></span>
+      <span class="what">${esc(e.kidName)} · ${what}${note}
+        <small>${e.group === 'reward' ? '🎁 Cashed in' : GROUPS[e.group]?.label || esc(e.group)} · ${e.group === 'reward' ? 'approved' : 'by'} ${esc(e.parent)} · now ${e.score}</small></span>
       <time datetime="${esc(e.createdAt)}" title="${esc(new Date(e.createdAt).toLocaleString())}">${timeAgo(e.createdAt)}</time>
     </li>`;
 }

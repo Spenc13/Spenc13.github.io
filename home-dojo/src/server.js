@@ -211,6 +211,22 @@ function createApp(config, db) {
         return send(res, 200, out);
       }
 
+      case 'POST /api/kid/cash-in': {
+        // The girl asks on her own screen; a grown-up approves by typing their PIN there.
+        if (s?.role !== 'kid') throw httpError(401, 'Kid login required');
+        const ip = clientIp(req);
+        checkLock(ip);
+        const { rewardId, pin } = await readJson(req);
+        const parent = config.parents.find((p) => pinEquals(p.pin, pin ?? ''));
+        if (!parent) {
+          recordFail(ip);
+          throw httpError(401, 'That PIN didn\u2019t match');
+        }
+        failures.delete(ip);
+        const entry = store.cashIn(db, { kidId: s.kidId, rewardId: Number(rewardId), parent: parent.name });
+        return send(res, 200, { entry });
+      }
+
       case 'POST /api/kid/seen': {
         if (s?.role !== 'kid') throw httpError(401, 'Kid login required');
         const { logId } = await readJson(req);

@@ -134,6 +134,30 @@ test('rewards can be added with a threshold and removed', async () => {
   assert.deepEqual(del.data.rewards, []);
 });
 
+test('cashing in needs a grown-up PIN and enough stars, then takes the stars and logs it', async () => {
+  const mom = await login('1111');
+  const kid = (await call('/api/login/kid', { method: 'POST', body: { kidId: 2 } })).cookie;
+  const { data: d } = await call('/api/dashboard', { cookie: mom });
+  const b = d.behaviors[0];
+  const start = d.kids.find((k) => k.id === 2).score;
+  for (let i = 0; i < 4; i++) await call('/api/points', { method: 'POST', cookie: mom, body: { kidId: 2, behaviorId: b.id, direction: 1 } });
+  const cheap = (await call('/api/rewards', { method: 'POST', cookie: mom, body: { name: 'Sticker', threshold: 3 } })).data.rewards.find((r) => r.name === 'Sticker');
+  const pricey = (await call('/api/rewards', { method: 'POST', cookie: mom, body: { name: 'Zoo', threshold: 999 } })).data.rewards.find((r) => r.name === 'Zoo');
+  const cash = (rewardId, pin, cookie = kid) => call('/api/kid/cash-in', { method: 'POST', cookie, body: { rewardId, pin } });
+
+  assert.equal((await cash(cheap.id, '0000')).status, 401); // kid can't approve herself
+  assert.equal((await cash(cheap.id, '2222', mom)).status, 401); // only from a kid's screen
+  assert.equal((await cash(pricey.id, '2222')).status, 400); // not enough stars
+  const ok = await cash(cheap.id, '2222');
+  assert.equal(ok.status, 200);
+  assert.deepEqual([ok.data.entry.parent, ok.data.entry.behavior, ok.data.entry.group, ok.data.entry.applied, ok.data.entry.score],
+    ['Dad', 'Sticker', 'reward', -3, start + 4 - 3]);
+  assert.equal((await call('/api/kid', { cookie: kid })).data.kid.score, start + 1);
+  const log = (await call('/api/log', { cookie: mom })).data.log;
+  assert.equal(log[0].id, ok.data.entry.id);
+  assert.equal((await call('/api/kid', { cookie: kid })).data.unseen.at(-1).emoji, '🎁');
+});
+
 test('mutations without the app header are rejected', async () => {
   const r = await call('/api/login/parent', { method: 'POST', body: { pin: '1111' }, csrf: false });
   assert.equal(r.status, 403);

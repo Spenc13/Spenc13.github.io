@@ -160,6 +160,34 @@ function applyPoints(db, { kidId, behaviorId, direction, parent }) {
   });
 }
 
+/**
+ * Spend stars on a reward. A grown-up has already approved it (the caller
+ * checked their PIN); the girl must have enough stars. Logged like any change.
+ */
+function cashIn(db, { kidId, rewardId, parent }) {
+  return tx(db, () => {
+    const kid = db.prepare('SELECT id, name, score FROM kids WHERE id = ?').get(kidId);
+    if (!kid) throw httpError(404, 'Unknown daughter');
+    const r = db.prepare('SELECT id, name, threshold FROM rewards WHERE id = ?').get(rewardId);
+    if (!r) throw httpError(404, 'That reward is gone');
+    if (kid.score < r.threshold) throw httpError(400, 'Not enough stars yet');
+
+    const newScore = kid.score - r.threshold;
+    const createdAt = new Date().toISOString();
+    db.prepare('UPDATE kids SET score = ? WHERE id = ?').run(newScore, kid.id);
+    const res = db.prepare(`
+      INSERT INTO score_log (created_at, kid_id, kid_name, behavior_id, behavior_label, behavior_group,
+                             parent, requested_delta, applied_delta, score_after)
+      VALUES (?, ?, ?, NULL, ?, 'reward', ?, ?, ?, ?)`)
+      .run(createdAt, kid.id, kid.name, r.name, parent, -r.threshold, -r.threshold, newScore);
+
+    return {
+      id: Number(res.lastInsertRowid), createdAt, kidId: kid.id, kidName: kid.name,
+      behavior: r.name, group: 'reward', parent, requested: -r.threshold, applied: -r.threshold, score: newScore,
+    };
+  });
+}
+
 function getLog(db, limit = 50) {
   return db.prepare(`
     SELECT id, created_at AS createdAt, kid_id AS kidId, kid_name AS kidName,
@@ -175,7 +203,8 @@ function getLog(db, limit = 50) {
 function getUnseen(db, kidId, limit = 20) {
   return db.prepare(`
     SELECT l.id, l.applied_delta AS applied, l.score_after AS score, l.behavior_label AS behavior,
-           l.behavior_group AS "group", COALESCE(b.emoji, '') AS emoji
+           l.behavior_group AS "group",
+           CASE WHEN l.behavior_group = 'reward' THEN '🎁' ELSE COALESCE(b.emoji, '') END AS emoji
     FROM score_log l
     JOIN kids k ON k.id = l.kid_id
     LEFT JOIN behaviors b ON b.id = l.behavior_id
@@ -199,5 +228,5 @@ function httpError(status, message) {
 
 module.exports = {
   openDb, syncKids, getKids, getKid, getBehaviors, getRewards, addReward, deleteReward,
-  applyPoints, getLog, getUnseen, markSeen, httpError,
+  applyPoints, cashIn, getLog, getUnseen, markSeen, httpError,
 };

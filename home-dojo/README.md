@@ -6,7 +6,7 @@ A family points app for two daughters. It installs to the home screen on iPads a
 - **Parents:** two PINs (mom and dad), set as environment variables. Every change is logged with the parent's name.
 - **Kids:** each daughter has her own login (tap her picture, or a PIN if you set one). She sees only her own piggy bank, in her color, with her star count on its side. Each time she opens the app, it replays every change since she last looked, oldest first: stars drop into the slot for a plus and fly out for a minus, the behavior's picture (and name, for the older girl) shows above the pig, and the number on its side counts along. Changes that come in while she's watching play the same way. Tapping the pig skips to the end. What she has seen is remembered on the server, so switching devices doesn't replay it again. Kids get no edit controls, and the server rejects edits from a kid login.
 - **Scoring:** behaviors are grouped as Kind, Helping and Listening, and each one has a + and a − button. Scores never go below 0. Every tap is logged with the time, behavior, daughter and parent, including a minus at 0 (logged as "already at 0").
-- **Rewards:** the list starts empty. Parents add rewards with a star price on the dashboard. Each girl has a Rewards page listing every reward with its star price, which ones she already has enough for, and how many more she needs for the rest. Cashing stars in isn't built yet: a girl's stars only go down when a parent taps a −.
+- **Rewards:** the list starts empty. Parents add rewards with a star price on the dashboard. Each girl has a Rewards page listing every reward with its star price, which ones she already has enough for, and how many more she needs for the rest. When she has enough for a reward, she taps **Cash in** on it, and a grown-up approves by typing their PIN on her screen. The stars fly out of her piggy bank and a celebration plays. The cash-in is logged with the approving parent's name, and the log shows it as 🎁 Cashed in.
 
 <p>
   <img src="docs/screenshots/2-parent-dashboard-ipad.png" alt="Parent dashboard on iPad" width="360">
@@ -63,6 +63,6 @@ The default behaviors (three per group, 1 point each) are created in the `behavi
 
 ## API (all JSON)
 
-`GET /api/me` · `GET /api/login-options` · `POST /api/login/parent {pin}` · `POST /api/login/kid {kidId, pin?}` · `POST /api/logout` · `GET /api/kid` · parent only: `GET /api/dashboard`, `GET /api/log?limit=`, `POST /api/points {kidId, behaviorId, direction: 1|-1}`, `POST /api/rewards {name, threshold}`, `DELETE /api/rewards/:id`.
+`GET /api/me` · `GET /api/login-options` · `POST /api/login/parent {pin}` · `POST /api/login/kid {kidId, pin?}` · `POST /api/logout` · `GET /api/kid` · kid only: `POST /api/kid/seen {logId}`, `POST /api/kid/cash-in {rewardId, pin}` (pin = a parent's PIN) · parent only: `GET /api/dashboard`, `GET /api/log?limit=`, `POST /api/points {kidId, behaviorId, direction: 1|-1}`, `POST /api/rewards {name, threshold}`, `DELETE /api/rewards/:id`.
 
 Requests that change data must send the header `X-Requested-With: home-dojo`. After 5 wrong PINs, that device is locked out for 1 minute.

@@ -229,3 +229,27 @@ h1, h2, h3, p { margin: 0; }
 @keyframes nudge { 25% { transform: translateX(-2%); } 75% { transform: translateX(2%); } }
 @keyframes countbump { 50% { transform: scale(1.25); } }
 @keyframes wiggle { 20% { transform: rotate(-5deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }
+
+/* ---------- cash in ---------- */
+.pin-sub { font-size: 22px; font-weight: 700; color: var(--muted); margin-top: 8px; line-height: 1.5; --star-size: 26px; }
+.pin-sub .star { vertical-align: -4px; }
+.cash-btn { grid-column: 1 / -1; justify-self: stretch; border: 0; border-radius: 20px; min-height: 64px; background: var(--plus); color: #fff; font-size: 26px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 5px 0 #168a60; --star-size: 30px; }
+.cash-btn:active { transform: translateY(4px); box-shadow: none; }
+.party { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(43,33,64,.35); overflow: hidden; animation: fade .2s; }
+.party-card { background: var(--card); border-radius: 36px; padding: 32px 40px; text-align: center; box-shadow: var(--shadow); animation: pop-in .5s cubic-bezier(.2,1.4,.4,1); max-width: calc(100% - 32px); }
+.party-gift { font-size: 96px; line-height: 1; animation: wiggle .8s ease-in-out .4s 2; }
+.party-card p { font-size: 24px; font-weight: 800; color: var(--muted); margin-top: 10px; }
+.party-card h2 { font-size: clamp(30px, 8vw, 48px); font-weight: 900; }
+.confetti { position: absolute; top: -10%; font-size: 36px; animation: fall 2.6s ease-in forwards; }
+@keyframes pop-in { from { transform: scale(.3); opacity: 0; } }
+@keyframes fall { to { transform: translateY(120vh) rotate(540deg); } }
+
+/* keep tall screens (PIN pad on a phone) scrollable from the top instead of clipped */
+.login { justify-content: flex-start; }
+.login > :first-child { margin-top: auto; }
+.login > :last-child { margin-bottom: auto; }
+@media (max-height: 760px) {
+  .login { gap: 16px; }
+  .keys { grid-template-columns: repeat(3, 76px); gap: 12px; }
+  .keys button { height: 76px; font-size: 30px; }
+}
