@@ -12,7 +12,6 @@ const GROUPS = {
 };
 
 let pollTimer = null;
-let lastKidScore = null;
 
 // ---------- utilities ----------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,34 +53,35 @@ function handleAuthError(err) {
   if (err.status === 401) boot();
 }
 
-/** Where a score sits between the last reward reached and the next one. */
-function progressFor(score, rewards, defaultGoal) {
-  const sorted = [...rewards].sort((a, b) => a.threshold - b.threshold);
-  const next = sorted.find((r) => r.threshold > score);
-  if (next) {
-    const prev = sorted.filter((r) => r.threshold <= score).pop();
-    const from = prev ? prev.threshold : 0;
-    return { from, to: next.threshold, reward: next.name, fraction: (score - from) / (next.threshold - from) };
-  }
-  // No rewards yet (or all reached): fill a bar every `defaultGoal` points.
-  const from = Math.floor(score / defaultGoal) * defaultGoal;
-  return { from, to: from + defaultGoal, reward: null, fraction: (score - from) / defaultGoal };
+/** The cheapest reward still out of reach, if any. */
+function nextReward(score, rewards) {
+  return [...rewards].sort((a, b) => a.threshold - b.threshold).find((r) => r.threshold > score) || null;
 }
 
 const STAR_PATH = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z';
-function starsHtml(p, popIndex = -1) {
-  const span = p.to - p.from;
-  // Show one star per point when it fits; otherwise ten stars as a gauge.
-  const slots = span <= 20 ? span : 10;
-  const filled = span <= 20 ? Math.round(p.fraction * span) : Math.floor(p.fraction * 10);
-  let out = '';
-  for (let i = 0; i < slots; i++) {
-    const cls = `star${i < filled ? ' on' : ''}${i === popIndex ? ' pop' : ''}`;
-    out += `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>`;
-  }
-  // Two even rows when there are many stars (e.g. 5 + 5), one row otherwise.
-  const cols = slots > 6 ? Math.ceil(slots / 2) : slots;
-  return { html: `<div class="stars" style="--cols:${cols}" role="img" aria-label="${filled} of ${slots} stars">${out}</div>`, filled };
+const starSvg = (cls = 'star') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg>`;
+
+/** A piggy bank in the girl's color with her star count painted on its side. */
+function piggyHtml(score) {
+  const digits = String(score).length;
+  return `
+    <svg class="piggy" viewBox="0 0 320 250" aria-hidden="true">
+      <path class="pig-tail" d="M44 128c-22-4-30-26-14-34 14-7 22 14 8 20" fill="none" stroke-width="8" stroke-linecap="round"/>
+      <rect class="pig-dark" x="78" y="180" width="34" height="50" rx="14"/>
+      <rect class="pig-dark" x="200" y="180" width="34" height="50" rx="14"/>
+      <path class="pig-dark" d="M196 66l18-46 30 42z"/>
+      <ellipse class="pig-body" cx="160" cy="132" rx="122" ry="88"/>
+      <ellipse class="pig-shine" cx="104" cy="84" rx="34" ry="13" transform="rotate(-18 104 84)"/>
+      <rect x="128" y="46" width="64" height="12" rx="6" fill="#2b2140" opacity=".75"/>
+      <ellipse class="pig-dark" cx="284" cy="138" rx="26" ry="32"/>
+      <ellipse cx="277" cy="130" rx="5" ry="8" fill="#2b2140" opacity=".6"/>
+      <ellipse cx="292" cy="146" rx="5" ry="8" fill="#2b2140" opacity=".6"/>
+      <circle cx="238" cy="104" r="9" fill="#2b2140"/>
+      <circle cx="241" cy="101" r="3" fill="#fff"/>
+    </svg>
+    <div class="pig-label d${Math.min(digits, 4)}" role="img" aria-label="${score} ${score === 1 ? 'star' : 'stars'} in the piggy bank">
+      ${starSvg('star on')}<span>${score}</span>
+    </div>`;
 }
 
 const barHtml = (fraction) => `<div class="bar"><i style="width:${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%"></i></div>`;
@@ -198,57 +198,152 @@ function showPinPad({ title, submit }) {
 
 async function logout() {
   await api('/api/logout', { method: 'POST' });
-  lastKidScore = null;
   boot();
 }
 
 // ---------- kid view ----------
+let replaying = false;
+
 async function showKid() {
   const render = async () => {
-    const { kid, rewards, defaultGoal } = await api('/api/kid');
-    const p = progressFor(kid.score, rewards, defaultGoal);
-    const gained = lastKidScore !== null && kid.score > lastKidScore;
-    const stars = starsHtml(p);
-    const popIndex = gained ? stars.filled - 1 : -1;
-    const toGo = p.to - kid.score;
-
-    $app.innerHTML = `
-      <section class="kid-view ${kid.young ? 'young' : ''}" style="--kid:${esc(kid.color)}">
-        <div class="avatar" aria-hidden="true">${esc(kid.emoji)}</div>
-        <h1>${esc(kid.name)}</h1>
-        <div class="goal">
-          ${starsHtml(p, popIndex).html}
-          ${barHtml(p.fraction)}
-          <p class="goal-label">${p.reward
-            ? `${'⭐'.repeat(Math.min(toGo, 3))} ${toGo} more for <b>${esc(p.reward)}</b>`
-            : kid.young ? '' : `${toGo} more ${toGo === 1 ? 'star' : 'stars'} to fill your bar!`}</p>
-        </div>
-        <p class="score"><b>${kid.score}</b> ${kid.score === 1 ? 'star' : 'stars'}</p>
-        <button class="corner-btn" id="switch">Switch</button>
-      </section>`;
-    document.getElementById('switch').onclick = logout;
-    if (gained) celebrate();
-    lastKidScore = kid.score;
+    if (replaying) return; // let the piggy finish its show
+    const { kid, rewards, unseen = [] } = await api('/api/kid');
+    if (location.hash === '#rewards') return renderKidRewards(kid, rewards); // replay waits for the piggy
+    if (!unseen.length) return renderPiggy(kid, rewards);
+    // Start from what she last saw, then play each change since.
+    const start = unseen[0].score - unseen[0].applied;
+    renderPiggy({ ...kid, score: start }, rewards, { hint: false });
+    await replay(unseen);
+    api('/api/kid/seen', { method: 'POST', body: { logId: unseen.at(-1).id } }).catch(() => {});
+    if (location.hash !== '#rewards') renderPiggy(kid, rewards);
   };
+  window.onhashchange = () => render().catch(handleAuthError);
   await render();
   poll(render, 5000);
 }
 
-function celebrate() {
-  const burst = document.createElement('div');
-  burst.className = 'burst';
-  for (let i = 0; i < 14; i++) {
-    const s = document.createElement('span');
-    s.textContent = ['⭐', '🌟', '✨'][i % 3];
-    s.style.left = '50%';
-    s.style.top = '45%';
-    const angle = (i / 14) * Math.PI * 2;
-    s.style.setProperty('--dx', `${Math.cos(angle) * 260}px`);
-    s.style.setProperty('--dy', `${Math.sin(angle) * 260}px`);
-    burst.appendChild(s);
+function kidHeader(kid) {
+  return `<header class="kid-head"><span class="mini-avatar" aria-hidden="true">${esc(kid.emoji)}</span><h1>${esc(kid.name)}</h1></header>`;
+}
+
+function renderPiggy(kid, rewards, { hint: showHint = true } = {}) {
+  const next = nextReward(kid.score, rewards);
+  const affordable = rewards.filter((r) => r.threshold <= kid.score).length;
+  let hint = '';
+  if (affordable) hint = `🎉 You have enough for ${affordable === 1 ? 'a reward' : `${affordable} rewards`}!`;
+  else if (next) hint = `${next.threshold - kid.score} more for <b>${esc(next.name)}</b>`;
+
+  $app.innerHTML = `
+    <section class="kid-view ${kid.young ? 'young' : ''}" style="--kid:${esc(kid.color)}">
+      ${kidHeader(kid)}
+      <div class="piggy-wrap" id="piggy">
+        <div class="replay-caption" aria-live="polite"></div>
+        <div class="drops" aria-hidden="true"></div>
+        ${piggyHtml(kid.score)}
+      </div>
+      <p class="piggy-hint">${hint && showHint && !kid.young ? hint : ''}</p>
+      <button class="big-btn" id="to-rewards">🎁 Rewards${affordable ? ` <span class="dot">${affordable}</span>` : ''}</button>
+      <button class="corner-btn" id="switch">Switch</button>
+    </section>`;
+  document.getElementById('switch').onclick = logout;
+  document.getElementById('to-rewards').onclick = () => { location.hash = 'rewards'; };
+  const piggy = document.getElementById('piggy');
+  piggy.onclick = () => (replaying ? (replay.skip = true) : wiggle(piggy));
+}
+
+function renderKidRewards(kid, rewards) {
+  const sorted = [...rewards].sort((a, b) => a.threshold - b.threshold);
+  $app.innerHTML = `
+    <section class="kid-view rewards-view ${kid.young ? 'young' : ''}" style="--kid:${esc(kid.color)}">
+      ${kidHeader(kid)}
+      <div class="mini-bank">🐷 ${starSvg('star on')} <b>${kid.score}</b></div>
+      <h2 class="rewards-title">🎁 Rewards</h2>
+      ${sorted.length ? `<ul class="reward-cards">${sorted.map((r) => {
+        const ok = kid.score >= r.threshold;
+        return `
+          <li class="reward-card ${ok ? 'ok' : ''}">
+            <span class="reward-name">${esc(r.name)}</span>
+            <span class="price">${starSvg('star on')}<b>${r.threshold}</b></span>
+            ${ok
+              ? '<span class="reward-status">🎉 You have enough!</span>'
+              : `<span class="reward-status">${barHtml(kid.score / r.threshold)}<small>${r.threshold - kid.score} more</small></span>`}
+          </li>`;
+      }).join('')}</ul>`
+        : '<p class="no-rewards">No rewards yet.<br>Ask Mom or Dad! 💬</p>'}
+      <button class="big-btn" id="to-piggy">🐷 My piggy bank</button>
+      <button class="corner-btn" id="switch">Switch</button>
+    </section>`;
+  document.getElementById('switch').onclick = logout;
+  document.getElementById('to-piggy').onclick = () => { history.length > 1 && location.hash ? history.back() : (location.hash = ''); };
+}
+
+function wiggle(el) {
+  el.classList.remove('wiggle');
+  void el.offsetWidth;
+  el.classList.add('wiggle');
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function setPigCount(n) {
+  const label = document.querySelector('.pig-label');
+  if (!label) return;
+  label.className = `pig-label d${Math.min(String(n).length, 4)} bump`;
+  label.querySelector('span').textContent = n;
+  label.setAttribute('aria-label', `${n} ${n === 1 ? 'star' : 'stars'} in the piggy bank`);
+  setTimeout(() => label.classList.remove('bump'), 350);
+}
+
+/**
+ * Play score changes one by one: stars drop into the slot for a plus and fly
+ * out of it for a minus, with the behavior shown above the pig and the count
+ * on its side ticking along. Tapping the pig skips to the end.
+ */
+async function replay(entries) {
+  replaying = true;
+  replay.skip = false;
+  const piggy = document.getElementById('piggy');
+  const drops = piggy.querySelector('.drops');
+  const caption = piggy.querySelector('.replay-caption');
+  const step = entries.length > 8 ? 650 : 1100; // speed up long catch-ups
+  try {
+    await sleep(500);
+    for (const e of entries) {
+      if (replay.skip || !document.body.contains(piggy)) break;
+      const up = e.applied > 0;
+      caption.innerHTML = `<span class="cap-emoji">${esc(e.emoji || '⭐')}</span>
+        <span class="cap-text">${esc(e.behavior)}</span>
+        <b class="${up ? 'up' : 'down'}">${up ? '+' : '−'}${Math.abs(e.applied)}</b>`;
+      caption.classList.remove('show');
+      void caption.offsetWidth;
+      caption.classList.add('show');
+
+      const n = Math.min(Math.abs(e.applied), 3);
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('span');
+        d.className = up ? 'drop' : 'lift';
+        d.innerHTML = starSvg('star on');
+        d.style.animationDuration = `${step * 0.8}ms`;
+        d.style.animationDelay = `${i * 120}ms`;
+        drops.appendChild(d);
+        setTimeout(() => d.remove(), step + i * 120 + 200);
+      }
+      // the count changes as the star lands in (or leaves) the slot
+      await sleep(up ? step * 0.7 : step * 0.25);
+      setPigCount(e.score);
+      if (up) wiggle(piggy); else nudge(piggy);
+      await sleep(up ? step * 0.3 : step * 0.75);
+    }
+  } finally {
+    caption.classList.remove('show');
+    replaying = false;
   }
-  document.body.appendChild(burst);
-  setTimeout(() => burst.remove(), 1500);
+}
+
+function nudge(el) {
+  el.classList.remove('nudge');
+  void el.offsetWidth;
+  el.classList.add('nudge');
 }
 
 // ---------- parent dashboard ----------
@@ -265,14 +360,17 @@ async function showDashboard() {
 }
 
 function scoreCardHtml(k) {
-  const p = progressFor(k.score, dash.rewards, dash.defaultGoal);
+  const next = nextReward(k.score, dash.rewards);
+  const affordable = dash.rewards.filter((r) => r.threshold <= k.score).length;
+  let note = 'No rewards yet';
+  if (affordable) note = `Has enough for ${affordable} ${affordable === 1 ? 'reward' : 'rewards'}`;
+  else if (next) note = `${next.threshold - k.score} more for ${esc(next.name)}`;
   return `
     <div class="score-card" data-score-kid="${k.id}" style="--kid:${esc(k.color)}">
       <span class="emoji" aria-hidden="true">${esc(k.emoji)}</span>
       <span class="name">${esc(k.name)}</span>
-      <span class="pts">${k.score}<small>points</small></span>
-      ${barHtml(p.fraction)}
-      <span class="next">${p.reward ? `${p.to - k.score} to ${esc(p.reward)}` : `${p.to - k.score} to fill the bar`}</span>
+      <span class="pts">${k.score}<small>${k.score === 1 ? 'star' : 'stars'}</small></span>
+      <span class="next">🐷 ${note}</span>
     </div>`;
 }
 
@@ -305,12 +403,12 @@ function renderDashboard() {
         <h2>🎁 Rewards</h2>
         ${dash.rewards.length
           ? `<ul class="rewards">${dash.rewards.map((r) => `
-              <li><span>${esc(r.name)} · <b>${r.threshold}</b> pts</span>
+              <li><span>${esc(r.name)} · ⭐ <b>${r.threshold}</b></span>
               <button class="x" data-del-reward="${r.id}" aria-label="Remove ${esc(r.name)}">✕</button></li>`).join('')}</ul>`
-          : `<p class="empty" style="margin-bottom:12px">No rewards yet. Add one when you’re ready. Until then, the bar fills every ${dash.defaultGoal} points.</p>`}
+          : `<p class="empty" style="margin-bottom:12px">No rewards yet. Add one with its star price, and the girls will see it on their Rewards page.</p>`}
         <form class="reward-form" id="reward-form">
           <input name="name" placeholder="Reward (e.g. Ice cream trip)" maxlength="80" required>
-          <input name="threshold" type="number" inputmode="numeric" min="1" placeholder="Points" required>
+          <input name="threshold" type="number" inputmode="numeric" min="1" placeholder="Stars" required>
           <button type="submit">Add</button>
         </form>
       </section>
@@ -363,7 +461,7 @@ function logItemHtml(e) {
 function chooseKid(behaviorId, direction) {
   const b = dash.behaviors.find((x) => x.id === behaviorId);
   const g = GROUPS[b.grp];
-  const verb = direction > 0 ? `+${b.points}` : `−${b.points}`;
+  const verb = direction > 0 ? `+${b.points} ⭐` : `−${b.points} ⭐`;
   $sheet.innerHTML = `
     <div class="sheet-backdrop" id="backdrop">
       <div class="sheet" role="dialog" aria-modal="true" aria-label="Choose daughter">

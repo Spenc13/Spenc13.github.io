@@ -67,6 +67,10 @@ function openDb(dbPath) {
     CREATE INDEX IF NOT EXISTS score_log_created ON score_log(created_at DESC);
   `);
 
+  // Added after launch: the last log entry each girl has watched on her piggy bank.
+  const kidCols = db.prepare('PRAGMA table_info(kids)').all().map((c) => c.name);
+  if (!kidCols.includes('seen_log_id')) db.exec('ALTER TABLE kids ADD COLUMN seen_log_id INTEGER NOT NULL DEFAULT 0');
+
   const behaviorCount = db.prepare('SELECT COUNT(*) AS n FROM behaviors').get().n;
   if (behaviorCount === 0) {
     const ins = db.prepare('INSERT INTO behaviors (grp, label, emoji, sort_order) VALUES (?, ?, ?, ?)');
@@ -164,6 +168,29 @@ function getLog(db, limit = 50) {
     FROM score_log ORDER BY id DESC LIMIT ?`).all(limit);
 }
 
+/**
+ * Score changes this girl hasn't watched yet, oldest first (at most `limit`, the most recent ones).
+ * Entries that changed nothing (a minus at 0) are left out.
+ */
+function getUnseen(db, kidId, limit = 20) {
+  return db.prepare(`
+    SELECT l.id, l.applied_delta AS applied, l.score_after AS score, l.behavior_label AS behavior,
+           l.behavior_group AS "group", COALESCE(b.emoji, '') AS emoji
+    FROM score_log l
+    JOIN kids k ON k.id = l.kid_id
+    LEFT JOIN behaviors b ON b.id = l.behavior_id
+    WHERE l.kid_id = ? AND l.id > k.seen_log_id AND l.applied_delta != 0
+    ORDER BY l.id DESC LIMIT ?`).all(kidId, limit).reverse();
+}
+
+/** Remember that she has watched everything up to `logId` (never moves backwards or past her real log). */
+function markSeen(db, kidId, logId) {
+  db.prepare(`
+    UPDATE kids SET seen_log_id = MAX(seen_log_id,
+      MIN(?, (SELECT COALESCE(MAX(id), 0) FROM score_log WHERE kid_id = ?)))
+    WHERE id = ?`).run(logId, kidId, kidId);
+}
+
 function httpError(status, message) {
   const e = new Error(message);
   e.status = status;
@@ -172,5 +199,5 @@ function httpError(status, message) {
 
 module.exports = {
   openDb, syncKids, getKids, getKid, getBehaviors, getRewards, addReward, deleteReward,
-  applyPoints, getLog, httpError,
+  applyPoints, getLog, getUnseen, markSeen, httpError,
 };

@@ -40,15 +40,12 @@ function readConfig(env = process.env) {
     ephemeralSecret = true;
   }
 
-  const goal = parseInt(env.DEFAULT_GOAL || '10', 10);
-
   return {
     errors,
     parents,
     kids,
     sessionSecret,
     ephemeralSecret,
-    defaultGoal: Number.isFinite(goal) && goal > 0 ? goal : 10,
     port: parseInt(env.PORT || '3000', 10),
     dbPath: env.DB_PATH || './data/home-dojo.sqlite',
     secureCookies: /^(1|true|yes)$/i.test(env.SECURE_COOKIES || (env.NODE_ENV === 'production' ? 'true' : 'false')),
