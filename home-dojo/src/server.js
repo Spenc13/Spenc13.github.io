@@ -205,7 +205,18 @@ function createApp(config, db) {
         else throw httpError(401, 'Login required');
         const kid = store.getKid(db, kidId);
         if (!kid) throw httpError(404, 'Unknown daughter');
-        return send(res, 200, { kid: publicKid(kid), rewards: store.getRewards(db) });
+        const out = { kid: publicKid(kid), rewards: store.getRewards(db) };
+        // Only the girl herself gets the replay of changes since she last looked.
+        if (s.role === 'kid') out.unseen = store.getUnseen(db, kid.id);
+        return send(res, 200, out);
+      }
+
+      case 'POST /api/kid/seen': {
+        if (s?.role !== 'kid') throw httpError(401, 'Kid login required');
+        const { logId } = await readJson(req);
+        if (!Number.isInteger(logId) || logId < 0) throw httpError(400, 'logId must be a whole number');
+        store.markSeen(db, s.kidId, logId);
+        return send(res, 200, { ok: true });
       }
 
       case 'GET /api/dashboard': {

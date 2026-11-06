@@ -168,11 +168,11 @@ h1, h2, h3, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 /* ---------- piggy bank ---------- */
-.kid-head { display: flex; align-items: center; gap: 14px; }
+.kid-head { margin-bottom: clamp(28px, 6vh, 64px); display: flex; align-items: center; gap: 14px; }
 .kid-head h1 { font-size: clamp(34px, 7vw, 56px); }
 .mini-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--kid); display: grid; place-items: center; font-size: 44px; box-shadow: 0 5px 0 color-mix(in srgb, var(--kid) 70%, #000); }
 .kid-view.young .mini-avatar { width: 88px; height: 88px; font-size: 56px; }
-.piggy-wrap { position: relative; width: min(520px, 88vw, 52vh * 1.28); container-type: inline-size; cursor: pointer; padding-top: 18%; }
+.piggy-wrap { position: relative; width: min(520px, 88vw, 46vh * 1.28); container-type: inline-size; cursor: pointer; padding-top: 18%; }
 .piggy { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 10px 0 rgba(43,33,64,.08)); }
 .pig-body { fill: color-mix(in srgb, var(--kid) 82%, #fff); }
 .pig-dark { fill: color-mix(in srgb, var(--kid) 80%, #000); }
@@ -186,8 +186,22 @@ h1, h2, h3, p { margin: 0; }
 .pig-label.d4 span { font-size: 12cqw; }
 .piggy-wrap.wiggle { animation: wiggle .6s ease-in-out; }
 .drops { position: absolute; left: 50%; top: 0; width: 0; height: 100%; pointer-events: none; }
-.drop { position: absolute; left: -6cqw; top: 0; width: 12cqw; height: 12cqw; opacity: 0; animation: drop .9s cubic-bezier(.5,0,.9,.6) forwards; }
-.drop .star { width: 100%; height: 100%; }
+.drop, .lift { position: absolute; left: -6cqw; top: 0; width: 12cqw; height: 12cqw; opacity: 0; animation: drop .9s cubic-bezier(.5,0,.9,.6) forwards; }
+.lift { animation-name: lift; animation-timing-function: cubic-bezier(.2,.6,.4,1); }
+.drop .star, .lift .star { width: 100%; height: 100%; }
+.lift .star.on path { fill: #ffd76a; }
+.piggy-wrap.nudge { animation: nudge .45s ease-in-out; }
+.pig-label.bump span { animation: countbump .35s ease-out; display: inline-block; }
+/* caption above the pig: which behavior, and + or − */
+.replay-caption { position: absolute; left: 50%; top: -2%; transform: translate(-50%, -100%) scale(.8); opacity: 0; display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 999px; padding: 8px 18px 8px 12px; box-shadow: var(--shadow); white-space: nowrap; font-weight: 800; font-size: clamp(18px, 4.6cqw, 26px); transition: opacity .2s, transform .2s; pointer-events: none; }
+.replay-caption.show { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+.replay-caption .cap-emoji { font-size: 1.5em; line-height: 1; }
+.replay-caption b { color: #fff; border-radius: 999px; padding: 2px 12px; }
+.replay-caption b.up { background: var(--plus); }
+.replay-caption b.down { background: var(--minus); }
+.kid-view.young .replay-caption .cap-text { display: none; }
+.kid-view.young .replay-caption { font-size: clamp(24px, 6cqw, 34px); }
+.piggy-hint:empty { visibility: hidden; }
 .piggy-hint { font-size: 22px; font-weight: 800; color: var(--muted); max-width: 560px; }
 .big-btn { border: 0; border-radius: 999px; background: var(--card); padding: 18px 34px; font-size: 26px; font-weight: 900; min-height: 72px; box-shadow: 0 6px 0 var(--line), 0 10px 24px rgba(43,33,64,.08); display: inline-flex; align-items: center; gap: 10px; }
 .big-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--line); }
@@ -211,4 +225,7 @@ h1, h2, h3, p { margin: 0; }
 
 /* the coin slot sits ~2.2 star-heights below the top of the wrap */
 @keyframes drop { 0% { transform: translateY(-30%) scale(.9); opacity: 0; } 15% { opacity: 1; } 80% { transform: translateY(190%) scale(.8); opacity: 1; } 100% { transform: translateY(230%) scale(.2); opacity: 0; } }
+@keyframes lift { 0% { transform: translateY(230%) scale(.2); opacity: 0; } 20% { opacity: 1; transform: translateY(170%) scale(.8); } 100% { transform: translate(60%, -60%) scale(1) rotate(30deg); opacity: 0; } }
+@keyframes nudge { 25% { transform: translateX(-2%); } 75% { transform: translateX(2%); } }
+@keyframes countbump { 50% { transform: scale(1.25); } }
 @keyframes wiggle { 20% { transform: rotate(-5deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); } }

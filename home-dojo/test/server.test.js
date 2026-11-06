@@ -93,6 +93,38 @@ test('kids see only their own score and cannot edit', async () => {
   assert.equal((await call('/api/rewards', { method: 'POST', cookie: kid, body: { name: 'x', threshold: 1 } })).status, 401);
 });
 
+test('kids replay unseen changes once, oldest first', async () => {
+  const mom = await login('1111');
+  const kid = (await call('/api/login/kid', { method: 'POST', body: { kidId: 1 } })).cookie;
+  let { data } = await call('/api/kid', { cookie: kid });
+  await call('/api/kid/seen', { method: 'POST', cookie: kid, body: { logId: data.unseen.at(-1)?.id ?? 0 } });
+  assert.deepEqual((await call('/api/kid', { cookie: kid })).data.unseen, []);
+
+  const { data: d } = await call('/api/dashboard', { cookie: mom });
+  const [b1, b2] = d.behaviors;
+  const add = (bid, dir) => call('/api/points', { method: 'POST', cookie: mom, body: { kidId: 1, behaviorId: bid, direction: dir } });
+  const e1 = (await add(b1.id, 1)).data.entry;
+  const e2 = (await add(b2.id, 1)).data.entry;
+  const e3 = (await add(b1.id, -1)).data.entry;
+  await add(b1.id, 1); // other girl's changes must not show up
+  await call('/api/points', { method: 'POST', cookie: mom, body: { kidId: 2, behaviorId: b1.id, direction: 1 } });
+
+  ({ data } = await call('/api/kid', { cookie: kid }));
+  assert.deepEqual(data.unseen.slice(0, 3).map((u) => [u.id, u.applied, u.score]),
+    [[e1.id, 1, e1.score], [e2.id, 1, e2.score], [e3.id, -1, e3.score]]);
+  assert.equal(data.unseen[0].emoji, b1.emoji);
+  assert.equal(data.unseen.length, 4);
+
+  // Parents previewing a girl don't get (or consume) her replay.
+  assert.equal((await call('/api/kid?id=1', { cookie: mom })).data.unseen, undefined);
+  assert.equal((await call('/api/kid/seen', { method: 'POST', cookie: mom, body: { logId: 1 } })).status, 401);
+
+  await call('/api/kid/seen', { method: 'POST', cookie: kid, body: { logId: e3.id } });
+  assert.equal((await call('/api/kid', { cookie: kid })).data.unseen.length, 1);
+  await call('/api/kid/seen', { method: 'POST', cookie: kid, body: { logId: 1 } }); // never moves backwards
+  assert.equal((await call('/api/kid', { cookie: kid })).data.unseen.length, 1);
+});
+
 test('rewards can be added with a threshold and removed', async () => {
   const mom = await login('1111');
   assert.equal((await call('/api/rewards', { method: 'POST', cookie: mom, body: { name: 'Park', threshold: 0 } })).status, 400);

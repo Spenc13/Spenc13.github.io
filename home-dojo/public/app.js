@@ -12,7 +12,6 @@ const GROUPS = {
 };
 
 let pollTimer = null;
-let lastKidScore = null;
 
 // ---------- utilities ----------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -199,18 +198,24 @@ function showPinPad({ title, submit }) {
 
 async function logout() {
   await api('/api/logout', { method: 'POST' });
-  lastKidScore = null;
   boot();
 }
 
 // ---------- kid view ----------
+let replaying = false;
+
 async function showKid() {
   const render = async () => {
-    const { kid, rewards } = await api('/api/kid');
-    const gained = lastKidScore !== null && kid.score > lastKidScore ? kid.score - lastKidScore : 0;
-    lastKidScore = kid.score;
-    if (location.hash === '#rewards') renderKidRewards(kid, rewards);
-    else renderPiggy(kid, rewards, gained);
+    if (replaying) return; // let the piggy finish its show
+    const { kid, rewards, unseen = [] } = await api('/api/kid');
+    if (location.hash === '#rewards') return renderKidRewards(kid, rewards); // replay waits for the piggy
+    if (!unseen.length) return renderPiggy(kid, rewards);
+    // Start from what she last saw, then play each change since.
+    const start = unseen[0].score - unseen[0].applied;
+    renderPiggy({ ...kid, score: start }, rewards, { hint: false });
+    await replay(unseen);
+    api('/api/kid/seen', { method: 'POST', body: { logId: unseen.at(-1).id } }).catch(() => {});
+    if (location.hash !== '#rewards') renderPiggy(kid, rewards);
   };
   window.onhashchange = () => render().catch(handleAuthError);
   await render();
@@ -221,7 +226,7 @@ function kidHeader(kid) {
   return `<header class="kid-head"><span class="mini-avatar" aria-hidden="true">${esc(kid.emoji)}</span><h1>${esc(kid.name)}</h1></header>`;
 }
 
-function renderPiggy(kid, rewards, gained) {
+function renderPiggy(kid, rewards, { hint: showHint = true } = {}) {
   const next = nextReward(kid.score, rewards);
   const affordable = rewards.filter((r) => r.threshold <= kid.score).length;
   let hint = '';
@@ -232,18 +237,18 @@ function renderPiggy(kid, rewards, gained) {
     <section class="kid-view ${kid.young ? 'young' : ''}" style="--kid:${esc(kid.color)}">
       ${kidHeader(kid)}
       <div class="piggy-wrap" id="piggy">
+        <div class="replay-caption" aria-live="polite"></div>
         <div class="drops" aria-hidden="true"></div>
         ${piggyHtml(kid.score)}
       </div>
-      ${hint && !kid.young ? `<p class="piggy-hint">${hint}</p>` : ''}
+      <p class="piggy-hint">${hint && showHint && !kid.young ? hint : ''}</p>
       <button class="big-btn" id="to-rewards">🎁 Rewards${affordable ? ` <span class="dot">${affordable}</span>` : ''}</button>
       <button class="corner-btn" id="switch">Switch</button>
     </section>`;
   document.getElementById('switch').onclick = logout;
   document.getElementById('to-rewards').onclick = () => { location.hash = 'rewards'; };
   const piggy = document.getElementById('piggy');
-  piggy.onclick = () => wiggle(piggy);
-  if (gained) dropStars(piggy, gained);
+  piggy.onclick = () => (replaying ? (replay.skip = true) : wiggle(piggy));
 }
 
 function renderKidRewards(kid, rewards) {
@@ -278,18 +283,67 @@ function wiggle(el) {
   el.classList.add('wiggle');
 }
 
-/** Stars fall one after another into the slot, then the pig wiggles. */
-function dropStars(piggy, count) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function setPigCount(n) {
+  const label = document.querySelector('.pig-label');
+  if (!label) return;
+  label.className = `pig-label d${Math.min(String(n).length, 4)} bump`;
+  label.querySelector('span').textContent = n;
+  label.setAttribute('aria-label', `${n} ${n === 1 ? 'star' : 'stars'} in the piggy bank`);
+  setTimeout(() => label.classList.remove('bump'), 350);
+}
+
+/**
+ * Play score changes one by one: stars drop into the slot for a plus and fly
+ * out of it for a minus, with the behavior shown above the pig and the count
+ * on its side ticking along. Tapping the pig skips to the end.
+ */
+async function replay(entries) {
+  replaying = true;
+  replay.skip = false;
+  const piggy = document.getElementById('piggy');
   const drops = piggy.querySelector('.drops');
-  const n = Math.min(count, 5);
-  for (let i = 0; i < n; i++) {
-    const d = document.createElement('span');
-    d.className = 'drop';
-    d.innerHTML = starSvg('star on');
-    d.style.animationDelay = `${i * 0.35}s`;
-    drops.appendChild(d);
+  const caption = piggy.querySelector('.replay-caption');
+  const step = entries.length > 8 ? 650 : 1100; // speed up long catch-ups
+  try {
+    await sleep(500);
+    for (const e of entries) {
+      if (replay.skip || !document.body.contains(piggy)) break;
+      const up = e.applied > 0;
+      caption.innerHTML = `<span class="cap-emoji">${esc(e.emoji || '⭐')}</span>
+        <span class="cap-text">${esc(e.behavior)}</span>
+        <b class="${up ? 'up' : 'down'}">${up ? '+' : '−'}${Math.abs(e.applied)}</b>`;
+      caption.classList.remove('show');
+      void caption.offsetWidth;
+      caption.classList.add('show');
+
+      const n = Math.min(Math.abs(e.applied), 3);
+      for (let i = 0; i < n; i++) {
+        const d = document.createElement('span');
+        d.className = up ? 'drop' : 'lift';
+        d.innerHTML = starSvg('star on');
+        d.style.animationDuration = `${step * 0.8}ms`;
+        d.style.animationDelay = `${i * 120}ms`;
+        drops.appendChild(d);
+        setTimeout(() => d.remove(), step + i * 120 + 200);
+      }
+      // the count changes as the star lands in (or leaves) the slot
+      await sleep(up ? step * 0.7 : step * 0.25);
+      setPigCount(e.score);
+      if (up) wiggle(piggy); else nudge(piggy);
+      await sleep(up ? step * 0.3 : step * 0.75);
+    }
+  } finally {
+    caption.classList.remove('show');
+    replaying = false;
   }
-  setTimeout(() => wiggle(piggy), 900 + (n - 1) * 350);
+}
+
+function nudge(el) {
+  el.classList.remove('nudge');
+  void el.offsetWidth;
+  el.classList.add('nudge');
 }
 
 // ---------- parent dashboard ----------
