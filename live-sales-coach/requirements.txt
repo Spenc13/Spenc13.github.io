@@ -1,0 +1,10 @@
+PySide6>=6.7            # desktop shell + QtWebEngine
+anthropic>=0.75         # Claude Messages API
+websockets>=14          # Deepgram streaming
+numpy>=1.26
+PyYAML>=6.0
+python-dotenv>=1.0
+pynput>=1.7             # global hotkey
+sounddevice>=0.4.6      # microphone (and BlackHole on macOS)
+PyAudioWPatch>=0.2.12; sys_platform == "win32"   # WASAPI loopback for prospect audio
+pytest>=8

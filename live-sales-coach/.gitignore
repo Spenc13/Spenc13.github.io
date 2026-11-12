@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Call recordings, transcripts, and summaries stay on this computer
+calls/*
+!calls/.gitkeep
+
+# Private business material and personal photo. This repo is public (GitHub Pages),
+# so these stay local. Copy them in from Google Drive (see README).
+prompts/*.md
+!prompts/README.md
+web/spencer.png
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.log
