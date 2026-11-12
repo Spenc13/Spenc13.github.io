@@ -322,6 +322,39 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .toast { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12px; }
 .toast.error { border-color: rgba(255,107,107,0.5); color: var(--bad); }
 .overview { margin: 0 0 10px; font-size: 13px; color: var(--fg); }
+.btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+.sum-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* Past calls browser */
+.modal.wide { max-width: 1100px; height: min(86vh, 860px); display: flex; flex-direction: column; padding: 0; }
+.calls-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.calls-head h2 { margin: 0; font-size: 16px; flex: 1; }
+.calls-head input { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--fg); min-width: 0; width: 220px; }
+.calls-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; }
+@media (max-width: 760px) { .calls-body { grid-template-columns: 1fr; grid-template-rows: 40% 60%; } }
+.calls-list { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: grid; align-content: start; gap: 6px; }
+.call-item { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 10px; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+.call-item:hover { background: var(--panel-2); }
+.call-item.active { background: var(--accent-soft); border-color: rgba(124,140,255,0.45); }
+.call-item strong { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-item small { color: var(--muted); font-size: 12px; grid-column: 1; }
+.call-item .score { grid-row: 1 / 3; grid-column: 2; align-self: center; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; }
+.call-detail { overflow-y: auto; padding: 16px; min-width: 0; }
+.call-detail .detail-head { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 12px; }
+.call-detail .detail-head h3 { margin: 0; font-size: 16px; flex: 1 1 240px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 10px; color: var(--muted); font-weight: 600; font-size: 13px; }
+.tabs button.on { color: var(--fg); border-bottom-color: var(--accent); }
+.md h2 { font-size: 14px; margin: 14px 0 6px; }
+.md h1 { font-size: 15px; margin: 0 0 8px; }
+.md p { margin: 0 0 8px; }
+.md ul { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
+.mini-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.mini-scores div { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; }
+.mini-scores b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.mini-scores span { font-size: 11px; color: var(--muted); }
+.plain { white-space: pre-wrap; font-size: 13px; line-height: 1.55; margin: 0; }
+.cards-list { display: grid; gap: 8px; }
+.cards-list .coach-card { margin: 0; }
 </style>
 </head>
 <body>
@@ -344,6 +377,7 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
     <button id="startBtn" class="btn primary">Start call</button>
     <button id="pauseBtn" class="btn" hidden>Pause</button>
     <button id="endBtn" class="btn danger" hidden>End call</button>
+    <button id="callsBtn" class="btn">Past calls</button>
     <div class="user">
       <div class="avatar"><img id="avatarImg" src="spencer.png" alt="Spencer Faircloth" onerror="this.outerHTML='<div class=&quot;initials&quot;>SF</div>'"></div>
       <div>
@@ -459,7 +493,11 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
   <section class="card span-7" aria-labelledby="p-h">
     <div class="card-head">
       <h2 id="p-h">Post-call summary</h2>
-      <span class="muted" style="font-size:12px;" id="sumMeta">Generated when you end the call</span>
+      <div class="sum-actions">
+        <span class="muted" style="font-size:12px;" id="sumMeta">Generated when you end the call</span>
+        <button class="btn small" id="sumCopy" hidden>Copy summary</button>
+        <button class="btn small" id="sumOpen" hidden>Open folder</button>
+      </div>
     </div>
     <p class="overview" id="overview" hidden></p>
     <div class="summary">
@@ -487,6 +525,22 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
   </div>
 </div>
 
+<!-- Past calls browser -->
+<div class="modal-back" id="callsModal" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="calls-h">
+    <div class="calls-head">
+      <h2 id="calls-h">Past calls</h2>
+      <input id="callsFilter" type="search" placeholder="Filter by name or date" autocomplete="off">
+      <button class="btn small" id="callsFolder">Open calls folder</button>
+      <button class="btn small" id="callsClose">Close</button>
+    </div>
+    <div class="calls-body">
+      <div class="calls-list" id="callsList"><div class="empty">Loading…</div></div>
+      <div class="call-detail" id="callDetail"><div class="empty">Pick a call to see its summary, scores, coaching, and transcript.</div></div>
+    </div>
+  </div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -502,6 +556,9 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
   var callState = "idle";      // idle | live | paused | ending | ended
   var BAR_NAMES = ["Discovery", "Listening", "Objection handling", "Pacing", "Next-step clarity"];
   var lastCard = null;
+  var lastCallName = null;
+  var allCalls = [];
+  var openCall = null;
 
   function send(cmd, data) {
     if (!bridge) { toast("Open this page with: python main.py", "error"); return; }
@@ -729,7 +786,10 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
       return;
     }
     var meta = s.meta || {};
-    $("sumMeta").textContent = "Call length " + (meta.length || "") + " · saved to " + (s.dir || "calls/");
+    lastCallName = s.name || null;
+    $("sumMeta").textContent = "Call length " + (meta.length || "") + " · saved in calls\\" + (s.name || "");
+    $("sumOpen").hidden = !lastCallName;
+    $("sumCopy").hidden = !(lastCallName && s.state === "done");
     if (s.state === "error") {
       $("overview").hidden = false;
       $("overview").textContent = "Summary unavailable: " + (s.error || "unknown error") + " The transcript and metrics were still saved.";
@@ -769,6 +829,8 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
     $("overview").hidden = true;
     ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Nothing yet.")); });
     $("sumMeta").textContent = "Generated when you end the call";
+    $("sumOpen").hidden = true;
+    $("sumCopy").hidden = true;
   }
 
   // ---------------------------------------------------------------- events from Python
@@ -812,10 +874,159 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
       case "on_top": $("onTop").checked = !!d.on_top; break;
       case "toast": toast(d.text, d.level); break;
       case "focus_ask": $("ask").focus(); break;
+      case "calls": allCalls = d.calls || []; renderCallList(); break;
+      case "call_detail": renderCallDetail(d); break;
     }
   }
 
+  // ---------------------------------------------------------------- past calls
+  function fmtStarted(iso) {
+    var dt = new Date(iso);
+    if (isNaN(dt)) return iso || "";
+    return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) + ", " +
+      dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
+  function openCalls() {
+    $("callsModal").hidden = false;
+    $("callsList").innerHTML = "";
+    $("callsList").appendChild(el("div", "empty", "Loading…"));
+    send("list_calls");
+    setTimeout(function () { $("callsFilter").focus(); }, 0);
+  }
+
+  function renderCallList() {
+    var list = $("callsList");
+    var q = $("callsFilter").value.trim().toLowerCase();
+    list.innerHTML = "";
+    var shown = allCalls.filter(function (c) {
+      return !q || (c.title + " " + c.name + " " + fmtStarted(c.started)).toLowerCase().indexOf(q) !== -1;
+    });
+    if (!shown.length) {
+      list.appendChild(el("div", "empty", allCalls.length ? "No calls match." : "No saved calls yet. They appear here after you end a call."));
+      return;
+    }
+    shown.forEach(function (c) {
+      var b = el("button", "call-item" + (c.name === openCall ? " active" : ""));
+      b.type = "button";
+      b.appendChild(el("strong", null, c.title.replace(/^Replay: /, "↻ ")));
+      b.appendChild(el("span", "score", c.overall == null ? "–" : String(c.overall)));
+      var bits = [fmtStarted(c.started)];
+      if (c.length) bits.push(c.length);
+      if (c.objections != null) bits.push(c.objections + " obj");
+      b.appendChild(el("small", null, bits.join(" · ")));
+      b.addEventListener("click", function () {
+        openCall = c.name;
+        renderCallList();
+        $("callDetail").innerHTML = "";
+        $("callDetail").appendChild(el("div", "empty", "Loading…"));
+        send("get_call", { name: c.name });
+      });
+      list.appendChild(b);
+    });
+  }
+
+  function renderMarkdown(md) {
+    // Small, safe renderer for summary.md (headings, bullets, paragraphs). Text only, no HTML.
+    var box = el("div", "md"), ul = null;
+    md.split(/\r?\n/).forEach(function (line) {
+      var m;
+      if ((m = line.match(/^\s*[-*]\s+(.*)$/))) {
+        if (!ul) { ul = el("ul"); box.appendChild(ul); }
+        ul.appendChild(el("li", null, m[1]));
+        return;
+      }
+      ul = null;
+      if ((m = line.match(/^(#{1,3})\s+(.*)$/))) box.appendChild(el(m[1].length === 1 ? "h1" : "h2", null, m[2]));
+      else if (line.trim()) box.appendChild(el("p", null, line));
+    });
+    return box;
+  }
+
+  function renderCallDetail(d) {
+    var box = $("callDetail");
+    box.innerHTML = "";
+    if (d.error) { box.appendChild(el("div", "empty", d.error)); return; }
+    var meta = (d.metrics && d.metrics.meta) || {};
+    var head = el("div", "detail-head");
+    head.appendChild(el("h3", null, (meta.title || "Call") + " · " + fmtStarted(meta.started || d.name)));
+    var copy = el("button", "btn small", "Copy summary");
+    copy.disabled = !d.summary_md;
+    copy.addEventListener("click", function () { send("copy_summary", { name: d.name }); });
+    var open = el("button", "btn small", "Open folder");
+    open.addEventListener("click", function () { send("open_folder", { name: d.name }); });
+    head.appendChild(copy);
+    head.appendChild(open);
+    box.appendChild(head);
+
+    var m = d.metrics || {};
+    var scores = el("div", "mini-scores");
+    function tile(label, val, sub) {
+      var t = el("div");
+      t.appendChild(el("b", null, val == null || val === "" ? "–" : String(val)));
+      t.appendChild(el("span", null, label + (sub ? " · " + sub : "")));
+      scores.appendChild(t);
+    }
+    tile("Overall", m.overall, meta.length);
+    Object.keys(m.scores || {}).forEach(function (k) { tile(k, m.scores[k], (m.score_details || {})[k]); });
+    box.appendChild(scores);
+
+    var tabs = el("div", "tabs"), pane = el("div");
+    var views = {
+      "Summary": function () { return d.summary_md ? renderMarkdown(d.summary_md) : el("p", "muted", "No summary saved."); },
+      ["Coaching (" + (d.coaching || []).length + ")"]: function () {
+        var wrap = el("div", "cards-list");
+        if (!(d.coaching || []).length) wrap.appendChild(el("p", "muted", "No coaching cards on this call."));
+        (d.coaching || []).forEach(function (c) {
+          var card = el("div", "coach-card");
+          card.appendChild(el("div", "q", (c.call_time ? c.call_time + " · " : "") + (c.question || "")));
+          card.appendChild(el("p", "say", c.say || ""));
+          var meta2 = el("div", "meta");
+          meta2.appendChild(document.createTextNode("Tactic: "));
+          meta2.appendChild(el("b", null, c.tactic || ""));
+          meta2.appendChild(el("br"));
+          meta2.appendChild(el("span", "watch", "Watch-out: " + (c.watch || "")));
+          card.appendChild(meta2);
+          if (c.latency_s != null) card.appendChild(el("div", "latency", "Card in " + Number(c.latency_s).toFixed(1) + "s"));
+          wrap.appendChild(card);
+        });
+        return wrap;
+      },
+      "Transcript": function () { return el("pre", "plain", d.transcript || "No transcript saved."); },
+      "Recommendations": function () {
+        var ul = el("ul", "checks");
+        (m.recommendations || []).forEach(function (r) {
+          var li = el("li"); li.appendChild(el("span", "box", "✓")); li.appendChild(el("span", null, r)); ul.appendChild(li);
+        });
+        if (!ul.children.length) ul.appendChild(el("li", "muted", "None."));
+        return ul;
+      }
+    };
+    Object.keys(views).forEach(function (name, i) {
+      var t = el("button", i === 0 ? "on" : "", name);
+      t.type = "button";
+      t.addEventListener("click", function () {
+        Array.prototype.forEach.call(tabs.children, function (x) { x.className = ""; });
+        t.className = "on";
+        pane.innerHTML = "";
+        pane.appendChild(views[name]());
+      });
+      tabs.appendChild(t);
+    });
+    box.appendChild(tabs);
+    pane.appendChild(views["Summary"]());
+    box.appendChild(pane);
+  }
+
   // ---------------------------------------------------------------- wiring
+  $("callsBtn").addEventListener("click", openCalls);
+  $("callsClose").addEventListener("click", function () { $("callsModal").hidden = true; });
+  $("callsFolder").addEventListener("click", function () { send("open_folder", {}); });
+  $("callsFilter").addEventListener("input", renderCallList);
+  $("callsModal").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") $("callsModal").hidden = true; });
+  $("sumOpen").addEventListener("click", function () { if (lastCallName) send("open_folder", { name: lastCallName }); });
+  $("sumCopy").addEventListener("click", function () { if (lastCallName) send("copy_summary", { name: lastCallName }); });
   $("mode").addEventListener("change", function () {
     if (this.value === "pick") send("pick_replay");
   });

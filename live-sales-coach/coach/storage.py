@@ -57,3 +57,79 @@ class CallStore:
     def close(self) -> None:
         if not self._coaching.closed:
             self._coaching.close()
+
+
+# ---------------------------------------------------------------- browsing past calls
+def calls_root(calls_dir: str = "calls") -> Path:
+    base = Path(calls_dir)
+    return base if base.is_absolute() else APP_DIR / base
+
+
+def call_path(calls_dir: str, name: str) -> Path | None:
+    """Resolve a call folder by name, refusing anything outside the calls folder."""
+    root = calls_root(calls_dir).resolve()
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        return None
+    p = (root / name).resolve()
+    return p if p.parent == root and p.is_dir() else None
+
+
+def _read_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def list_calls(calls_dir: str = "calls", limit: int = 200) -> list[dict]:
+    """Newest first: name, title, start time, length, overall score, objections, questions."""
+    root = calls_root(calls_dir)
+    if not root.exists():
+        return []
+    out = []
+    for d in sorted((p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")),
+                    key=lambda p: p.name, reverse=True)[:limit]:
+        m = _read_json(d / "metrics.json")
+        meta = m.get("meta", {})
+        out.append({
+            "name": d.name,
+            "title": meta.get("title") or "Call",
+            "started": meta.get("started") or d.name,
+            "length": meta.get("length") or "",
+            "mode": meta.get("mode") or "",
+            "overall": m.get("overall"),
+            "objections": m.get("objection_count"),
+            "questions": m.get("questions"),
+            "has_summary": (d / "summary.md").exists(),
+        })
+    return out
+
+
+def load_call(calls_dir: str, name: str) -> dict | None:
+    d = call_path(calls_dir, name)
+    if d is None:
+        return None
+
+    def text(fname: str) -> str:
+        try:
+            return (d / fname).read_text(encoding="utf-8")
+        except OSError:
+            return ""
+
+    metrics = _read_json(d / "metrics.json")
+    coaching = []
+    for line in text("coaching.jsonl").splitlines():
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        coaching.append({k: rec.get(k) for k in ("timestamp", "call_time", "question", "say", "tactic", "watch", "latency_s")})
+    return {
+        "name": d.name,
+        "path": str(d),
+        "summary_md": text("summary.md"),
+        "transcript": text("transcript.txt"),
+        "metrics": {k: metrics.get(k) for k in ("meta", "scores", "score_details", "overall", "rep_share_pct",
+                                                 "rep_wpm", "questions", "objection_count", "recommendations")},
+        "coaching": coaching,
+    }

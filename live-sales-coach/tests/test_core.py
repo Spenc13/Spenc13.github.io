@@ -260,3 +260,31 @@ def test_script_parser():
     lines = parse_script("# c\nRep: Hi\nProspect: Hello\n[pause 2]\nrep: ok")
     assert [(l.speaker, l.text, l.pause) for l in lines] == [
         ("rep", "Hi", 0), ("prospect", "Hello", 0), (None, "", 2.0), ("rep", "ok", 0)]
+
+
+# ---------------------------------------------------------------- past calls browser
+def test_list_and_load_calls(tmp_path):
+    from coach.storage import CallStore, call_path, list_calls, load_call
+    from datetime import datetime
+
+    s1 = CallStore(str(tmp_path), datetime(2026, 11, 10, 9, 5))
+    s1.write_transcript("[00:01] Rep: Hi")
+    s1.write_metrics({"meta": {"title": "Live call", "started": "2026-11-10T09:05:00", "length": "12:00"},
+                      "overall": 81, "objection_count": 2, "questions": 9})
+    s1.log_coaching({"question": "Too expensive", "say": "What's one extra job worth?", "latency_s": 1.9})
+    s1.write_summary({"overview": "Good call.", "key_wins": ["a"], "missed_opportunities": [], "next_steps": ["b"]},
+                     {"title": "Live call"})
+    s1.close()
+    s2 = CallStore(str(tmp_path), datetime(2026, 11, 11, 14, 30))
+    s2.close()
+
+    calls = list_calls(str(tmp_path))
+    assert [c["name"] for c in calls] == ["2026-11-11_14-30", "2026-11-10_09-05"]     # newest first
+    assert calls[1]["overall"] == 81 and calls[1]["has_summary"] and calls[1]["length"] == "12:00"
+    d = load_call(str(tmp_path), "2026-11-10_09-05")
+    assert "Good call." in d["summary_md"] and d["transcript"].startswith("[00:01]")
+    assert d["coaching"][0]["say"] == "What's one extra job worth?"
+    # Names can't escape the calls folder.
+    for bad in ("..", "../..", "..\\x", "/etc", ".hidden", ""):
+        assert call_path(str(tmp_path), bad) is None
+        assert load_call(str(tmp_path), bad) is None

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QIODevice, QObject, QSettings, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -19,6 +19,7 @@ from .hotkey import GlobalHotkey, pretty
 from .replay import script_title
 from .runner import AsyncRunner
 from .session import CallSession
+from .storage import call_path, calls_root, list_calls, load_call
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ class MainWindow(QMainWindow):
         self.start_replay = start_replay
         self.runner = AsyncRunner()
         self.session: CallSession | None = None
+        self.calls_dir = get(cfg, "storage.calls_dir", "calls")
         self.settings = QSettings("OllyOlly", "LiveSalesCoach")
 
         self.setWindowTitle("Live Sales Coach")
@@ -219,6 +221,25 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "info", "text": "Start a call (or a replay) first, then ask the coach."})
         elif cmd == "suggestion" and self.session and self.session.running:
             self.runner.submit(self.session.suggestion(msg.get("key", "")))
+        elif cmd == "list_calls":
+            self.bridge.post("calls", {"calls": list_calls(self.calls_dir)})
+        elif cmd == "get_call":
+            detail = load_call(self.calls_dir, str(msg.get("name", "")))
+            self.bridge.post("call_detail", detail or {"error": "That call folder wasn't found."})
+        elif cmd == "open_folder":
+            name = str(msg.get("name") or "")
+            target = call_path(self.calls_dir, name) if name else calls_root(self.calls_dir)
+            if target is None or not target.exists():
+                self.bridge.post("toast", {"level": "error", "text": "That call folder wasn't found."})
+            else:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+        elif cmd == "copy_summary":
+            detail = load_call(self.calls_dir, str(msg.get("name", "")))
+            if detail and detail["summary_md"]:
+                QApplication.clipboard().setText(detail["summary_md"])
+                self.bridge.post("toast", {"level": "info", "text": "Summary copied. Paste it into HubSpot notes."})
+            else:
+                self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "on_top":
             self.set_on_top(bool(msg.get("on")))
 
