@@ -47,6 +47,15 @@ Call a teammate on **Google Meet**, or through your dialer for phone calls. Give
 - [ ] End the call. The summary has wins, misses, and next steps that match what actually happened.
 - [ ] Read `summary.md` and `coaching.jsonl`. Note the average `latency_s`.
 
+## D2. Dialer link (if you installed Olly Coach Bridge)
+
+- [ ] Open the coach, then HubSpot. The header says **Dialer: linked**.
+- [ ] Click-to-dial a colleague from HubSpot. The pill shows **Dialer: calling (number)**.
+- [ ] They answer. The coach pops up with **"They picked up: (number)"**. Tick the box and start.
+- [ ] Hang up from the dialer. Coaching ends by itself and the summary appears.
+- [ ] Dial a number that won't answer, or that goes to voicemail. Nothing records, or the call ends with **"Not saved because it reached voicemail."**
+- [ ] If "picked up" or "ended" never triggered, send Claude the lines in `calls/.phone-events.log`.
+
 ## E. Go / no-go
 
 Go live with a real prospect only if:

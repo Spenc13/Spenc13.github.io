@@ -18,6 +18,7 @@ from typing import Callable
 from .config import Prompts, get, keys_status
 from .engine import CoachEngine, CoachRequest, CoachUnavailable, parse_coach
 from .metrics import Metrics
+from .callfilter import judge
 from .storage import CallStore
 from .stt import make_stream
 from .stt.base import SttEvent
@@ -37,7 +38,8 @@ SUGGESTIONS = {
 
 class CallSession:
     def __init__(self, cfg: dict, prompts: Prompts, emit: Emit, mode: str = "live",
-                 replay_path: str | None = None) -> None:
+                 replay_path: str | None = None, call_info: dict | None = None) -> None:
+        self.call_info = call_info or {}
         self.cfg = cfg
         self.prompts = prompts
         self.emit = emit
@@ -75,6 +77,10 @@ class CallSession:
         self._summarized_upto = 0.0
         self._last_summary_mono = 0.0
         self._coaching_count = 0
+        self._coaching_log: list[dict] = []
+        self._final_meta: dict | None = None
+        self._final_snap: dict | None = None
+        self.discarded_reason: str | None = None
         self._ended = asyncio.Event()
         self.health = {
             "stt": {"state": "idle", "message": ""},
@@ -154,12 +160,12 @@ class CallSession:
             self._set_health("stt", "connecting", "Connecting to Deepgram")
             self._tasks.append(asyncio.create_task(self._run_replay()))
         else:
-            self.title = "Live call"
+            who = self.call_info.get("contact") or self.call_info.get("phone")
+            self.title = f"Call with {who}" if who else "Live call"
             await self._start_live(loop)
 
         self._tasks.append(asyncio.create_task(self._tick()))
-        self.emit("call", {"state": "live", "title": self.title, "mode": self.mode,
-                           "dir": str(self.store.dir)})
+        self.emit("call", {"state": "live", "title": self.title, "mode": self.mode})
         self.emit("health", self.health)
 
     async def _start_live(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -281,11 +287,40 @@ class CallSession:
             "coach_model": self.engine.model,
             "coaching_cards": self._coaching_count,
             "consent_confirmed": True,
+            "phone": self.call_info.get("phone"),
+            "direction": self.call_info.get("direction"),
         }
+        self._final_meta, self._final_snap = meta, snap
+        verdict = judge(self.transcript, self._accum, self.cfg.get("call_filter") or {})
+        meta["prospect_words"] = verdict.prospect_words
+        if not verdict.keep:
+            # A call that went nowhere: no files, no summary request. Kept in memory
+            # until the next call so "Save anyway" still works.
+            self.store.finalize(keep=False)
+            self.discarded_reason = verdict.reason
+            self.emit("summary", {"state": "discarded", "reason": verdict.reason, "meta": meta})
+            self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode})
+            self._ended.set()
+            return
+        await self._save()
+        self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode})
+        self._ended.set()
+
+    async def save_anyway(self) -> None:
+        """Keep a call the filter discarded."""
+        if self.running or self.discarded_reason is None or self._final_meta is None:
+            return
+        self.discarded_reason = None
+        self.store = CallStore(get(self.cfg, "storage.calls_dir", "calls"), self.started_at)
+        for rec in self._coaching_log:
+            self.store.log_coaching(rec, stamp=False)
+        await self._save()
+
+    async def _save(self) -> None:
+        meta, snap = self._final_meta, self._final_snap
         full = self.transcript.text()
         self.store.write_transcript(full)
         self.store.write_metrics({"meta": meta, **snap})
-
         self.emit("summary", {"state": "pending"})
         summary, err = None, None
         if not self.transcript.finals:
@@ -299,12 +334,9 @@ class CallSession:
                 err = f"Claude API error ({type(e).__name__})"
                 log.warning("post-call summary failed: %s", type(e).__name__)
         self.store.write_summary(summary, meta, err)
-        self.store.close()
+        final_dir = self.store.finalize(keep=True)
         self.emit("summary", {"state": "done" if summary else "error", "summary": summary, "error": err,
-                              "meta": meta, "dir": str(self.store.dir),
-                              "name": self.store.dir.name})
-        self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode, "dir": str(self.store.dir)})
-        self._ended.set()
+                              "meta": meta, "dir": str(final_dir), "name": final_dir.name})
 
     async def wait_ended(self) -> None:
         await self._ended.wait()
@@ -474,8 +506,10 @@ class CallSession:
             "cache_write_tokens": result.get("cache_write_tokens"),
         }
         self._coaching_count += 1
+        record = {"timestamp": datetime.now().isoformat(timespec="seconds"), **record}
+        self._coaching_log.append(record)
         if self.store:
-            self.store.log_coaching(record)
+            self.store.log_coaching(record, stamp=False)
         self.emit("coach", {"state": "done", "question": req.question, **parsed,
                             "latency_s": record["latency_s"], "latency_complete_s": record["latency_complete_s"],
                             "measured_from": "prospect stopped talking" if req.spoke_end_mono else "your request",
