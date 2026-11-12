@@ -410,6 +410,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <span id="coachPill" class="pill idle"><span class="dot"></span><span id="coachText">Coach: ready</span></span>
   <span id="latPill" class="pill idle"><span id="latText">Latency: –</span></span>
   <span class="pill idle" id="hotkeyPill">Hotkey: –</span>
+  <span class="pill idle" id="dialerPill"><span class="dot"></span><span id="dialerText">Dialer: not linked</span></span>
   <span class="spacer"></span>
   <label class="toggle"><input type="checkbox" id="onTop"> Stay on top</label>
 </div>
@@ -514,6 +515,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         <span class="muted" style="font-size:12px;" id="sumMeta">Generated when you end the call</span>
         <button class="btn small" id="sumCopy" hidden>Copy summary</button>
         <button class="btn small" id="sumOpen" hidden>Open folder</button>
+        <button class="btn small" id="sumKeep" hidden>Save anyway</button>
       </div>
     </div>
     <p class="overview" id="overview" hidden></p>
@@ -532,6 +534,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 <div class="modal-back" id="consent" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="consent-h">
     <h2 id="consent-h">Before you record</h2>
+    <p id="consentCall" class="say-it" hidden></p>
     <p>Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:</p>
     <div class="say-it">"Quick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?"</div>
     <label><input type="checkbox" id="consentBox"> <span>I will tell the prospect this call is recorded, and I'll stop if they say no.</span></label>
@@ -802,6 +805,16 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Working…")); });
       return;
     }
+    if (s.state === "discarded") {
+      lastCallName = null;
+      $("sumMeta").textContent = "Not saved";
+      $("overview").hidden = false;
+      $("overview").textContent = "Not saved because " + s.reason + ". No files were written and no summary was generated. If this call mattered, click Save anyway.";
+      ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "–")); });
+      $("sumOpen").hidden = true; $("sumCopy").hidden = true; $("sumKeep").hidden = false;
+      return;
+    }
+    $("sumKeep").hidden = true;
     var meta = s.meta || {};
     lastCallName = s.name || null;
     $("sumMeta").textContent = "Call length " + (meta.length || "") + " · saved in calls\\" + (s.name || "");
@@ -848,6 +861,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("sumMeta").textContent = "Generated when you end the call";
     $("sumOpen").hidden = true;
     $("sumCopy").hidden = true;
+    $("sumKeep").hidden = true;
   }
 
   // ---------------------------------------------------------------- events from Python
@@ -867,6 +881,10 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         var f = el("option", null, "Replay a file (WAV or .txt)…"); f.value = "pick"; sel.appendChild(f);
         if (d.default_mode) sel.value = d.default_mode;
         onHealth(d.health || {});
+        var pb = d.phone_bridge || {};
+        if (!pb.enabled) setPill("dialerPill", "idle", "Dialer link: off", "dialerText");
+        else if (pb.error) setPill("dialerPill", "bad", "Dialer link: " + pb.error, "dialerText");
+        else if (pb.linked) setPill("dialerPill", "", "Dialer: linked", "dialerText");
         if (!d.prompts_ok) toast(d.prompts_error || "Prompt files missing.", "error");
         if (!d.keys.anthropic) toast("ANTHROPIC_API_KEY not set: coaching and summary are off.", "error");
         if (!d.keys.deepgram) toast("DEEPGRAM_API_KEY not set: live calls and WAV replay can't transcribe. Text replay still works.", "error");
@@ -879,7 +897,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         break;
       case "call":
         setCallState(d.state);
-        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saving to " + (d.dir || "calls/");
+        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saved to the calls folder when it ends (calls that go nowhere aren't saved)";
         break;
       case "health": onHealth(d); break;
       case "timer": $("timer").textContent = d.elapsed; break;
@@ -892,7 +910,35 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "toast": toast(d.text, d.level); break;
       case "focus_ask": $("ask").focus(); break;
       case "calls": allCalls = d.calls || []; renderCallList(); break;
+      case "phone_link": setPill("dialerPill", "", "Dialer: linked", "dialerText"); break;
+      case "phone": onPhone(d); break;
       case "call_detail": renderCallDetail(d); break;
+    }
+  }
+
+  // ---------------------------------------------------------------- dialer link
+  var phonePending = false;
+  function showConsent(callLabel) {
+    $("consentBox").checked = false;
+    $("consentGo").disabled = true;
+    $("consentCall").hidden = !callLabel;
+    $("consentCall").textContent = callLabel ? "They picked up: " + callLabel : "";
+    $("consent").hidden = false;
+    $("consentBox").focus();
+  }
+  function onPhone(d) {
+    if (d.state === "ringing") {
+      setPill("dialerPill", "warn", "Dialer: calling " + d.label, "dialerText");
+    } else if (d.state === "answered") {
+      setPill("dialerPill", "", "Dialer: on a call with " + d.label, "dialerText");
+      if (callState === "live" || callState === "paused" || callState === "ending") return;
+      $("mode").value = "live";
+      phonePending = true;
+      showConsent(d.label);
+    } else if (d.state === "ended") {
+      setPill("dialerPill", "", "Dialer: linked", "dialerText");
+      if (phonePending && !$("consent").hidden) { $("consent").hidden = true; toast("Call ended before coaching started. Nothing was recorded."); }
+      phonePending = false;
     }
   }
 
@@ -1043,21 +1089,21 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   $("callsModal").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") $("callsModal").hidden = true; });
   $("sumOpen").addEventListener("click", function () { if (lastCallName) send("open_folder", { name: lastCallName }); });
+  $("sumKeep").addEventListener("click", function () { $("sumKeep").hidden = true; send("keep_call"); });
   $("sumCopy").addEventListener("click", function () { if (lastCallName) send("copy_summary", { name: lastCallName }); });
   $("mode").addEventListener("change", function () {
     if (this.value === "pick") send("pick_replay");
   });
-  $("startBtn").addEventListener("click", function () {
-    $("consentBox").checked = false;
-    $("consentGo").disabled = true;
-    $("consent").hidden = false;
-    $("consentBox").focus();
-  });
+  $("startBtn").addEventListener("click", function () { phonePending = false; showConsent(null); });
   $("consentBox").addEventListener("change", function () { $("consentGo").disabled = !this.checked; });
-  $("consentCancel").addEventListener("click", function () { $("consent").hidden = true; });
+  $("consentCancel").addEventListener("click", function () {
+    $("consent").hidden = true;
+    if (phonePending) { phonePending = false; send("dismiss_phone"); }
+  });
   $("consentGo").addEventListener("click", function () {
     if (!$("consentBox").checked) return;
     $("consent").hidden = true;
+    phonePending = false;
     resetAll();
     renderSuggestions();
     send("start", { mode: $("mode").value, consent: true });

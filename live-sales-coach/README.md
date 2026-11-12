@@ -102,7 +102,24 @@ python main.py
 
 **Stay on top** (header checkbox or the View menu) keeps the window above Meet. The window remembers its size and position, so it reopens on your second monitor.
 
-## 6. Replay mode (practice without a live call)
+## 6. HubSpot / Aloware dialer link (optional, recommended)
+
+The `extension/` folder has **Olly Coach Bridge**, a small Chrome extension that runs alongside Olly Phone. With it:
+- **When the prospect picks up,** the coach pops up with "They picked up: (number)" and the recording notice. One click starts coaching. Unanswered calls never record.
+- **When you hang up,** coaching ends and the summary runs automatically.
+
+Install it from `chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension` folder. Full steps are in [`extension/README.md`](extension/README.md). The header shows **Dialer: linked** when it's working.
+
+### Calls that go nowhere aren't saved
+
+When a call ends, it's thrown away (no files and no summary charge) if any of these is true:
+- it was **under 45 seconds**
+- the prospect said **fewer than 25 words**
+- it hit a **voicemail greeting**
+
+The summary panel then says why, with a **Save anyway** button if you want to keep it. You can change the limits under `call_filter` in `config.yaml`.
+
+## 7. Replay mode (practice without a live call)
 
 Replays run through the same pipeline as a live call: transcript, triggers, coach, scoring, summary, and saving. The dropdown lists the samples, or choose **Replay a file…**
 
@@ -132,7 +149,7 @@ In each sample, Spencer makes realistic mistakes, so you can see whether the coa
 
 **Recordings:** `--replay mycall.wav` streams a 16-bit WAV to Deepgram in real time. A **stereo** file uses the left channel as Rep and the right as Prospect. A **mono** file uses Deepgram diarization, which assumes the first voice is Rep.
 
-## 7. Latency
+## 8. Latency
 
 Every coaching card shows how long it took, measured from **when the prospect stopped talking** to when the first line of the card appeared. That total includes Deepgram's finalization time. The header shows the last value against the **3-second target**, and every card's latency is logged in `coaching.jsonl` (`latency_s`, `latency_complete_s`, `api_seconds`).
 
@@ -142,7 +159,7 @@ Settings that affect speed, in `config.yaml`:
 - `stt.endpointing_ms` sets how long Deepgram waits after speech stops before finalizing (default 300 ms).
 - **Prompt caching:** the instructions, playbook, and offer reference are cached after the first request. A card that hit the cache says "prompt cache hit."
 
-## 8. How scoring works (no fake numbers)
+## 9. How scoring works (no fake numbers)
 
 Everything is computed from the transcript as the call goes. A score shows "–" until there's enough of the call to judge, and it's left out of the overall score until then.
 
@@ -156,24 +173,24 @@ Everything is computed from the transcript as the call goes. A score shows "–"
 
 The objection and buying-signal check is a fast local keyword list in `coach/triggers.py`. It only decides **when** to call the coach. Claude decides **what** to say. Auto triggers are debounced: at most one every 8 seconds, and the same objection type at most once every 45 seconds. Both are configurable.
 
-## 9. What leaves your computer
+## 10. What leaves your computer
 
 - **Deepgram:** audio from your mic and from the call, for transcription.
 - **Anthropic:** the prompt files, a short running summary, and the last 4 minutes of transcript with each coaching request, plus the full transcript once for the post-call summary.
 - **Nothing else.** Calls are saved only in `calls/`, which is gitignored. Check your company's policy and your state's recording-consent rules. Some states require every party's consent.
 
-## 10. When something is down
+## 11. When something is down
 
 The header has a status pill for each service.
 - **Speech-to-text down** (bad key, no network): the pill turns red. The app reconnects with backoff, and the other audio side keeps transcribing.
 - **Coach down** (no key, API error, rate limit): the coaching card says so. The transcript, scoring, and saving keep running, and the summary file records that the summary couldn't be written.
 - **Refusals:** server-side fallback is on (`coach.server_fallback`), so a declined request is retried on a fallback model automatically.
 
-## 11. Speech-to-text provider
+## 12. Speech-to-text provider
 
 Deepgram is built in. The STT layer is pluggable (`coach/stt/`): subclass `SpeechStream` and register it in `make_stream()`. I couldn't confirm that Wispr Flow has a public streaming API for system audio. It's a dictation app, and the only "API" found was an unofficial, reverse-engineered SDK. If you get official API access, it can be added as a provider.
 
-## 12. Configuration
+## 13. Configuration
 
 Settings live in `config.yaml`, and each one is commented there. The main ones:
 - `coach.model`: default `claude-sonnet-5-5`
@@ -183,7 +200,7 @@ Settings live in `config.yaml`, and each one is commented there. The main ones:
 - `audio.*`: devices and backend
 - `window.stay_on_top`
 
-## 13. Tests
+## 14. Tests
 
 ```bash
 pytest -q

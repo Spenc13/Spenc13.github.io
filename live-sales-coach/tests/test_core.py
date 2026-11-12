@@ -274,9 +274,9 @@ def test_list_and_load_calls(tmp_path):
     s1.log_coaching({"question": "Too expensive", "say": "What's one extra job worth?", "latency_s": 1.9})
     s1.write_summary({"overview": "Good call.", "key_wins": ["a"], "missed_opportunities": [], "next_steps": ["b"]},
                      {"title": "Live call"})
-    s1.close()
+    s1.finalize(keep=True)
     s2 = CallStore(str(tmp_path), datetime(2026, 11, 11, 14, 30))
-    s2.close()
+    s2.finalize(keep=True)
 
     calls = list_calls(str(tmp_path))
     assert [c["name"] for c in calls] == ["2026-11-11_14-30", "2026-11-10_09-05"]     # newest first
@@ -288,3 +288,106 @@ def test_list_and_load_calls(tmp_path):
     for bad in ("..", "../..", "..\\x", "/etc", ".hidden", ""):
         assert call_path(str(tmp_path), bad) is None
         assert load_call(str(tmp_path), bad) is None
+
+
+# ---------------------------------------------------------------- calls that go nowhere
+def _t(lines):
+    from coach.transcript import Transcript
+    tr = Transcript()
+    for sp, text, t in lines:
+        tr.add(Utterance(sp, text, t, max(1.0, len(text.split()) / 2.7)))
+    return tr
+
+
+def test_call_filter():
+    from coach.callfilter import judge
+    real = _t([(REP, "Hi Dana, what got you looking at marketing?", 0),
+               (PROSPECT, "Our leads have dried up and we need about six good kitchen jobs a month to keep both crews "
+                          "booked through the winter, honestly we are worried", 4)])
+    assert judge(real, 120).keep
+    assert not judge(_t([]), 30).keep
+    vm = judge(_t([(PROSPECT, "Hi, you've reached Mike's Roofing. Please leave a message after the tone.", 2),
+                   (REP, "Hey Mike, Spencer with Olly Olly, give me a call back.", 8)]), 50)
+    assert not vm.keep and vm.reason == "it reached voicemail"
+    hangup = judge(_t([(PROSPECT, "Not interested, thanks.", 1)]), 20)
+    assert not hangup.keep and "only said 3 words" in hangup.reason
+    short = judge(real, 20)
+    assert not short.keep and "20 seconds" in short.reason
+
+
+def test_store_discard_and_keep(tmp_path):
+    from coach.storage import CallStore, list_calls
+    a = CallStore(str(tmp_path))
+    a.log_coaching({"say": "x"})
+    assert list_calls(str(tmp_path)) == []            # in-progress folders are hidden
+    assert a.finalize(keep=False) is None
+    assert list(tmp_path.iterdir()) == []             # nothing left behind
+    b = CallStore(str(tmp_path))
+    b.write_transcript("[00:00] Rep: hi")
+    final = b.finalize(keep=True)
+    assert final.name == b.name and (final / "transcript.txt").exists()
+    assert [c["name"] for c in list_calls(str(tmp_path))] == [b.name]
+
+
+def test_short_call_is_discarded_then_saved_anyway(tmp_path):
+    script = tmp_path / "hangup.txt"
+    script.write_text("Rep: Hey Mike, it's Spencer with Olly Olly.\nProspect: Not interested, thanks.\n")
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path / "calls")
+    cfg["replay"]["speed"] = 40
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text", str(script))
+        s.engine.client = _FakeClient(REPLY)
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=30)
+        assert not (tmp_path / "calls").exists() or not any(
+            p for p in (tmp_path / "calls").iterdir() if not p.name.startswith("."))
+        assert s.engine.client.messages.calls == [] or all("Return: a 2-sentence" not in str(c) for c in s.engine.client.messages.calls)
+        await s.save_anyway()
+        return s
+
+    s = asyncio.run(run())
+    disc = [d for k, d in events if k == "summary" and d.get("state") == "discarded"]
+    assert disc and "only said 3 words" in disc[0]["reason"]
+    saved = [d for k, d in events if k == "summary" and d.get("state") == "done"]
+    assert saved, "save anyway should write the call and summarize it"
+    folder = Path(saved[0]["dir"])
+    assert {p.name for p in folder.iterdir()} >= {"transcript.txt", "metrics.json", "summary.md", "coaching.jsonl"}
+
+
+# ---------------------------------------------------------------- dialer link
+def test_phone_bridge_security_and_events():
+    import socket
+    import urllib.request
+    from coach.phone_bridge import PhoneBridge
+
+    with socket.socket() as sk:
+        sk.bind(("127.0.0.1", 0))
+        port = sk.getsockname()[1]
+    got = []
+    br = PhoneBridge(port, got.append)
+    assert br.start()
+    try:
+        def post(body, origin="chrome-extension://abc", header=True, method="POST"):
+            req = urllib.request.Request(f"http://127.0.0.1:{port}/phone", data=json.dumps(body).encode(), method=method)
+            req.add_header("Content-Type", "application/json")
+            if origin:
+                req.add_header("Origin", origin)
+            if header:
+                req.add_header("X-Olly-Coach", "1")
+            try:
+                return urllib.request.urlopen(req, timeout=5).status
+            except urllib.error.HTTPError as e:
+                return e.code
+
+        assert post({"event": "answered", "phone": "+15125550123", "callId": "c1", "junk": "x" * 999}) == 200
+        assert post({"event": "answered"}, origin="https://evil.example") == 403      # web pages can't
+        assert post({"event": "answered"}, header=False) == 403
+        assert post({"event": "explode"}) == 400
+        assert post({"event": "seen", "type": "callDisposition"}) == 200              # logged, not forwarded
+        assert post({}, method="OPTIONS") == 403
+        assert got == [{"event": "answered", "phone": "+15125550123", "callId": "c1"}]
+    finally:
+        br.stop()

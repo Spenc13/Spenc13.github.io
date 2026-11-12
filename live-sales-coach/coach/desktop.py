@@ -19,6 +19,7 @@ from .hotkey import GlobalHotkey, pretty
 from .replay import script_title
 from .runner import AsyncRunner
 from .session import CallSession
+from .phone_bridge import PhoneBridge
 from .storage import call_path, calls_root, list_calls, load_call
 
 log = logging.getLogger(__name__)
@@ -80,7 +81,19 @@ class Bridge(QObject):
         self.window.handle_command(msg)
 
 
+def call_label(info: dict) -> str:
+    phone = info.get("phone") or ""
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    pretty_phone = f"({digits[:3]}) {digits[3:6]}-{digits[6:]}" if len(digits) == 10 else phone
+    name = info.get("contact")
+    return f"{name} · {pretty_phone}" if name and pretty_phone else (name or pretty_phone or "HubSpot call")
+
+
 class MainWindow(QMainWindow):
+    phone_event = Signal(object)
+
     def __init__(self, cfg: dict, start_replay: str | None = None) -> None:
         super().__init__()
         self.cfg = cfg
@@ -88,6 +101,17 @@ class MainWindow(QMainWindow):
         self.runner = AsyncRunner()
         self.session: CallSession | None = None
         self.calls_dir = get(cfg, "storage.calls_dir", "calls")
+        self.pending_call: dict | None = None
+        self.phone_linked = False
+        self.phone_bridge: PhoneBridge | None = None
+        self.phone_event.connect(self.handle_phone, Qt.QueuedConnection)
+        if get(cfg, "phone_bridge.enabled", True):
+            self.phone_bridge = PhoneBridge(
+                int(get(cfg, "phone_bridge.port", 8765)),
+                self.phone_event.emit,                      # called on the server thread
+                calls_root(self.calls_dir) / ".phone-events.log",
+            )
+            self.phone_bridge.start()
         self.settings = QSettings("OllyOlly", "LiveSalesCoach")
 
         self.setWindowTitle("Live Sales Coach")
@@ -165,6 +189,8 @@ class MainWindow(QMainWindow):
                 pass
         if self.global_hotkey:
             self.global_hotkey.stop()
+        if self.phone_bridge:
+            self.phone_bridge.stop()
         self.runner.stop()
         super().closeEvent(event)
 
@@ -176,6 +202,38 @@ class MainWindow(QMainWindow):
 
     def trigger_hotkey(self) -> None:
         self.trigger_hotkey_from_thread()
+
+    # ------------------------------------------------------------ dialer events
+    def handle_phone(self, ev: dict) -> None:
+        kind = ev.get("event")
+        busy = bool(self.session and self.session.running)
+        if kind == "hello":
+            if not self.phone_linked:
+                self.phone_linked = True
+                self.bridge.post("phone_link", {"connected": True})
+            return
+        if not self.phone_linked:
+            self.phone_linked = True
+            self.bridge.post("phone_link", {"connected": True})
+        info = {k: ev.get(k) for k in ("phone", "contact", "direction", "callId") if ev.get(k)}
+        if kind == "ringing":
+            if busy:
+                return
+            self.pending_call = {**(self.pending_call or {}), **info, "state": "ringing"}
+            self.bridge.post("phone", {"state": "ringing", "label": call_label(self.pending_call)})
+        elif kind == "answered":
+            if busy:
+                return
+            self.pending_call = {**(self.pending_call or {}), **info, "state": "answered"}
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
+            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call)})
+        elif kind == "ended":
+            self.pending_call = None
+            self.bridge.post("phone", {"state": "ended"})
+            if busy and self.session.mode == "live":
+                self.runner.submit(self.session.end())
 
     # ------------------------------------------------------------ commands from JS
     def handle_command(self, msg: dict) -> None:
@@ -197,6 +255,9 @@ class MainWindow(QMainWindow):
                 "default_mode": default_mode,
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
+                "phone_bridge": {"enabled": self.phone_bridge is not None,
+                                 "error": self.phone_bridge.error if self.phone_bridge else None,
+                                 "linked": self.phone_linked},
                 "prompts_error": self.prompts_error,
                 "health": {"stt": {"state": "idle", "message": ""},
                            "coach": {"state": "ok" if keys_status()["anthropic"] else "down",
@@ -221,6 +282,10 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "info", "text": "Start a call (or a replay) first, then ask the coach."})
         elif cmd == "suggestion" and self.session and self.session.running:
             self.runner.submit(self.session.suggestion(msg.get("key", "")))
+        elif cmd == "keep_call" and self.session and not self.session.running:
+            self.runner.submit(self.session.save_anyway())
+        elif cmd == "dismiss_phone":
+            self.pending_call = None
         elif cmd == "list_calls":
             self.bridge.post("calls", {"calls": list_calls(self.calls_dir)})
         elif cmd == "get_call":
@@ -259,7 +324,11 @@ class MainWindow(QMainWindow):
             mode = "replay_wav" if path.lower().endswith(".wav") else "replay_text"
         else:
             path, mode = None, "live"
-        self.session = CallSession(self.cfg, self.prompts, self.bridge.post, mode, path)
+        info = None
+        if mode == "live" and self.pending_call:
+            info = {k: v for k, v in self.pending_call.items() if k != "state"}
+        self.pending_call = None
+        self.session = CallSession(self.cfg, self.prompts, self.bridge.post, mode, path, info)
         fut = self.runner.submit(self.session.start())
 
         def done(f):

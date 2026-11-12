@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -9,26 +10,47 @@ from .config import APP_DIR
 
 
 class CallStore:
+    """Writes into a hidden in-progress folder; finalize() either names it
+    calls/YYYY-MM-DD_HH-MM/ (kept) or deletes it (call that went nowhere)."""
+
     def __init__(self, calls_dir: str = "calls", started: datetime | None = None) -> None:
         base = Path(calls_dir)
         if not base.is_absolute():
             base = APP_DIR / base
-        started = started or datetime.now()
-        name = started.strftime("%Y-%m-%d_%H-%M")
-        path = base / name
+        self.base = base
+        self.started = started or datetime.now()
+        self.name = self.started.strftime("%Y-%m-%d_%H-%M")
+        tmp = base / f".in-progress-{self.started.strftime('%Y%m%d-%H%M%S-%f')}"
+        tmp.mkdir(parents=True, exist_ok=True)
+        self.dir = tmp
+        self.kept: bool | None = None
+        self._coaching = open(tmp / "coaching.jsonl", "a", encoding="utf-8")
+
+    def finalize(self, keep: bool) -> Path | None:
+        """Keep: move to calls/<date_time>/ and return it. Discard: delete everything."""
+        self.close()
+        if self.kept is not None:
+            return self.dir if self.kept else None
+        if not keep:
+            shutil.rmtree(self.dir, ignore_errors=True)
+            self.kept = False
+            return None
+        path = self.base / self.name
         n = 2
         while path.exists():                  # two calls in the same minute
-            path = base / f"{name}_{n}"
+            path = self.base / f"{self.name}_{n}"
             n += 1
-        path.mkdir(parents=True, exist_ok=True)
+        self.dir.rename(path)
         self.dir = path
-        self._coaching = open(path / "coaching.jsonl", "a", encoding="utf-8")
+        self.kept = True
+        return path
 
     def write_transcript(self, text: str) -> None:
         (self.dir / "transcript.txt").write_text(text + ("\n" if text else ""), encoding="utf-8")
 
-    def log_coaching(self, record: dict) -> None:
-        record = {"timestamp": datetime.now().isoformat(timespec="seconds"), **record}
+    def log_coaching(self, record: dict, stamp: bool = True) -> None:
+        if stamp:
+            record = {"timestamp": datetime.now().isoformat(timespec="seconds"), **record}
         self._coaching.write(json.dumps(record, ensure_ascii=False) + "\n")
         self._coaching.flush()
 

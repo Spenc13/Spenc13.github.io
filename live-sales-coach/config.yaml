@@ -66,3 +66,17 @@ replay:
 
 storage:
   calls_dir: calls
+
+call_filter:
+  # Calls that go nowhere (no answer, quick hang-up, voicemail) are not saved
+  # or graded. You can still keep one with "Save anyway" right after it ends.
+  min_seconds: 45            # shorter calls are discarded
+  min_prospect_words: 25     # the prospect must say at least this much
+  discard_voicemail: true    # discard calls that hit a voicemail greeting
+
+phone_bridge:
+  # Link to the "Olly Coach Bridge" Chrome extension (extension/ folder).
+  # When a HubSpot/Aloware call is answered, the coach pops up ready to start;
+  # when the call ends, coaching ends. Listens on this computer only.
+  enabled: true
+  port: 8765                 # if you change this, change it in extension/background.js too
