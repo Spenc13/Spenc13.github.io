@@ -322,6 +322,18 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .toast { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12px; }
 .toast.error { border-color: rgba(255,107,107,0.5); color: var(--bad); }
 .overview { margin: 0 0 10px; font-size: 13px; color: var(--fg); }
+/* Header: two roomy rows. Title + Past calls on the left, profile on the right;
+   ask bar and call controls underneath. */
+header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
+.top-row { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; }
+.top-row .brand { flex: 0 1 auto; }
+.top-spacer { flex: 1 1 0; }
+.calls-btn { display: inline-flex; align-items: center; gap: 8px; }
+.user { border-left: 0; padding-left: 0; }
+.call-row { display: flex; align-items: center; gap: 14px 20px; flex-wrap: wrap; margin-top: 18px; }
+.call-row .search { flex: 1 1 380px; }
+.call-row .controls { gap: 12px; }
+.call-row .select { max-width: 260px; }
 .btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
 .sum-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 /* Past calls browser */
@@ -360,30 +372,35 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 <body>
 
 <header>
-  <div class="brand">
-    <h1>Live Call Coach</h1>
-    <p>Olly Olly · Discovery, demo, and close support</p>
-  </div>
-  <label class="search" aria-label="Ask the coach a question">
-    <span class="muted" aria-hidden="true">⌕</span>
-    <input id="ask" type="text" placeholder="Ask the coach: e.g. 'they said send me something'" autocomplete="off">
-    <span class="kbd" id="askHint">Enter</span>
-  </label>
-  <div class="controls">
-    <span id="status" class="pill idle"><span class="dot"></span><span id="statusText">Not live</span></span>
-    <select id="mode" class="select" aria-label="Call source">
-      <option value="live">Live call (mic + system audio)</option>
-    </select>
-    <button id="startBtn" class="btn primary">Start call</button>
-    <button id="pauseBtn" class="btn" hidden>Pause</button>
-    <button id="endBtn" class="btn danger" hidden>End call</button>
-    <button id="callsBtn" class="btn">Past calls</button>
+  <div class="top-row">
+    <div class="brand">
+      <h1>Live Call Coach</h1>
+      <p>Olly Olly · Discovery, demo, and close support</p>
+    </div>
+    <button id="callsBtn" class="btn calls-btn" type="button"><span aria-hidden="true">🗂</span> Past calls</button>
+    <div class="top-spacer"></div>
     <div class="user">
       <div class="avatar"><img id="avatarImg" src="spencer.png" alt="Spencer Faircloth" onerror="this.outerHTML='<div class=&quot;initials&quot;>SF</div>'"></div>
       <div>
         <strong id="repName">Spencer Faircloth</strong>
         <small id="repTitle">Sales Rep</small>
       </div>
+    </div>
+  </div>
+  <div class="call-row">
+    <label class="search" aria-label="Ask the coach a question">
+      <span class="muted" aria-hidden="true">⌕</span>
+      <input id="ask" type="text" placeholder="Ask the coach: e.g. 'they said send me something'" autocomplete="off">
+      <span class="kbd" id="askHint">Enter</span>
+    </label>
+    <div class="controls">
+      <span id="status" class="pill idle"><span class="dot"></span><span id="statusText">Not live</span></span>
+      <select id="mode" class="select" aria-label="Call source">
+        <option value="live">Live call (mic + system audio)</option>
+      </select>
+      <button id="startBtn" class="btn primary">Start call</button>
+      <button id="pauseBtn" class="btn" hidden>Pause</button>
+      <button id="endBtn" class="btn danger" hidden>End call</button>
     </div>
   </div>
 </header>
