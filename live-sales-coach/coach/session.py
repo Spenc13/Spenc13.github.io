@@ -301,7 +301,8 @@ class CallSession:
         self.store.write_summary(summary, meta, err)
         self.store.close()
         self.emit("summary", {"state": "done" if summary else "error", "summary": summary, "error": err,
-                              "meta": meta, "dir": str(self.store.dir)})
+                              "meta": meta, "dir": str(self.store.dir),
+                              "name": self.store.dir.name})
         self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode, "dir": str(self.store.dir)})
         self._ended.set()
 

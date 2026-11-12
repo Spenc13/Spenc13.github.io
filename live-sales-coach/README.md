@@ -98,6 +98,8 @@ python main.py
    - Click a quick prompt: *Ask a deeper question*, *Pause and let them talk*, *Confirm the pain*.
 4. Press **End call**. The app sends the full transcript and metrics to Claude once for the summary, then saves everything to `calls/`.
 
+**Past calls** (header button) lists every saved call, newest first, with its score. Open one to read the summary, scores, coaching cards, transcript, and recommendations, then **Copy summary** (to paste into HubSpot) or **Open folder**. The same two buttons appear in the summary panel when a call ends.
+
 **Stay on top** (header checkbox or the View menu) keeps the window above Meet. The window remembers its size and position, so it reopens on your second monitor.
 
 ## 6. Replay mode (practice without a live call)
