@@ -1,0 +1,58 @@
+# Test plan: before the first real prospect
+
+Allow about 45 minutes. Do it on the computer and headset you'll use for calls. Tick each box before moving on. If a step fails, the fix is usually in the README troubleshooting section.
+
+## A. Setup checks (5 min)
+
+- [ ] `pytest -q` passes (offline: no keys or audio needed).
+- [ ] `python main.py --replay samples/roofing_send_me_something.txt --headless` prints the transcript, at least one `** COACH` card, and a post-call summary. This confirms both keys and all three prompt files.
+- [ ] Open `calls/<newest>/`. It has `transcript.txt`, `coaching.jsonl`, `metrics.json`, and `summary.md`, and none of them contain an API key.
+
+## B. Replay all three samples in the app (10 min)
+
+Run `python main.py` and play each sample from the dropdown.
+
+| Sample | Expect |
+|---|---|
+| Roofing: "send me something" | An auto card at "send me something" that qualifies before sending (Miner), not "sure, I'll email it." Objection handling is about 50%: Spencer asks one good question, then agrees to email pricing without asking another. |
+| Remodeler: "too expensive" | Cards for price and month-to-month. The coach runs the **payment waterfall before any discount** and is honest that Growth and Strategic month-to-month is a last resort. A decision-maker card at "run it by my husband." |
+| Pool: burned by an agency | A Voss label for the agency story. At "guarantee," the coach **does not invent a guarantee** and says to confirm it with leadership. Buying signals at "when can you start" and "who else." Next-step clarity shows **agreed** after "Thursday at ten works." |
+
+For each card, check:
+- [ ] Three parts: Say this next / Tactic / Watch-out, under about 80 words.
+- [ ] Prices and terms match `offer-reference.md` exactly. Growth $400–550, Strategic $500–750, Elite $1,100 (12-month) or $1,300 (6-month), and Elite is never month-to-month.
+- [ ] The latency label is **3.0 s or less** for most cards. Note any that aren't.
+- [ ] Typing a question in the ask bar gets a card within a few seconds.
+- [ ] The three quick-prompt buttons each get a relevant card.
+- [ ] The talk ratio, question count, and scores change as the call plays, and the summary appears after it ends.
+
+## C. Audio routing (10 min)
+
+- [ ] `python main.py --list-devices` shows your headset mic and a LOOPBACK device for your headset or speakers.
+- [ ] Start a **Live call**. The recording notice appears, and Start stays disabled until the box is ticked.
+- [ ] Say a sentence. It appears as **Rep**, gray and italic while partial, then solid.
+- [ ] Play a YouTube video of someone talking through the same output Meet uses. It appears as **Prospect**.
+- [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep. (If it does, check your headset and Windows "listen to this device" settings.)
+
+## D. Practice call with a colleague (15 min)
+
+Call a teammate on **Google Meet**, or through your dialer for phone calls. Give them one of the sample scripts to improvise from. Don't let them read it word for word.
+
+- [ ] Say the recording notice line at the start.
+- [ ] They say "send me something." An auto card appears within about 3 seconds of them finishing.
+- [ ] Press **Ctrl+Shift+Space** while Meet has focus. You get a card about the last ~20 seconds. (This checks the global hotkey.)
+- [ ] **Stay on top:** click into Meet. The coach window stays visible on monitor 2.
+- [ ] **Pause** for 20 seconds, then **Resume**. The timer pauses, and nothing is transcribed while paused.
+- [ ] **Failure drill:** turn Wi-Fi off for 10 seconds, then on. The speech-to-text pill goes red, then back to OK. The app doesn't crash, and transcription resumes.
+- [ ] End the call. The summary has wins, misses, and next steps that match what actually happened.
+- [ ] Read `summary.md` and `coaching.jsonl`. Note the average `latency_s`.
+
+## E. Go / no-go
+
+Go live with a real prospect only if:
+- [ ] Most cards appeared in 3 seconds or less on the practice call.
+- [ ] No card invented a price, term, guarantee, discount, or deadline.
+- [ ] Both speakers were labeled correctly on Meet (and on your dialer, if you use one).
+- [ ] You're comfortable saying the recording notice, and you know what to do if a prospect says no: end the recording, keep the call.
+
+If latency is over target, try these in order: set `coach.thinking: between_tools`, lower `stt.endpointing_ms` to 200, and check your network.

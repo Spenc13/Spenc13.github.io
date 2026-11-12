@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Live Sales Coach",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Replay: roofing (send me something)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--replay", "samples/roofing_send_me_something.txt"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Replay in terminal (key check)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--replay", "samples/remodeler_too_expensive.txt", "--headless", "--speed", "3"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "List audio devices",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--list-devices"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

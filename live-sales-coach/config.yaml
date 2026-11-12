@@ -1,0 +1,68 @@
+# Live Sales Coach configuration.
+# API keys are NOT stored here. Put them in a .env file (see .env.example)
+# or set DEEPGRAM_API_KEY and ANTHROPIC_API_KEY in your environment.
+
+rep_name: Spencer Faircloth
+rep_title: Sales Rep
+
+window:
+  stay_on_top: true          # keep the window above Meet / your dialer (toggle in View menu)
+  width: 1440
+  height: 960
+
+audio:
+  # Run `python main.py --list-devices` to see names and indexes.
+  # A device can be an index (number) or part of its name (text, case-insensitive).
+  # Leave blank to use the system default.
+  mic_device: ""             # Spencer's microphone or headset
+  # Prospect audio:
+  #   Windows: leave blank to use WASAPI loopback of your default speakers/headset,
+  #            or name the output device whose audio you want to capture.
+  #   macOS:   set to "BlackHole 2ch" (see README, "macOS audio routing").
+  loopback_device: ""
+  backend: auto              # auto | wasapi (Windows, PyAudioWPatch) | sounddevice
+  chunk_ms: 100              # size of each audio chunk sent to STT
+
+stt:
+  provider: deepgram         # deepgram (live). Replay text mode bypasses STT.
+  model: nova-3
+  language: en-US
+  endpointing_ms: 300        # silence before Deepgram finalizes a phrase
+  utterance_end_ms: 1000
+  keyterms:                  # words Deepgram should favor (nova-3 keyterm prompting)
+    - Olly Olly
+    - Google Business Profile
+    - NAP
+    - retargeting
+    - Map Pack
+    - LSA
+
+coach:
+  model: claude-sonnet-5-5   # current Sonnet. Any Messages API model id works.
+  # Thinking: "adaptive" (model decides; keep effort low for speed) or
+  # "between_tools" (Sonnet 5.5 only: no extended thinking, lowest latency).
+  thinking: adaptive
+  effort: low                # low | medium | high
+  max_tokens: 2000           # includes any thinking tokens; replies are ~80 words
+  server_fallback: true      # retry declined requests on a fallback model (server-side)
+  transcript_window_minutes: 4   # last N minutes of transcript sent with each request
+  summary_refresh_seconds: 90    # how often the running summary absorbs older lines
+  post_call_max_tokens: 8000
+
+triggers:
+  auto: true
+  min_gap_seconds: 8         # never auto-fire more often than this
+  same_kind_cooldown_seconds: 45   # don't repeat the same objection type within this window
+
+hotkey:
+  windows: "<ctrl>+<shift>+<space>"
+  mac: "<cmd>+<shift>+<space>"
+  global: true               # works while Meet or your dialer has focus (needs pynput)
+  lookback_seconds: 20       # "the last few seconds" the hotkey asks about
+
+replay:
+  speed: 1.0                 # 2.0 plays a sample script twice as fast
+  words_per_minute: 165      # speaking rate used to time text-script lines
+
+storage:
+  calls_dir: calls

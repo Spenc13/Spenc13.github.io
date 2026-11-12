@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Call Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: three-column command deck on wide screens, stacked on phones.
+   Dark only, one accent (indigo), semantic green/amber/red for scores. */
+:root {
+  --bg: #0b0d14;
+  --panel: #131722;
+  --panel-2: #1a2030;
+  --line: #242b3d;
+  --fg: #e8ecf5;
+  --muted: #8b94a9;
+  --accent: #7c8cff;
+  --accent-soft: rgba(124, 140, 255, 0.14);
+  --good: #38d9a9;
+  --warn: #f5c451;
+  --bad: #ff6b6b;
+  --rep: #5b8cff;
+  --prospect: #b38cff;
+  color-scheme: dark;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 24px;
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { min-width: 0; flex: 1 1 260px; }
+.brand h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.search {
+  flex: 1 1 280px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 12px;
+  min-width: 0;
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 10px 0;
+}
+.search input::placeholder { color: var(--muted); }
+.kbd {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #0b0d14; }
+.btn.danger { background: transparent; border-color: rgba(255,107,107,0.5); color: var(--bad); }
+.btn:hover { filter: brightness(1.12); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(56, 217, 169, 0.12);
+  color: var(--good);
+}
+.pill.idle { background: var(--panel-2); color: var(--muted); }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.live .dot { animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { opacity: 0.25; } }
+.user { display: flex; align-items: center; gap: 10px; padding-left: 12px; border-left: 1px solid var(--line); }
+.user strong { display: block; font-size: 13px; font-weight: 600; }
+.user small { display: block; color: var(--muted); font-size: 12px; }
+.avatar { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid var(--accent); }
+.avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  min-width: 0;
+}
+.span-4 { grid-column: span 12; }
+.span-5 { grid-column: span 12; }
+.span-7 { grid-column: span 12; }
+.span-8 { grid-column: span 12; }
+.span-12 { grid-column: span 12; }
+@media (min-width: 900px) {
+  .span-4 { grid-column: span 4; }
+  .span-5 { grid-column: span 5; }
+  .span-7 { grid-column: span 7; }
+  .span-8 { grid-column: span 8; }
+}
+
+.card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 12px;
+}
+.card-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.tag {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--accent); background: var(--accent-soft);
+  border-radius: 6px; padding: 3px 8px; white-space: nowrap;
+}
+.muted { color: var(--muted); }
+
+/* Transcript */
+.timer { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.transcript {
+  height: 340px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-right: 4px;
+}
+.line { display: grid; grid-template-columns: 52px 1fr; gap: 10px; align-items: start; }
+.line time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 2px; }
+.speaker {
+  display: inline-block; font-size: 11px; font-weight: 600; border-radius: 6px;
+  padding: 2px 7px; margin-bottom: 3px;
+}
+.speaker.rep { background: rgba(91,140,255,0.16); color: var(--rep); }
+.speaker.prospect { background: rgba(179,140,255,0.16); color: var(--prospect); }
+.line p { margin: 0; }
+.line.flash p { animation: flash 1.2s ease; }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+.empty { color: var(--muted); text-align: center; padding: 60px 12px; }
+
+/* Coaching */
+.suggest {
+  width: 100%;
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.suggest:hover { border-color: var(--accent); }
+.suggest .ico {
+  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700;
+}
+.suggest strong { display: block; font-size: 13px; }
+.suggest small { color: var(--muted); font-size: 12px; }
+.chev { color: var(--muted); }
+
+.coach-card {
+  border: 1px solid rgba(124,140,255,0.45);
+  background: linear-gradient(180deg, rgba(124,140,255,0.10), rgba(124,140,255,0.02));
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.coach-card .q { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.coach-card .say { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.coach-card .meta { font-size: 12px; color: var(--muted); }
+.coach-card .meta b { color: var(--fg); font-weight: 600; }
+.coach-card .watch { color: var(--warn); }
+
+/* Objections */
+.objection-now {
+  border-radius: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.objection-now .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.objection-now .quote { font-size: 16px; font-weight: 600; margin: 6px 0 0; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.steps li {
+  display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start;
+  background: var(--panel-2); border-radius: 10px; padding: 10px;
+}
+.steps .n {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px;
+}
+.steps b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+.steps span { font-size: 13px; }
+
+/* Talk ratio */
+.ratio { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: center; }
+@media (max-width: 420px) { .ratio { grid-template-columns: 1fr; justify-items: center; } }
+.ring { width: 140px; height: 140px; }
+.ring text { fill: var(--fg); }
+.legend-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.legend-row:last-child { border-bottom: 0; }
+.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 8px; }
+.legend-row .pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+.health {
+  margin-top: 10px; font-size: 12px; color: var(--good);
+  background: rgba(56,217,169,0.1); border-radius: 8px; padding: 8px 10px;
+}
+.health.off { color: var(--warn); background: rgba(245,196,81,0.1); }
+
+/* Scoring */
+.score-top { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; flex-wrap: wrap; }
+.big { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.big small { font-size: 16px; color: var(--muted); font-weight: 500; }
+.bars { flex: 1 1 260px; display: grid; gap: 10px; min-width: 0; }
+.bar-row { display: grid; grid-template-columns: 150px 1fr 36px; gap: 10px; align-items: center; font-size: 13px; }
+@media (max-width: 420px) { .bar-row { grid-template-columns: 110px 1fr 32px; } }
+.track { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.fill { height: 100%; border-radius: 999px; background: var(--good); transition: width 0.6s ease; }
+.fill.mid { background: var(--warn); }
+.fill.low { background: var(--bad); }
+.val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Recs and summary */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: flex; gap: 10px; align-items: flex-start; background: var(--panel-2); border-radius: 10px; padding: 10px 12px; }
+.checks .box {
+  width: 18px; height: 18px; border-radius: 5px; flex: 0 0 18px; margin-top: 1px;
+  background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+.summary { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .summary { grid-template-columns: repeat(3, 1fr); } }
+.sum {
+  background: var(--panel-2); border-radius: 12px; padding: 12px; border-top: 3px solid var(--line);
+}
+.sum.win { border-top-color: var(--good); }
+.sum.miss { border-top-color: var(--warn); }
+.sum.next { border-top-color: var(--accent); }
+.sum h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.sum ul { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+
+footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
+</style>
+<style>
+/* Live app additions: same tokens as the mockup. */
+.select {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; font: inherit; font-size: 13px; color: var(--fg); max-width: 230px;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.pill.warn { background: rgba(245,196,81,0.12); color: var(--warn); }
+.pill.bad { background: rgba(255,107,107,0.12); color: var(--bad); }
+.healthbar {
+  display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center;
+  margin: -4px 0 16px; font-size: 12px;
+}
+.healthbar .pill { font-weight: 500; }
+.healthbar .spacer { flex: 1; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; }
+.toggle input { accent-color: var(--accent); }
+.avatar .initials { width: 100%; height: 100%; display: grid; place-items: center; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.line.partial p { color: var(--muted); font-style: italic; }
+.coach-card .latency { margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.coach-card .latency.slow { color: var(--warn); }
+.coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
+.coach-card.thinking .say { color: var(--muted); }
+.coach-history { margin-top: 4px; display: grid; gap: 6px; }
+.coach-history .old { font-size: 12px; color: var(--muted); border-left: 2px solid var(--line); padding: 2px 0 2px 8px; }
+.bar-row .detail { grid-column: 2 / 4; font-size: 11px; color: var(--muted); margin-top: -6px; }
+.tag.buy { color: var(--good); background: rgba(56,217,169,0.12); }
+.tag.risk { color: var(--warn); background: rgba(245,196,81,0.12); }
+.modal-back {
+  position: fixed; inset: 0; background: rgba(5,7,12,0.72); display: grid; place-items: center; z-index: 50;
+  padding: 16px;
+}
+.modal {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  max-width: 460px; width: 100%;
+}
+.modal h2 { margin: 0 0 8px; font-size: 17px; }
+.modal p { margin: 0 0 12px; color: var(--muted); }
+.modal .say-it { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; font-weight: 600; }
+.modal label { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 16px; cursor: pointer; }
+.modal input[type=checkbox] { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; }
+.modal .row { display: flex; gap: 8px; justify-content: flex-end; }
+.toasts { position: fixed; right: 16px; bottom: 16px; display: grid; gap: 8px; z-index: 60; max-width: 380px; }
+.toast { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12px; }
+.toast.error { border-color: rgba(255,107,107,0.5); color: var(--bad); }
+.overview { margin: 0 0 10px; font-size: 13px; color: var(--fg); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Live Call Coach</h1>
+    <p>Olly Olly · Discovery, demo, and close support</p>
+  </div>
+  <label class="search" aria-label="Ask the coach a question">
+    <span class="muted" aria-hidden="true">⌕</span>
+    <input id="ask" type="text" placeholder="Ask the coach: e.g. 'they said send me something'" autocomplete="off">
+    <span class="kbd" id="askHint">Enter</span>
+  </label>
+  <div class="controls">
+    <span id="status" class="pill idle"><span class="dot"></span><span id="statusText">Not live</span></span>
+    <select id="mode" class="select" aria-label="Call source">
+      <option value="live">Live call (mic + system audio)</option>
+    </select>
+    <button id="startBtn" class="btn primary">Start call</button>
+    <button id="pauseBtn" class="btn" hidden>Pause</button>
+    <button id="endBtn" class="btn danger" hidden>End call</button>
+    <div class="user">
+      <div class="avatar"><img id="avatarImg" src="spencer.png" alt="Spencer Faircloth" onerror="this.outerHTML='<div class=&quot;initials&quot;>SF</div>'"></div>
+      <div>
+        <strong id="repName">Spencer Faircloth</strong>
+        <small id="repTitle">Sales Rep</small>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="healthbar" aria-live="polite">
+  <span id="sttPill" class="pill idle"><span class="dot"></span><span id="sttText">Speech-to-text: idle</span></span>
+  <span id="coachPill" class="pill idle"><span class="dot"></span><span id="coachText">Coach: ready</span></span>
+  <span id="latPill" class="pill idle"><span id="latText">Latency: –</span></span>
+  <span class="pill idle" id="hotkeyPill">Hotkey: –</span>
+  <span class="spacer"></span>
+  <label class="toggle"><input type="checkbox" id="onTop"> Stay on top</label>
+</div>
+
+<main class="grid">
+
+  <!-- Live transcript -->
+  <section class="card span-4" aria-labelledby="t-h">
+    <div class="card-head">
+      <h2 id="t-h">Live transcript</h2>
+      <span class="timer" id="timer">00:00</span>
+    </div>
+    <div class="transcript" id="transcript" aria-live="polite">
+      <div class="empty" id="transcriptEmpty">Pick "Live call" or a replay, then press Start. Your mic is labeled Rep; the call audio is labeled Prospect.</div>
+    </div>
+  </section>
+
+  <!-- Coaching suggestions -->
+  <section class="card span-4" aria-labelledby="c-h">
+    <div class="card-head">
+      <h2 id="c-h">AI coaching</h2>
+      <span class="tag">Live guidance</span>
+    </div>
+    <div id="coachFeed">
+      <div class="coach-card" id="coachNow">
+        <div class="q">Waiting for the call</div>
+        <p class="say">Start the call or type a question above.</p>
+        <div class="meta">Next move, tactic, and watch-out will appear here.</div>
+      </div>
+    </div>
+    <div id="suggestions"></div>
+    <div class="coach-history" id="coachHistory"></div>
+  </section>
+
+  <!-- Objection handling -->
+  <section class="card span-4" aria-labelledby="o-h">
+    <div class="card-head">
+      <h2 id="o-h">Objection handling</h2>
+      <span class="tag" id="objTag">None detected</span>
+    </div>
+    <div class="objection-now">
+      <div class="label">Current objection or signal</div>
+      <p class="quote" id="objQuote">Nothing yet.</p>
+    </div>
+    <div class="label muted" style="font-size:12px;margin:0 0 8px;">Response framework</div>
+    <ol class="steps" id="objSteps">
+      <li><span class="n">1</span><div><b>Acknowledge</b><span id="stepAck">Name the concern in their words.</span></div></li>
+      <li><span class="n">2</span><div><b>Ask</b><span id="stepAsk">Find out what is behind it.</span></div></li>
+      <li><span class="n">3</span><div><b>Move forward</b><span id="stepMove">Propose one clear next step.</span></div></li>
+    </ol>
+  </section>
+
+  <!-- Talk ratio -->
+  <section class="card span-5" aria-labelledby="r-h">
+    <div class="card-head">
+      <h2 id="r-h">Talk-to-listen ratio</h2>
+      <span class="muted" style="font-size:12px;">Target: 40–60% you</span>
+    </div>
+    <div class="ratio">
+      <svg class="ring" viewBox="0 0 140 140" role="img" aria-label="Rep talk share">
+        <circle cx="70" cy="70" r="54" fill="none" stroke="#1a2030" stroke-width="14"></circle>
+        <circle id="ringRep" cx="70" cy="70" r="54" fill="none" stroke="#5b8cff" stroke-width="14"
+          stroke-linecap="round" stroke-dasharray="0 999" transform="rotate(-90 70 70)"></circle>
+        <text id="ringText" x="70" y="68" text-anchor="middle" font-size="22" font-weight="700">0 : 0</text>
+        <text x="70" y="88" text-anchor="middle" font-size="11" fill="#8b94a9">talk : listen</text>
+      </svg>
+      <div>
+        <div class="legend-row"><span><i class="swatch" style="background:#5b8cff"></i>You (rep)</span><span class="pct" id="repPct">0%</span></div>
+        <div class="legend-row"><span><i class="swatch" style="background:#b38cff"></i>Prospect</span><span class="pct" id="prosPct">0%</span></div>
+        <div class="health" id="ratioHealth">Start the call to measure.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scoring -->
+  <section class="card span-7" aria-labelledby="s-h">
+    <div class="card-head">
+      <h2 id="s-h">Call scoring</h2>
+      <span class="tag" id="scoreTag">Live score</span>
+    </div>
+    <div class="score-top">
+      <div class="big"><span id="overall">–</span><small> / 100</small></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </section>
+
+  <!-- Recommendations -->
+  <section class="card span-5" aria-labelledby="i-h">
+    <div class="card-head">
+      <h2 id="i-h">Improvement recommendations</h2>
+    </div>
+    <ul class="checks" id="recs">
+      <li><span class="box">·</span><span class="muted">Recommendations appear as the call goes on.</span></li>
+    </ul>
+  </section>
+
+  <!-- Post call -->
+  <section class="card span-7" aria-labelledby="p-h">
+    <div class="card-head">
+      <h2 id="p-h">Post-call summary</h2>
+      <span class="muted" style="font-size:12px;" id="sumMeta">Generated when you end the call</span>
+    </div>
+    <p class="overview" id="overview" hidden></p>
+    <div class="summary">
+      <div class="sum win"><h3>Key wins</h3><ul id="wins"><li class="muted">Nothing yet.</li></ul></div>
+      <div class="sum miss"><h3>Missed opportunities</h3><ul id="miss"><li class="muted">Nothing yet.</li></ul></div>
+      <div class="sum next"><h3>Next steps</h3><ul id="next"><li class="muted">Nothing yet.</li></ul></div>
+    </div>
+  </section>
+
+</main>
+
+<footer id="footer">Calls are saved only on this computer, in the calls folder. Coaching uses Claude; transcription uses Deepgram.</footer>
+
+<!-- Consent gate: shown before every recording -->
+<div class="modal-back" id="consent" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="consent-h">
+    <h2 id="consent-h">Before you record</h2>
+    <p>Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:</p>
+    <div class="say-it">"Quick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?"</div>
+    <label><input type="checkbox" id="consentBox"> <span>I will tell the prospect this call is recorded, and I'll stop if they say no.</span></label>
+    <div class="row">
+      <button class="btn" id="consentCancel">Cancel</button>
+      <button class="btn primary" id="consentGo" disabled>Start recording</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  };
+  var bridge = null;
+  var callState = "idle";      // idle | live | paused | ending | ended
+  var BAR_NAMES = ["Discovery", "Listening", "Objection handling", "Pacing", "Next-step clarity"];
+  var lastCard = null;
+
+  function send(cmd, data) {
+    if (!bridge) { toast("Open this page with: python main.py", "error"); return; }
+    var payload = data || {};
+    payload.cmd = cmd;
+    bridge.command(JSON.stringify(payload));
+  }
+
+  function toast(text, level) {
+    var t = el("div", "toast" + (level === "error" ? " error" : ""), text);
+    $("toasts").appendChild(t);
+    setTimeout(function () { t.remove(); }, level === "error" ? 9000 : 5000);
+  }
+
+  // ---------------------------------------------------------------- status
+  function setPill(id, cls, text, textId) {
+    var p = $(id);
+    p.className = "pill " + cls;
+    $(textId).textContent = text;
+  }
+
+  function setCallState(s) {
+    callState = s;
+    var live = s === "live", paused = s === "paused", busy = live || paused || s === "ending";
+    $("startBtn").hidden = busy;
+    $("mode").disabled = busy;
+    $("pauseBtn").hidden = !(live || paused);
+    $("pauseBtn").textContent = paused ? "Resume" : "Pause";
+    $("endBtn").hidden = !(live || paused);
+    if (live) setPill("status", "live", "Live", "statusText");
+    else if (paused) setPill("status", "idle", "Paused", "statusText");
+    else if (s === "ending") setPill("status", "idle", "Wrapping up…", "statusText");
+    else if (s === "ended") setPill("status", "idle", "Call ended", "statusText");
+    else setPill("status", "idle", "Not live", "statusText");
+  }
+
+  function onHealth(h) {
+    var stt = h.stt || {}, coach = h.coach || {};
+    var sttCls = stt.state === "ok" ? "" : stt.state === "down" ? "bad" : stt.state === "connecting" ? "warn" : "idle";
+    setPill("sttPill", sttCls, "Speech-to-text: " + (stt.state === "ok" ? "OK" : stt.state) + (stt.message ? " · " + stt.message : ""), "sttText");
+    var coachCls = coach.state === "ok" ? "" : "bad";
+    setPill("coachPill", coachCls, "Coach: " + (coach.state === "ok" ? "OK" : "offline") + (coach.message ? " · " + coach.message : ""), "coachText");
+  }
+
+  // ---------------------------------------------------------------- transcript
+  function onLine(m) {
+    var tr = $("transcript");
+    var empty = $("transcriptEmpty");
+    if (empty) empty.remove();
+    if (m.replaces) { var old = document.getElementById("line-" + m.replaces); if (old) old.remove(); }
+    var row = document.getElementById("line-" + m.id);
+    var atBottom = tr.scrollHeight - tr.scrollTop - tr.clientHeight < 40;
+    if (!row) {
+      row = el("div", "line flash");
+      row.id = "line-" + m.id;
+      row.appendChild(el("time", null, m.t));
+      var body = el("div");
+      body.appendChild(el("span", "speaker " + m.speaker, m.speaker === "rep" ? "Rep" : "Prospect"));
+      body.appendChild(el("p"));
+      row.appendChild(body);
+      tr.appendChild(row);
+    }
+    row.classList.toggle("partial", !m.final);
+    row.querySelector("p").textContent = m.text;
+    if (atBottom) tr.scrollTop = tr.scrollHeight;
+  }
+
+  // ---------------------------------------------------------------- coaching
+  function renderCard(c) {
+    var box = $("coachFeed");
+    box.innerHTML = "";
+    var card = el("div", "coach-card" + (c.state === "error" ? " error" : "") + (c.state === "thinking" ? " thinking" : ""));
+    card.appendChild(el("div", "q", c.question ? ("Say this next · " + c.question) : "Say this next"));
+    if (c.state === "error") {
+      card.appendChild(el("p", "say", c.error || "Coach unavailable."));
+      card.appendChild(el("div", "meta", "The transcript and scoring keep running."));
+      box.appendChild(card);
+      return;
+    }
+    card.appendChild(el("p", "say", c.say || (c.state === "thinking" ? "Thinking…" : "")));
+    var meta = el("div", "meta");
+    meta.appendChild(document.createTextNode("Tactic: "));
+    meta.appendChild(el("b", null, c.tactic || "…"));
+    meta.appendChild(el("br"));
+    meta.appendChild(el("span", "watch", "Watch-out: " + (c.watch || "…")));
+    card.appendChild(meta);
+    if (c.latency_s) {
+      var lat = el("div", "latency" + (c.latency_s > 3 ? " slow" : ""),
+        "Card in " + c.latency_s.toFixed(1) + "s" + (c.measured_from ? " from " + c.measured_from : "") +
+        (c.stt_latency_s != null ? " (speech-to-text " + c.stt_latency_s.toFixed(1) + "s)" : "") +
+        (c.cached ? " · prompt cache hit" : ""));
+      card.appendChild(lat);
+    }
+    box.appendChild(card);
+  }
+
+  function onCoach(c) {
+    if (c.state === "thinking" && lastCard && lastCard.say) {
+      var hist = $("coachHistory");
+      var old = el("div", "old", lastCard.say);
+      hist.insertBefore(old, hist.firstChild);
+      while (hist.children.length > 3) hist.lastChild.remove();
+    }
+    renderCard(c);
+    if (c.state === "done") {
+      lastCard = c;
+      $("stepAsk").textContent = c.say || "Find out what is behind it.";
+      $("stepMove").textContent = c.watch ? ("Watch-out: " + c.watch) : "Propose one clear next step.";
+      if (c.tactic) $("stepAck").textContent = c.tactic;
+      if (c.latency_s) {
+        setPill("latPill", c.latency_s <= 3 ? "" : "warn",
+          "Latency: " + c.latency_s.toFixed(1) + "s" + (c.latency_s <= 3 ? " (target ≤ 3s)" : " (over 3s target)"), "latText");
+      }
+    }
+  }
+
+  function onSignal(s) {
+    $("objQuote").textContent = "“" + s.quote + "”";
+    var tag = $("objTag");
+    tag.textContent = s.label;
+    tag.className = "tag" + (s.kind === "buying_signal" ? " buy" : s.kind === "risk_signal" ? " risk" : "");
+    $("stepAck").textContent = s.kind === "buying_signal" ? "Buying signal: don't rush past it." : "Name the concern in their words.";
+  }
+
+  function renderSuggestions() {
+    var box = $("suggestions");
+    box.innerHTML = "";
+    [
+      { key: "deeper", ico: "?", t: "Ask a deeper question", d: "Get a NEPQ question for this moment." },
+      { key: "listen", ico: "↔", t: "Pause and let them talk", d: "Get a short question that hands the floor back." },
+      { key: "pain", ico: "◎", t: "Confirm the pain", d: "Restate the problem in their words." }
+    ].forEach(function (x) {
+      var b = el("button", "suggest");
+      b.type = "button";
+      b.appendChild(el("span", "ico", x.ico));
+      var txt = el("span");
+      txt.appendChild(el("strong", null, x.t));
+      txt.appendChild(el("small", null, x.d));
+      b.appendChild(txt);
+      b.appendChild(el("span", "chev", "›"));
+      b.addEventListener("click", function () { send("suggestion", { key: x.key }); });
+      box.appendChild(b);
+    });
+  }
+
+  // ---------------------------------------------------------------- metrics
+  function buildBars() {
+    var bars = $("bars");
+    bars.innerHTML = "";
+    BAR_NAMES.forEach(function (name, i) {
+      var row = el("div", "bar-row");
+      row.appendChild(el("span", null, name));
+      var track = el("div", "track");
+      var fill = el("div", "fill");
+      fill.id = "f-" + i;
+      fill.style.width = "0%";
+      track.appendChild(fill);
+      row.appendChild(track);
+      var v = el("span", "val", "–");
+      v.id = "v-" + i;
+      row.appendChild(v);
+      var d = el("span", "detail", "");
+      d.id = "d-" + i;
+      row.appendChild(d);
+      bars.appendChild(row);
+    });
+  }
+
+  function onMetrics(m) {
+    var rep = m.rep_share_pct, pros = m.prospect_share_pct;
+    $("repPct").textContent = rep == null ? "0%" : rep + "%";
+    $("prosPct").textContent = pros == null ? "0%" : pros + "%";
+    $("ringText").textContent = rep == null ? "0 : 0" : rep + " : " + pros;
+    var circ = 2 * Math.PI * 54;
+    $("ringRep").setAttribute("stroke-dasharray", (circ * (rep || 0) / 100).toFixed(1) + " 999");
+    var h = $("ratioHealth");
+    if (rep == null) { h.textContent = "Start the call to measure."; h.className = "health"; }
+    else if (rep >= 40 && rep <= 60) { h.textContent = "In a healthy range (40–60%)."; h.className = "health"; }
+    else if (rep > 60) { h.textContent = "You're talking too much. Ask a question and wait."; h.className = "health off"; }
+    else { h.textContent = "You're listening a lot. Ask a clear next-step question."; h.className = "health off"; }
+
+    BAR_NAMES.forEach(function (name, i) {
+      var val = m.scores ? m.scores[name] : null;
+      var f = $("f-" + i), v = $("v-" + i), d = $("d-" + i);
+      if (val == null) { f.style.width = "0%"; f.className = "fill"; v.textContent = "–"; }
+      else {
+        f.style.width = val + "%";
+        f.className = "fill " + (val >= 80 ? "" : (val >= 60 ? "mid" : "low"));
+        v.textContent = val;
+      }
+      d.textContent = (m.score_details && m.score_details[name]) || "";
+    });
+    $("overall").textContent = m.overall == null ? "–" : m.overall;
+    $("scoreTag").textContent = m.objection_count + " objection" + (m.objection_count === 1 ? "" : "s") +
+      " · " + m.questions + " question" + (m.questions === 1 ? "" : "s");
+
+    var list = $("recs");
+    list.innerHTML = "";
+    (m.recommendations || []).forEach(function (r) {
+      var li = el("li");
+      li.appendChild(el("span", "box", "✓"));
+      li.appendChild(el("span", null, r));
+      list.appendChild(li);
+    });
+    if (!list.children.length) {
+      var li = el("li");
+      li.appendChild(el("span", "box", "·"));
+      li.appendChild(el("span", "muted", "Recommendations appear as the call goes on."));
+      list.appendChild(li);
+    }
+  }
+
+  // ---------------------------------------------------------------- summary
+  function fillList(id, arr) {
+    var ul = $(id);
+    ul.innerHTML = "";
+    if (!arr || !arr.length) { ul.appendChild(el("li", "muted", "None.")); return; }
+    arr.forEach(function (t) { ul.appendChild(el("li", null, t)); });
+  }
+
+  function onSummary(s) {
+    if (s.state === "pending") {
+      $("sumMeta").textContent = "Writing the summary…";
+      ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Working…")); });
+      return;
+    }
+    var meta = s.meta || {};
+    $("sumMeta").textContent = "Call length " + (meta.length || "") + " · saved to " + (s.dir || "calls/");
+    if (s.state === "error") {
+      $("overview").hidden = false;
+      $("overview").textContent = "Summary unavailable: " + (s.error || "unknown error") + " The transcript and metrics were still saved.";
+      fillList("wins", []); fillList("miss", []); fillList("next", []);
+      return;
+    }
+    var sum = s.summary || {};
+    $("overview").hidden = !sum.overview;
+    $("overview").textContent = sum.overview || "";
+    fillList("wins", sum.key_wins);
+    fillList("miss", sum.missed_opportunities);
+    fillList("next", sum.next_steps);
+  }
+
+  // ---------------------------------------------------------------- reset
+  function resetAll() {
+    $("transcript").innerHTML = "";
+    $("transcript").appendChild(el("div", "empty", "Listening…"));
+    $("timer").textContent = "00:00";
+    $("objQuote").textContent = "Nothing yet.";
+    $("objTag").textContent = "None detected";
+    $("objTag").className = "tag";
+    $("stepAck").textContent = "Name the concern in their words.";
+    $("stepAsk").textContent = "Find out what is behind it.";
+    $("stepMove").textContent = "Propose one clear next step.";
+    $("coachFeed").innerHTML = "";
+    var c = el("div", "coach-card");
+    c.appendChild(el("div", "q", "Listening"));
+    c.appendChild(el("p", "say", "Coaching appears when the prospect raises a concern or a buying signal."));
+    c.appendChild(el("div", "meta", "Or type a question above, or press the hotkey."));
+    $("coachFeed").appendChild(c);
+    $("coachHistory").innerHTML = "";
+    lastCard = null;
+    setPill("latPill", "idle", "Latency: –", "latText");
+    buildBars();
+    onMetrics({ scores: {}, recommendations: [], questions: 0, objection_count: 0 });
+    $("overview").hidden = true;
+    ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Nothing yet.")); });
+    $("sumMeta").textContent = "Generated when you end the call";
+  }
+
+  // ---------------------------------------------------------------- events from Python
+  function onEvent(json) {
+    var e = JSON.parse(json);
+    var d = e.data || {};
+    switch (e.type) {
+      case "init":
+        $("repName").textContent = d.rep_name || "Spencer Faircloth";
+        $("repTitle").textContent = d.rep_title || "Sales Rep";
+        $("hotkeyPill").textContent = "Hotkey: " + (d.hotkey_label || "–") + " asks about the last few seconds";
+        $("onTop").checked = !!d.on_top;
+        var sel = $("mode");
+        sel.innerHTML = "";
+        var live = el("option", null, "Live call (mic + system audio)"); live.value = "live"; sel.appendChild(live);
+        (d.samples || []).forEach(function (s) { var o = el("option", null, "Replay: " + s.title); o.value = "replay:" + s.path; sel.appendChild(o); });
+        var f = el("option", null, "Replay a file (WAV or .txt)…"); f.value = "pick"; sel.appendChild(f);
+        if (d.default_mode) sel.value = d.default_mode;
+        onHealth(d.health || {});
+        if (!d.prompts_ok) toast(d.prompts_error || "Prompt files missing.", "error");
+        if (!d.keys.anthropic) toast("ANTHROPIC_API_KEY not set: coaching and summary are off.", "error");
+        if (!d.keys.deepgram) toast("DEEPGRAM_API_KEY not set: live calls and WAV replay can't transcribe. Text replay still works.", "error");
+        break;
+      case "picked":
+        if (d.path) {
+          var o = el("option", null, "Replay: " + d.name); o.value = "replay:" + d.path;
+          $("mode").insertBefore(o, $("mode").lastChild); $("mode").value = o.value;
+        } else { $("mode").value = "live"; }
+        break;
+      case "call":
+        setCallState(d.state);
+        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saving to " + (d.dir || "calls/");
+        break;
+      case "health": onHealth(d); break;
+      case "timer": $("timer").textContent = d.elapsed; break;
+      case "line": onLine(d); break;
+      case "coach": onCoach(d); break;
+      case "signal": onSignal(d); break;
+      case "metrics": onMetrics(d); break;
+      case "summary": onSummary(d); break;
+      case "on_top": $("onTop").checked = !!d.on_top; break;
+      case "toast": toast(d.text, d.level); break;
+      case "focus_ask": $("ask").focus(); break;
+    }
+  }
+
+  // ---------------------------------------------------------------- wiring
+  $("mode").addEventListener("change", function () {
+    if (this.value === "pick") send("pick_replay");
+  });
+  $("startBtn").addEventListener("click", function () {
+    $("consentBox").checked = false;
+    $("consentGo").disabled = true;
+    $("consent").hidden = false;
+    $("consentBox").focus();
+  });
+  $("consentBox").addEventListener("change", function () { $("consentGo").disabled = !this.checked; });
+  $("consentCancel").addEventListener("click", function () { $("consent").hidden = true; });
+  $("consentGo").addEventListener("click", function () {
+    if (!$("consentBox").checked) return;
+    $("consent").hidden = true;
+    resetAll();
+    renderSuggestions();
+    send("start", { mode: $("mode").value, consent: true });
+  });
+  $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
+  $("endBtn").addEventListener("click", function () { send("end"); });
+  $("onTop").addEventListener("change", function () { send("on_top", { on: this.checked }); });
+  $("ask").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var q = this.value.trim();
+    if (!q) return;
+    this.value = "";
+    send("ask", { text: q });
+  });
+
+  buildBars();
+  renderSuggestions();
+
+  if (typeof QWebChannel !== "undefined" && window.qt && qt.webChannelTransport) {
+    new QWebChannel(qt.webChannelTransport, function (channel) {
+      bridge = channel.objects.bridge;
+      bridge.event.connect(onEvent);
+      bridge.command(JSON.stringify({ cmd: "ready" }));
+    });
+  } else {
+    $("footer").textContent = "Preview only. Run python main.py to use the live coach.";
+  }
+  window.__coachTest = { onEvent: onEvent };   // used by the automated UI check
+})();
+</script>
+</body>
+</html>

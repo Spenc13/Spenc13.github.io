@@ -1,0 +1,16 @@
+# title: Roofing owner: "send me something"
+# Mike runs a 3-crew roofing company. He's busy, a little guarded, and tries to end the call with "send me something."
+Rep: Hey Mike, it's Spencer with Olly Olly. Thanks for grabbing a few minutes. What made you take the call today?
+Prospect: Honestly, I almost didn't. We're busy on jobs, but the phone's not ringing the way it did two years ago.
+Rep: When you say not the way it did, what's changed?
+Prospect: We used to get most of our work off referrals and Google. Now I see the same three big outfits at the top every time I search roofing in our town.
+Rep: How are most of your jobs coming in right now?
+Prospect: Mostly referrals and insurance work after storms. Some from the website but I couldn't tell you how many.
+[pause 1.5]
+Prospect: Look, I've got a crew waiting on me. Can you just send me something and I'll take a look when I get a chance?
+Rep: Sure. What do you want to see?
+Prospect: I don't know, whatever you've got. Pricing, what you do. I'll look at it this weekend.
+Rep: We have three packages, Growth, Strategic, and Elite. Growth starts at four hundred a month and includes a website and your Google profile.
+Prospect: Four hundred a month. Yeah, send that over and I'll think about it.
+Rep: Okay, I'll email it this afternoon.
+Prospect: Sounds good.
