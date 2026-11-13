@@ -295,6 +295,13 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .toggle input { accent-color: var(--accent); }
 .avatar .initials { width: 100%; height: 100%; display: grid; place-items: center; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
 .line.partial p { color: var(--muted); font-style: italic; }
+.t-tools { display: flex; align-items: center; gap: 10px; }
+.meters { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+.meter { display: inline-flex; align-items: center; gap: 4px; }
+.meter .m-track { display: inline-block; width: 40px; height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.meter .m-fill { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width 0.2s linear; }
+.meter.rep .m-fill { background: var(--rep); }
+.meter.pro .m-fill { background: var(--prospect); }
 .coach-card .latency { margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .coach-card .latency.slow { color: var(--warn); }
 .coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
@@ -428,7 +435,14 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <section class="card span-4" aria-labelledby="t-h">
     <div class="card-head">
       <h2 id="t-h">Live transcript</h2>
-      <span class="timer" id="timer">00:00</span>
+      <div class="t-tools">
+        <div class="meters" id="meters" hidden title="Sound levels: when you talk, only You should move">
+          <span class="meter rep">You <span class="m-track"><span class="m-fill" id="lvRep"></span></span></span>
+          <span class="meter pro">Them <span class="m-track"><span class="m-fill" id="lvPro"></span></span></span>
+        </div>
+        <button class="btn small" id="swapBtn" type="button" hidden title="Labels backwards? Swap Rep and Prospect for this call">⇄ Swap</button>
+        <span class="timer" id="timer">00:00</span>
+      </div>
     </div>
     <div class="transcript" id="transcript" aria-live="polite">
       <div class="empty" id="transcriptEmpty">Pick "Live call" or a replay, then press Start. Your mic is labeled Rep; the call audio is labeled Prospect.</div>
@@ -615,6 +629,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("pauseBtn").hidden = !(live || paused);
     $("pauseBtn").textContent = paused ? "Resume" : "Pause";
     $("endBtn").hidden = !(live || paused);
+    $("swapBtn").hidden = !(live || paused);
+    if (!(live || paused)) $("meters").hidden = true;
     if (live) setPill("status", "live", "Live", "statusText");
     else if (paused) setPill("status", "idle", "Paused", "statusText");
     else if (s === "ending") setPill("status", "idle", "Wrapping up…", "statusText");
@@ -928,6 +944,16 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "toast": toast(d.text, d.level); break;
       case "focus_ask": $("ask").focus(); break;
       case "calls": allCalls = d.calls || []; renderCallList(); break;
+      case "levels":
+        $("meters").hidden = false;
+        $("lvRep").style.width = Math.round(d.rep * 100) + "%";
+        $("lvPro").style.width = Math.round(d.prospect * 100) + "%";
+        break;
+      case "line_remove": var gone = document.getElementById("line-" + d.id); if (gone) gone.remove(); break;
+      case "transcript_reset":
+        $("transcript").innerHTML = "";
+        (d.lines || []).forEach(onLine);
+        break;
       case "phone_link": setPill("dialerPill", "", "Dialer: linked", "dialerText"); break;
       case "phone": onPhone(d); break;
       case "call_detail": renderCallDetail(d); break;
@@ -1126,6 +1152,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     renderSuggestions();
     send("start", { mode: $("mode").value, consent: true });
   });
+  $("swapBtn").addEventListener("click", function () { send("swap_speakers"); });
   $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
   $("endBtn").addEventListener("click", function () { send("end"); });
   $("onTop").addEventListener("change", function () { send("on_top", { on: this.checked }); });

@@ -39,7 +39,9 @@ For each card, check:
 - [ ] Start a **Live call**. The recording notice appears, and Start stays disabled until the box is ticked.
 - [ ] Say a sentence. It appears as **Rep**, gray and italic while partial, then solid.
 - [ ] Play a YouTube video of someone talking through the same output Meet uses. It appears as **Prospect**.
-- [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep. (If it does, check your headset and Windows "listen to this device" settings.)
+- [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep.
+- [ ] Watch the **You / Them** meters in the transcript header. Talking moves only **You**, and the video moves only **Them**. If **Them** moves when you talk, follow README → Troubleshooting → "Your words show up as Prospect."
+- [ ] Click **⇄ Swap** once. All labels flip. Click it again to flip them back.
 
 ## D. Practice call with a colleague (15 min)
 

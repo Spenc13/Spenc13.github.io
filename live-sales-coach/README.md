@@ -214,6 +214,11 @@ The tests run offline, with no keys or audio. They cover reply parsing, trigger 
 
 - **"Missing prompt files":** see step 2.
 - **Prospect side is silent:** run `--list-devices`, make sure Meet or your dialer plays through the device named in `loopback_device` (or your default output on Windows), and check that call volume isn't muted.
-- **Your words show up as Prospect, or theirs as Rep:** wear a headset, and turn off "listen to this device" or monitoring in Windows sound settings.
+- **Your words show up as Prospect:** your voice is getting into the PC's sound output. The app filters out repeats of what you just said, and the **You / Them meters** in the transcript header show it live: while you talk, only **You** should move. If **Them** moves too, fix it at the source:
+  1. **Windows "Listen to this device":** Settings → System → Sound → More sound settings → **Recording** tab → your headset mic → **Properties** → **Listen** tab. Untick **Listen to this device**.
+  2. **Headset sidetone:** in your headset's app (Jabra Direct, Poly Lens, Logitech G HUB, and similar), turn sidetone off. Or use the headset's own hardware sidetone if it has one.
+  3. **Same mic everywhere:** make Windows' default input the headset mic Aloware uses (Settings → System → Sound → Input), or name it in `audio.mic_device`.
+  4. **Echo from the prospect's speakerphone** can't be fixed on your side. The echo filter catches most of it.
+- **Labels are backwards on a call:** click **⇄ Swap** in the transcript header. It flips past lines, scores, and everything after for that call. If it happens on every call, your two devices are reversed: run `python main.py --list-devices` and set `audio.mic_device` and `audio.loopback_device` explicitly.
 - **The hotkey only works when the app has focus:** pynput couldn't register a global hotkey. The pill says "(window only)". On macOS, grant Accessibility permission.
 - **Fonts look different offline:** the page uses Inter from Google Fonts and falls back to Segoe UI.

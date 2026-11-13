@@ -428,3 +428,66 @@ def test_live_mode_coaches_every_prospect_turn(tmp_path):
     assert 'The prospect just finished saying: "I\'ll be honest with you' in first["messages"][0]["content"]
     done = [d for k, d in events if k == "coach" and d.get("state") == "done"]
     assert done and all(d.get("live") for d in done)
+
+
+# ---------------------------------------------------------------- speaker hygiene
+def _live_session(events):
+    import time as _time
+    from coach.stt.base import SttEvent
+    cfg = load_config()
+    cfg["coach"]["live_mode"] = False
+    cfg["audio"]["echo_hold_ms"] = 60
+    s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "live")
+    s.running = True
+    s._resume_mono = _time.monotonic()
+
+    def ev(sp, text, t, final=True, speech_final=True):
+        return SttEvent(sp, text, final, t, len(text.split()) / 2.7, _time.monotonic(), speech_final)
+    return s, ev
+
+
+def test_echo_of_rep_is_not_labeled_prospect():
+    events = []
+
+    async def run():
+        s, ev = _live_session(events)
+        line = "So what would one extra kitchen job a month be worth to you"
+        await s.on_stt(ev(REP, line, 1))
+        await s.on_stt(ev(PROSPECT, "what would one extra kitchen job a month be worth to you", 1.2))   # sidetone
+        # Echo that lands before Spencer's own final: he's mid-sentence (partial only).
+        await s.on_stt(ev(REP, "Does that make sense for", 6, final=False))
+        await asyncio.gather(
+            s.on_stt(ev(PROSPECT, "Does that make sense for your crews", 6.1)),
+            s.on_stt(ev(REP, "Does that make sense for your crews", 6, final=True)),
+        )
+        s._rep_active_mono = 0                       # Spencer has gone quiet
+        await s.on_stt(ev(PROSPECT, "Honestly we need about six more jobs a month", 9))
+        await s.on_stt(ev(REP, "What happens if that doesn't change", 12))
+        await s.on_stt(ev(PROSPECT, "Yeah it would be worth a lot to us", 12.3))   # real reply while he talks
+        return s
+
+    s = asyncio.run(run())
+    who = [(u.speaker, u.text) for u in s.transcript.finals]
+    assert (PROSPECT, "what would one extra kitchen job a month be worth to you") not in who
+    assert (PROSPECT, "Does that make sense for your crews") not in who
+    assert (PROSPECT, "Honestly we need about six more jobs a month") in who
+    assert (PROSPECT, "Yeah it would be worth a lot to us") in who
+    assert s.echo_dropped == 2
+
+
+def test_swap_speakers_relabels_past_and_future():
+    events = []
+
+    async def run():
+        s, ev = _live_session(events)
+        await s.on_stt(ev(PROSPECT, "Hey Luis, Spencer with Olly Olly. What made you take the call?", 0))
+        s._rep_active_mono = 0
+        await s.on_stt(ev(REP, "We tried an agency and it was a waste of money.", 5))
+        s.swap_speakers()
+        await s.on_stt(ev(PROSPECT, "It sounds like you got burned before.", 9))   # mic stream, still reversed
+        return s
+
+    s = asyncio.run(run())
+    assert [u.speaker for u in s.transcript.finals] == [REP, PROSPECT, REP]
+    assert s.metrics.questions == 1 and s.metrics.rep_words > 0
+    assert any(k == "transcript_reset" for k, _ in events)

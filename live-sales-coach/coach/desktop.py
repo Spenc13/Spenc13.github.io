@@ -309,6 +309,8 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "info", "text": "Summary copied. Paste it into HubSpot notes."})
             else:
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
+        elif cmd == "swap_speakers" and self.session and self.session.running:
+            self.runner.call(self.session.swap_speakers)
         elif cmd == "live_mode":
             on = bool(msg.get("on"))
             self.cfg.setdefault("coach", {})["live_mode"] = on      # next calls too

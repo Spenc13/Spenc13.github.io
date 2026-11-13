@@ -22,6 +22,11 @@ audio:
   loopback_device: ""
   backend: auto              # auto | wasapi (Windows, PyAudioWPatch) | sounddevice
   chunk_ms: 100              # size of each audio chunk sent to STT
+  # If your own voice also shows up in the call audio (headset sidetone, Windows
+  # "Listen to this device", or echo from the prospect's phone), drop those
+  # repeats instead of labeling them Prospect.
+  echo_filter: true
+  echo_hold_ms: 700          # how long to wait for your own line before deciding
 
 stt:
   provider: deepgram         # deepgram (live). Replay text mode bypasses STT.

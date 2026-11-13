@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+
+import numpy as np
 
 from .config import Prompts, get, keys_status
 from .engine import LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, parse_coach, said_it
@@ -63,6 +67,14 @@ class CallSession:
         self._turn_det = None
         self._last_live_fire = -1e9
         self._last_say = ""
+        # Speaker hygiene: echo filter, live levels, manual swap.
+        self.echo_filter = bool(get(cfg, "audio.echo_filter", True))
+        self.echo_hold = float(get(cfg, "audio.echo_hold_ms", 700)) / 1000
+        self._rep_recent: deque = deque(maxlen=12)       # (monotonic, text) of Rep finals
+        self._rep_active_mono = 0.0
+        self.echo_dropped = 0
+        self._swap = False
+        self._levels = {REP: 0.0, PROSPECT: 0.0}
         self.window_s = float(get(cfg, "coach.transcript_window_minutes", 4)) * 60
         self.summary_every = float(get(cfg, "coach.summary_refresh_seconds", 90))
         self.lookback = float(get(cfg, "hotkey.lookback_seconds", 20))
@@ -188,7 +200,14 @@ class CallSession:
         for speaker, opener in ((REP, open_mic), (PROSPECT, open_loopback)):
             holder: dict = {}
 
-            def on_chunk(pcm: bytes, holder=holder) -> None:   # audio thread
+            def on_chunk(pcm: bytes, holder=holder, sp=speaker) -> None:   # audio thread
+                try:
+                    a = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+                    if a.size:
+                        rms = float(np.sqrt(np.mean(a * a))) / 32768.0
+                        self._levels[sp] = max(rms, self._levels[sp] * 0.7)
+                except Exception:
+                    pass
                 s = holder.get("stream")
                 if s is not None:
                     loop.call_soon_threadsafe(s.feed, pcm)
@@ -218,6 +237,8 @@ class CallSession:
             self.emit("toast", {"level": "info", "text": f"{LABELS[speaker]}: {cap.device_name} @ {cap.rate} Hz"})
         if not self.keys["deepgram"]:
             self._set_health("stt", "down", "DEEPGRAM_API_KEY not set: no live transcript")
+        if self._captures:
+            self._tasks.append(asyncio.create_task(self._level_loop()))
 
     async def _run_replay(self) -> None:
         try:
@@ -301,6 +322,8 @@ class CallSession:
             "coach_model": self.engine.model,
             "coaching_cards": self._coaching_count,
             "consent_confirmed": True,
+            "echo_lines_dropped": self.echo_dropped,
+            "speakers_swapped": self._swap,
             "phone": self.call_info.get("phone"),
             "direction": self.call_info.get("direction"),
         }
@@ -364,9 +387,74 @@ class CallSession:
         self._open_turn[speaker] = None
         self._partial[speaker] = ""
 
+    _ECHO_WORD = re.compile(r"[a-z0-9']+")
+
+    def _is_echo(self, text: str) -> bool:
+        """Does this "Prospect" text repeat what Spencer just said? (sidetone or line echo)"""
+        now = time.monotonic()
+        recent = " ".join(t for (m, t) in self._rep_recent if now - m <= 6) + " " + self._partial.get(REP, "")
+        rep_words = set(self._ECHO_WORD.findall(recent.lower()))
+        words = [w for w in self._ECHO_WORD.findall(text.lower()) if len(w) > 2]
+        if len(words) < 2 or not rep_words:
+            return False
+        hits = sum(1 for w in words if w in rep_words)
+        if len(words) <= 3:
+            return hits == len(words)
+        return hits >= 3 and hits / len(words) >= 0.7
+
+    def swap_speakers(self) -> None:
+        """Flip Rep/Prospect for this call: past lines, scores, and everything after."""
+        if not self.running:
+            return
+        for sp in (REP, PROSPECT):
+            self._close_turn(sp)
+        self._swap = not self._swap
+        flip = {REP: PROSPECT, PROSPECT: REP}
+        for u in self.transcript.finals:
+            u.speaker = flip[u.speaker]
+        m = Metrics()
+        for u in self.transcript.finals:
+            m.add_utterance(u)
+            if u.speaker == PROSPECT:
+                det = detect(u.text)
+                if det and det.kind == OBJECTION:
+                    m.add_objection(det.key, det.label, u.t)
+        m.tick(self.elapsed())
+        self.metrics = m
+        self._rep_recent.clear()
+        self.emit("transcript_reset", {"lines": [
+            {"id": u.id, "speaker": u.speaker, "text": u.text, "t": fmt_clock(u.t), "final": True}
+            for u in self.transcript.finals]})
+        self.emit("metrics", self.metrics.snapshot())
+        self.emit("toast", {"level": "info", "text": "Speakers swapped for this call. If it happens every call, "
+                            "check the audio devices in config.yaml (README, Troubleshooting)."})
+
     async def on_stt(self, ev: SttEvent) -> None:
         if not self.running:
             return
+        if self._swap:
+            ev.speaker = PROSPECT if ev.speaker == REP else REP
+        if ev.speaker == REP:
+            self._rep_active_mono = time.monotonic()
+            if ev.final:
+                self._rep_recent.append((time.monotonic(), ev.text))
+        elif (self.echo_filter and self.mode != "replay_text"
+              and time.monotonic() - self._rep_active_mono < 2.0):
+            # Spencer spoke just now: this "prospect" audio may be his own voice coming
+            # back (headset sidetone, Windows "Listen to this device", or line echo).
+            echo = self._is_echo(ev.text)
+            if ev.final and not echo and self._partial.get(REP):
+                # He's mid-sentence, so his own words aren't final yet. Wait briefly
+                # for them (only happens while both sides talk at once).
+                await asyncio.sleep(self.echo_hold)
+                echo = self._is_echo(ev.text)
+            if echo:
+                if ev.final:
+                    self.echo_dropped += 1
+                    if self._open_turn.get(PROSPECT) is None:
+                        self.emit("line_remove", {"id": f"p-{PROSPECT}"})
+                    self._partial[PROSPECT] = ""
+                return
         sp = ev.speaker
         other = PROSPECT if sp == REP else REP
         if ev.final or ev.text:
@@ -582,6 +670,17 @@ class CallSession:
                             "cached": bool(result.get("cache_read_tokens"))})
 
     # ------------------------------------------------------------ background
+    async def _level_loop(self) -> None:
+        """Send You / Them sound levels to the UI a few times a second."""
+        while self.running:
+            await asyncio.sleep(0.25)
+            lv = {sp: min(1.0, (self._levels[sp] * 6) ** 0.6) for sp in (REP, PROSPECT)}
+            if self._swap:
+                lv = {REP: lv[PROSPECT], PROSPECT: lv[REP]}
+            self.emit("levels", {"rep": round(lv[REP], 2), "prospect": round(lv[PROSPECT], 2)})
+            for sp in (REP, PROSPECT):
+                self._levels[sp] *= 0.5
+
     async def _tick(self) -> None:
         while self.running:
             await asyncio.sleep(1.0)
