@@ -220,6 +220,7 @@ def test_replay_pipeline_saves_call(tmp_path):
     cfg["storage"]["calls_dir"] = str(tmp_path)
     cfg["replay"]["speed"] = 40
     cfg["triggers"]["min_gap_seconds"] = 5
+    cfg["coach"]["live_mode"] = False          # keyword-trigger mode
     events = []
 
     def emit(kind, data):
@@ -391,3 +392,39 @@ def test_phone_bridge_security_and_events():
         assert got == [{"event": "answered", "phone": "+15125550123", "callId": "c1"}]
     finally:
         br.stop()
+
+
+# ---------------------------------------------------------------- live coach (parrot mode)
+def test_said_it():
+    from coach.engine import said_it
+    line = "What would one extra kitchen job a month be worth to your business?"
+    assert said_it(line, "So what would one extra kitchen job a month be worth to the business")
+    assert not said_it(line, "Totally, I hear you on that.")
+    assert not said_it("(Stay quiet. Let them finish.)", "stay quiet let them finish")
+
+
+def test_live_mode_coaches_every_prospect_turn(tmp_path):
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path)
+    cfg["replay"]["speed"] = 12
+    cfg["coach"]["live_mode"] = True
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text",
+                        str(ROOT / "samples" / "pool_burned_by_agency.txt"))
+        s.engine.client = _FakeClient(REPLY)
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=60)
+        return s
+
+    s = asyncio.run(run())
+    calls = [c for c in s.engine.client.messages.calls if "messages" in c and "stream" not in c]
+    live = [c for c in calls if "Live coach mode" in c["messages"][0]["content"]]
+    prospect_turns = [u for u in s.transcript.finals if u.speaker == PROSPECT and len(u.text.split()) >= 3]
+    assert len(live) >= len(prospect_turns) - 1, (len(live), len(prospect_turns))
+    first = live[0]
+    assert first["thinking"] == {"type": "between_tools"} and first["output_config"]["effort"] == "low"
+    assert 'The prospect just finished saying: "I\'ll be honest with you' in first["messages"][0]["content"]
+    done = [d for k, d in events if k == "coach" and d.get("state") == "done"]
+    assert done and all(d.get("live") for d in done)
