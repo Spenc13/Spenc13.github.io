@@ -91,7 +91,7 @@ python main.py
 ```
 
 1. Pick **Live call** (or a replay) in the dropdown and press **Start call**.
-2. The **recording notice** appears. Tick "I will tell the prospect this call is recorded" to enable Start. Every call starts with this, and it's noted in `metrics.json`. Say the line it shows at the top of the call, and stop if they say no.
+2. The **recording notice** appears. Tick "I will tell the prospect this call is recorded" to enable Start, and say the line it shows (a shorter mid-call version appears if you're joining partway through). **If your dialer already announces recording on every call,** also tick **"Don't ask again."** From then on, Start begins right away, and with the dialer link coaching **starts by itself when the prospect picks up**. Turn the prompt back on in **Call menu → Ask before each recording** (or set `recording.consent_mode` in `config.yaml`). Each call's `metrics.json` records which applied (`consent_basis`).
 3. Talk. With **Live coach** on (the default, toggled in the header), a new "Say this next" line streams in **every time the prospect finishes talking**. It's written as your exact words, so you can read it out loud. If they keep talking, the coach drops the half-written line and starts over with what they just said. When you say the line, the card dims and shows **✓ You said it**, so a bright card always means a fresh line. With Live coach off, cards appear only on objections and buying signals. You can also:
    - Type a question in the ask bar and press **Enter**.
    - Press **Ctrl+Shift+Space** (Cmd+Shift+Space on Mac) from any app to ask about the last ~20 seconds.
@@ -109,6 +109,10 @@ The `extension/` folder has **Olly Coach Bridge**, a small Chrome extension that
 - **When you hang up,** coaching ends and the summary runs automatically.
 
 Install it from `chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension` folder. Full steps are in [`extension/README.md`](extension/README.md). The header shows **Dialer: linked** when it's working.
+
+### Starting partway through a call
+
+You can press **Start call** at any point. If the dialer shows the call was answered more than 15 seconds earlier, the call is marked **Partial call (joined at m:ss)**. The coach and the post-call summary are told the beginning wasn't heard, so a "missing" intro isn't counted against you. The scores are labeled partial, and the caller's number is kept even if you canceled the "They picked up" prompt.
 
 ### Calls that go nowhere aren't saved
 
@@ -214,6 +218,11 @@ The tests run offline, with no keys or audio. They cover reply parsing, trigger 
 
 - **"Missing prompt files":** see step 2.
 - **Prospect side is silent:** run `--list-devices`, make sure Meet or your dialer plays through the device named in `loopback_device` (or your default output on Windows), and check that call volume isn't muted.
-- **Your words show up as Prospect, or theirs as Rep:** wear a headset, and turn off "listen to this device" or monitoring in Windows sound settings.
+- **Your words show up as Prospect:** your voice is getting into the PC's sound output. The app filters out repeats of what you just said, and the **You / Them meters** in the transcript header show it live: while you talk, only **You** should move. If **Them** moves too, fix it at the source:
+  1. **Windows "Listen to this device":** Settings → System → Sound → More sound settings → **Recording** tab → your headset mic → **Properties** → **Listen** tab. Untick **Listen to this device**.
+  2. **Headset sidetone:** in your headset's app (Jabra Direct, Poly Lens, Logitech G HUB, and similar), turn sidetone off. Or use the headset's own hardware sidetone if it has one.
+  3. **Same mic everywhere:** make Windows' default input the headset mic Aloware uses (Settings → System → Sound → Input), or name it in `audio.mic_device`.
+  4. **Echo from the prospect's speakerphone** can't be fixed on your side. The echo filter catches most of it.
+- **Labels are backwards on a call:** click **⇄ Swap** in the transcript header. It flips past lines, scores, and everything after for that call. If it happens on every call, your two devices are reversed: run `python main.py --list-devices` and set `audio.mic_device` and `audio.loopback_device` explicitly.
 - **The hotkey only works when the app has focus:** pynput couldn't register a global hotkey. The pill says "(window only)". On macOS, grant Accessibility permission.
 - **Fonts look different offline:** the page uses Inter from Google Fonts and falls back to Segoe UI.

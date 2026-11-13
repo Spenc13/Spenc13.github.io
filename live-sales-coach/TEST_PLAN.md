@@ -39,7 +39,9 @@ For each card, check:
 - [ ] Start a **Live call**. The recording notice appears, and Start stays disabled until the box is ticked.
 - [ ] Say a sentence. It appears as **Rep**, gray and italic while partial, then solid.
 - [ ] Play a YouTube video of someone talking through the same output Meet uses. It appears as **Prospect**.
-- [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep. (If it does, check your headset and Windows "listen to this device" settings.)
+- [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep.
+- [ ] Watch the **You / Them** meters in the transcript header. Talking moves only **You**, and the video moves only **Them**. If **Them** moves when you talk, follow README → Troubleshooting → "Your words show up as Prospect."
+- [ ] Click **⇄ Swap** once. All labels flip. Click it again to flip them back.
 
 ## D. Practice call with a colleague (15 min)
 
@@ -62,6 +64,12 @@ Call a teammate on **Google Meet**, or through your dialer for phone calls. Give
 - [ ] Hang up from the dialer. Coaching ends by itself and the summary appears.
 - [ ] Dial a number that won't answer, or that goes to voicemail. Nothing records, or the call ends with **"Not saved because it reached voicemail."**
 - [ ] If "picked up" or "ended" never triggered, send Claude the lines in `calls/.phone-events.log`.
+
+## D3. Consent mode and joining late
+
+- [ ] On a dialer call, click **Cancel** on "They picked up", wait 30 seconds, then press **Start call**. The notice shows the mid-call line, the call is titled with the number, and the score card says **Partial call (joined at 0:3x)**.
+- [ ] If your dialer announces recording: tick **Don't ask again** once. On the next dialer call, coaching starts by itself when the prospect answers.
+- [ ] **Call menu → Ask before each recording** turns the notice back on.
 
 ## E. Go / no-go
 

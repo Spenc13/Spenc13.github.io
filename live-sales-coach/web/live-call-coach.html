@@ -295,6 +295,13 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .toggle input { accent-color: var(--accent); }
 .avatar .initials { width: 100%; height: 100%; display: grid; place-items: center; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
 .line.partial p { color: var(--muted); font-style: italic; }
+.t-tools { display: flex; align-items: center; gap: 10px; }
+.meters { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+.meter { display: inline-flex; align-items: center; gap: 4px; }
+.meter .m-track { display: inline-block; width: 40px; height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
+.meter .m-fill { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width 0.2s linear; }
+.meter.rep .m-fill { background: var(--rep); }
+.meter.pro .m-fill { background: var(--prospect); }
 .coach-card .latency { margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .coach-card .latency.slow { color: var(--warn); }
 .coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
@@ -428,7 +435,14 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <section class="card span-4" aria-labelledby="t-h">
     <div class="card-head">
       <h2 id="t-h">Live transcript</h2>
-      <span class="timer" id="timer">00:00</span>
+      <div class="t-tools">
+        <div class="meters" id="meters" hidden title="Sound levels: when you talk, only You should move">
+          <span class="meter rep">You <span class="m-track"><span class="m-fill" id="lvRep"></span></span></span>
+          <span class="meter pro">Them <span class="m-track"><span class="m-fill" id="lvPro"></span></span></span>
+        </div>
+        <button class="btn small" id="swapBtn" type="button" hidden title="Labels backwards? Swap Rep and Prospect for this call">⇄ Swap</button>
+        <span class="timer" id="timer">00:00</span>
+      </div>
     </div>
     <div class="transcript" id="transcript" aria-live="polite">
       <div class="empty" id="transcriptEmpty">Pick "Live call" or a replay, then press Start. Your mic is labeled Rep; the call audio is labeled Prospect.</div>
@@ -542,9 +556,10 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="consent-h">
     <h2 id="consent-h">Before you record</h2>
     <p id="consentCall" class="say-it" hidden></p>
-    <p>Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:</p>
-    <div class="say-it">"Quick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?"</div>
+    <p id="consentIntro">Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:</p>
+    <div class="say-it" id="consentLine">"Quick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?"</div>
     <label><input type="checkbox" id="consentBox"> <span>I will tell the prospect this call is recorded, and I'll stop if they say no.</span></label>
+    <label class="muted"><input type="checkbox" id="dialerConsent"> <span>Our dialer already announces recording on every call. Don't ask again. (Undo: Call menu → Ask before each recording.)</span></label>
     <div class="row">
       <button class="btn" id="consentCancel">Cancel</button>
       <button class="btn primary" id="consentGo" disabled>Start recording</button>
@@ -615,6 +630,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("pauseBtn").hidden = !(live || paused);
     $("pauseBtn").textContent = paused ? "Resume" : "Pause";
     $("endBtn").hidden = !(live || paused);
+    $("swapBtn").hidden = !(live || paused);
+    if (!(live || paused)) $("meters").hidden = true;
     if (live) setPill("status", "live", "Live", "statusText");
     else if (paused) setPill("status", "idle", "Paused", "statusText");
     else if (s === "ending") setPill("status", "idle", "Wrapping up…", "statusText");
@@ -764,6 +781,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     });
   }
 
+  function fmtSecs(n) { n = Math.max(0, Math.round(n || 0)); return Math.floor(n / 60) + ":" + ("0" + (n % 60)).slice(-2); }
+
   function onMetrics(m) {
     var rep = m.rep_share_pct, pros = m.prospect_share_pct;
     $("repPct").textContent = rep == null ? "0%" : rep + "%";
@@ -789,7 +808,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       d.textContent = (m.score_details && m.score_details[name]) || "";
     });
     $("overall").textContent = m.overall == null ? "–" : m.overall;
-    $("scoreTag").textContent = m.objection_count + " objection" + (m.objection_count === 1 ? "" : "s") +
+    $("scoreTag").textContent = (m.partial_call ? "Partial call (joined at " + fmtSecs(m.joined_after_seconds) + ") · " : "") +
+      m.objection_count + " objection" + (m.objection_count === 1 ? "" : "s") +
       " · " + m.questions + " question" + (m.questions === 1 ? "" : "s");
 
     var list = $("recs");
@@ -892,6 +912,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         $("hotkeyPill").textContent = "Hotkey: " + (d.hotkey_label || "–") + " asks about the last few seconds";
         $("onTop").checked = !!d.on_top;
         $("liveMode").checked = d.live_mode !== false;
+        consentMode = d.consent_mode === "dialer" ? "dialer" : "ask";
         var sel = $("mode");
         sel.innerHTML = "";
         var live = el("option", null, "Live call (mic + system audio)"); live.value = "live"; sel.appendChild(live);
@@ -928,16 +949,43 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "toast": toast(d.text, d.level); break;
       case "focus_ask": $("ask").focus(); break;
       case "calls": allCalls = d.calls || []; renderCallList(); break;
+      case "levels":
+        $("meters").hidden = false;
+        $("lvRep").style.width = Math.round(d.rep * 100) + "%";
+        $("lvPro").style.width = Math.round(d.prospect * 100) + "%";
+        break;
+      case "line_remove": var gone = document.getElementById("line-" + d.id); if (gone) gone.remove(); break;
+      case "transcript_reset":
+        $("transcript").innerHTML = "";
+        (d.lines || []).forEach(onLine);
+        break;
       case "phone_link": setPill("dialerPill", "", "Dialer: linked", "dialerText"); break;
       case "phone": onPhone(d); break;
+      case "consent_mode": consentMode = d.mode === "dialer" ? "dialer" : "ask"; break;
       case "call_detail": renderCallDetail(d); break;
     }
   }
 
   // ---------------------------------------------------------------- dialer link
   var phonePending = false;
+  var answeredAt = 0;
+  var LINE_START = "\u201cQuick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?\u201d";
+  var LINE_MID = "\u201cHeads-up, I\u2019m going to start recording and transcribing from here so I can follow up accurately. That okay?\u201d";
+  var consentMode = "ask";
+  function startNow(basis) {
+    phonePending = false;
+    resetAll();
+    renderSuggestions();
+    send("start", { mode: $("mode").value, consent: true, basis: basis });
+  }
   function showConsent(callLabel) {
+    var mid = !callLabel && answeredAt && Date.now() - answeredAt > 15000;
+    $("consentLine").textContent = mid ? LINE_MID : LINE_START;
+    $("consentIntro").textContent = mid
+      ? "You're joining partway through the call. Tell the prospect you're starting to record and transcribe now:"
+      : "Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:";
     $("consentBox").checked = false;
+    $("dialerConsent").checked = false;
     $("consentGo").disabled = true;
     $("consentCall").hidden = !callLabel;
     $("consentCall").textContent = callLabel ? "They picked up: " + callLabel : "";
@@ -948,12 +996,23 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     if (d.state === "ringing") {
       setPill("dialerPill", "warn", "Dialer: calling " + d.label, "dialerText");
     } else if (d.state === "answered") {
+      answeredAt = Date.now();
       setPill("dialerPill", "", "Dialer: on a call with " + d.label, "dialerText");
       if (callState === "live" || callState === "paused" || callState === "ending") return;
+      if (d.auto) {                       // dialer announces recording: start coaching now
+        $("mode").value = "live";
+        $("consent").hidden = true;
+        phonePending = false;
+        resetAll();
+        renderSuggestions();
+        toast("They picked up: " + d.label + ". Coaching started.");
+        return;
+      }
       $("mode").value = "live";
       phonePending = true;
       showConsent(d.label);
     } else if (d.state === "ended") {
+      answeredAt = 0;
       setPill("dialerPill", "", "Dialer: linked", "dialerText");
       if (phonePending && !$("consent").hidden) { $("consent").hidden = true; toast("Call ended before coaching started. Nothing was recorded."); }
       phonePending = false;
@@ -1112,7 +1171,11 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   $("mode").addEventListener("change", function () {
     if (this.value === "pick") send("pick_replay");
   });
-  $("startBtn").addEventListener("click", function () { phonePending = false; showConsent(null); });
+  $("startBtn").addEventListener("click", function () {
+    if (consentMode === "dialer") { startNow("dialer"); return; }
+    phonePending = false;
+    showConsent(null);
+  });
   $("consentBox").addEventListener("change", function () { $("consentGo").disabled = !this.checked; });
   $("consentCancel").addEventListener("click", function () {
     $("consent").hidden = true;
@@ -1120,12 +1183,14 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   });
   $("consentGo").addEventListener("click", function () {
     if (!$("consentBox").checked) return;
+    if ($("dialerConsent").checked) { consentMode = "dialer"; send("consent_mode", { mode: "dialer" }); }
     $("consent").hidden = true;
     phonePending = false;
     resetAll();
     renderSuggestions();
     send("start", { mode: $("mode").value, consent: true });
   });
+  $("swapBtn").addEventListener("click", function () { send("swap_speakers"); });
   $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
   $("endBtn").addEventListener("click", function () { send("end"); });
   $("onTop").addEventListener("change", function () { send("on_top", { on: this.checked }); });
@@ -1153,7 +1218,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   } else {
     $("footer").textContent = "Preview only. Run python main.py to use the live coach.";
   }
-  window.__coachTest = { onEvent: onEvent };   // used by the automated UI check
+  window.__coachTest = { onEvent: onEvent, setAnsweredAt: function (t) { answeredAt = t; } };   // used by the automated UI check
 })();
 </script>
 </body>

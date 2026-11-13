@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QIODevice, QObject, QSettings, Qt, QUrl, Signal, Slot
@@ -113,6 +114,11 @@ class MainWindow(QMainWindow):
             )
             self.phone_bridge.start()
         self.settings = QSettings("OllyOlly", "LiveSalesCoach")
+        # Recording consent: "ask" = confirm before every recording;
+        # "dialer" = the dialer already announces recording, so start right away.
+        saved_consent = self.settings.value("consent_mode")
+        self.consent_mode = saved_consent if saved_consent in ("ask", "dialer") else \
+            ("dialer" if get(cfg, "recording.consent_mode", "ask") == "dialer" else "ask")
         saved_live = self.settings.value("live_mode")
         if saved_live is not None:
             cfg.setdefault("coach", {})["live_mode"] = saved_live in (True, "true")
@@ -153,6 +159,11 @@ class MainWindow(QMainWindow):
         focus_ask.setShortcut(QKeySequence("Ctrl+K"))
         focus_ask.triggered.connect(lambda: self.bridge.post("focus_ask", {}))
         call_menu.addAction(focus_ask)
+        call_menu.addSeparator()
+        self.ask_consent_action = QAction("Ask before each recording", self, checkable=True)
+        self.ask_consent_action.setChecked(self.consent_mode == "ask")
+        self.ask_consent_action.toggled.connect(lambda on: self.set_consent_mode("ask" if on else "dialer"))
+        call_menu.addAction(self.ask_consent_action)
         self.on_top_action.setChecked(on_top)
         self.set_on_top(on_top)
 
@@ -181,6 +192,19 @@ class MainWindow(QMainWindow):
         if self.on_top_action.isChecked() != bool(on):
             self.on_top_action.setChecked(bool(on))
         self.bridge.post("on_top", {"on_top": bool(on)})
+
+    def set_consent_mode(self, mode: str) -> None:
+        mode = "dialer" if mode == "dialer" else "ask"
+        if mode == self.consent_mode:
+            return
+        self.consent_mode = mode
+        self.settings.setValue("consent_mode", mode)
+        if self.ask_consent_action.isChecked() != (mode == "ask"):
+            self.ask_consent_action.setChecked(mode == "ask")
+        self.bridge.post("consent_mode", {"mode": mode})
+        self.bridge.post("toast", {"level": "info", "text": (
+            "Recording starts right away now (your dialer announces it). Turn the prompt back on in Call menu → Ask before each recording."
+            if mode == "dialer" else "You'll confirm the recording notice before each call again.")})
 
     def closeEvent(self, event) -> None:
         self.settings.setValue("geometry", self.saveGeometry())
@@ -222,16 +246,19 @@ class MainWindow(QMainWindow):
         if kind == "ringing":
             if busy:
                 return
-            self.pending_call = {**(self.pending_call or {}), **info, "state": "ringing"}
+            self.pending_call = {**(self.pending_call or {}), **info, "state": "ringing", "at": time.monotonic()}
             self.bridge.post("phone", {"state": "ringing", "label": call_label(self.pending_call)})
         elif kind == "answered":
             if busy:
                 return
-            self.pending_call = {**(self.pending_call or {}), **info, "state": "answered"}
+            self.pending_call = {**(self.pending_call or {}), **info, "state": "answered", "at": time.monotonic()}
             self.showNormal()
             self.raise_()
             self.activateWindow()
-            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call)})
+            auto = self.consent_mode == "dialer" and self.prompts is not None
+            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call), "auto": auto})
+            if auto:
+                self.start_call({"mode": "live", "consent": True, "basis": "dialer"})
         elif kind == "ended":
             self.pending_call = None
             self.bridge.post("phone", {"state": "ended"})
@@ -258,6 +285,7 @@ class MainWindow(QMainWindow):
                 "default_mode": default_mode,
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
+                "consent_mode": self.consent_mode,
                 "live_mode": bool(get(self.cfg, "coach.live_mode", True)),
                 "phone_bridge": {"enabled": self.phone_bridge is not None,
                                  "error": self.phone_bridge.error if self.phone_bridge else None,
@@ -289,7 +317,9 @@ class MainWindow(QMainWindow):
         elif cmd == "keep_call" and self.session and not self.session.running:
             self.runner.submit(self.session.save_anyway())
         elif cmd == "dismiss_phone":
-            self.pending_call = None
+            pass        # keep the caller's number in case coaching is started later in the call
+        elif cmd == "consent_mode":
+            self.set_consent_mode(str(msg.get("mode", "ask")))
         elif cmd == "list_calls":
             self.bridge.post("calls", {"calls": list_calls(self.calls_dir)})
         elif cmd == "get_call":
@@ -309,6 +339,8 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "info", "text": "Summary copied. Paste it into HubSpot notes."})
             else:
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
+        elif cmd == "swap_speakers" and self.session and self.session.running:
+            self.runner.call(self.session.swap_speakers)
         elif cmd == "live_mode":
             on = bool(msg.get("on"))
             self.cfg.setdefault("coach", {})["live_mode"] = on      # next calls too
@@ -319,9 +351,10 @@ class MainWindow(QMainWindow):
             self.set_on_top(bool(msg.get("on")))
 
     def start_call(self, msg: dict) -> None:
-        if not msg.get("consent"):
+        if not msg.get("consent") and self.consent_mode != "dialer":
             self.bridge.post("toast", {"level": "error", "text": "Confirm the recording notice first."})
             return
+        basis = "dialer disclosure" if (msg.get("basis") == "dialer" or self.consent_mode == "dialer") else "rep confirmed"
         if self.prompts is None:
             self.bridge.post("toast", {"level": "error", "text": self.prompts_error})
             self.bridge.post("call", {"state": "idle"})
@@ -335,10 +368,15 @@ class MainWindow(QMainWindow):
         else:
             path, mode = None, "live"
         info = None
-        if mode == "live" and self.pending_call:
-            info = {k: v for k, v in self.pending_call.items() if k != "state"}
-        self.pending_call = None
+        fresh = self.pending_call and time.monotonic() - self.pending_call.get("at", 0) < 2 * 3600
+        if mode == "live" and fresh:
+            info = {k: v for k, v in self.pending_call.items() if k not in ("state", "at")}
         self.session = CallSession(self.cfg, self.prompts, self.bridge.post, mode, path, info)
+        self.session.consent_basis = basis
+        if info and self.pending_call.get("state") == "answered":
+            missed = time.monotonic() - self.pending_call.get("at", time.monotonic())
+            if missed > 15:
+                self.session.mark_joined_mid_call(missed)
         fut = self.runner.submit(self.session.start())
 
         def done(f):

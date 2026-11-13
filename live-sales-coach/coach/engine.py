@@ -235,7 +235,8 @@ class CoachEngine:
         msg = await self._create(kw)
         return self._text_of(msg).strip()
 
-    async def post_call_summary(self, transcript: str, metrics: dict, coaching_count: int) -> dict:
+    async def post_call_summary(self, transcript: str, metrics: dict, coaching_count: int,
+                                note: str = "") -> dict:
         if self.client is None:
             raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
         schema = {
@@ -255,6 +256,7 @@ class CoachEngine:
             "role": "user",
             "content": (
                 "The call has ended. Review it as Spencer's coach.\n\n"
+                + (note + "\n\n" if note else "") +
                 f"Computed call metrics (JSON):\n{json.dumps(metrics, indent=2)}\n\n"
                 f"Coaching cards shown during the call: {coaching_count}\n\n"
                 f"Full transcript:\n{transcript or '(empty)'}\n\n"
