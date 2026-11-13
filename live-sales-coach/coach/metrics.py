@@ -76,6 +76,7 @@ class Metrics:
     next_step_agreed: bool = False
     _next_step_t: float | None = None
     elapsed: float = 0.0
+    partial_after: float = 0.0     # >0: coaching joined this many seconds into the call
 
     # ---- updates -------------------------------------------------------
     def add_utterance(self, u: Utterance) -> None:
@@ -226,6 +227,8 @@ class Metrics:
     def snapshot(self) -> dict:
         return {
             "elapsed_seconds": round(self.elapsed, 1),
+            "partial_call": self.partial_after > 0,
+            "joined_after_seconds": round(self.partial_after) if self.partial_after else None,
             "rep_talk_seconds": round(self.rep_seconds, 1),
             "prospect_talk_seconds": round(self.prospect_seconds, 1),
             "rep_share_pct": self.rep_share,

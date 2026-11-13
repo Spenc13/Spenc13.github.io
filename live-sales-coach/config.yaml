@@ -81,6 +81,13 @@ replay:
 storage:
   calls_dir: calls
 
+recording:
+  # "ask": confirm the recording notice before every recording.
+  # "dialer": your dialer already announces recording on every call, so coaching
+  #           starts immediately (and automatically when a dialer call is answered).
+  # You can also switch this in the app: Call menu → Ask before each recording.
+  consent_mode: ask
+
 call_filter:
   # Calls that go nowhere (no answer, quick hang-up, voicemail) are not saved
   # or graded. You can still keep one with "Save anyway" right after it ends.

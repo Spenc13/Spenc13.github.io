@@ -491,3 +491,28 @@ def test_swap_speakers_relabels_past_and_future():
     assert [u.speaker for u in s.transcript.finals] == [REP, PROSPECT, REP]
     assert s.metrics.questions == 1 and s.metrics.rep_words > 0
     assert any(k == "transcript_reset" for k, _ in events)
+
+
+# ---------------------------------------------------------------- joined mid-call
+def test_joined_mid_call_is_marked_everywhere(tmp_path):
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path)
+    cfg["replay"]["speed"] = 40
+    cfg["coach"]["live_mode"] = True
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: None, "replay_text",
+                        str(ROOT / "samples" / "remodeler_too_expensive.txt"))
+        s.engine.client = _FakeClient(REPLY)
+        s.mark_joined_mid_call(130)
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=60)
+        return s
+
+    s = asyncio.run(run())
+    contents = [c["messages"][0]["content"] for c in s.engine.client.messages.calls]
+    assert any("coaching started about 02:10 into the call" in c for c in contents if "Live coach mode" in c)
+    assert any("coaching started about 02:10" in c and "The call has ended" in c for c in contents)
+    metrics = json.loads((Path(s.store.dir) / "metrics.json").read_text())
+    assert metrics["partial_call"] is True and metrics["joined_after_seconds"] == 130
+    assert metrics["meta"]["joined_mid_call_after"] == "02:10"

@@ -44,6 +44,8 @@ class CallSession:
     def __init__(self, cfg: dict, prompts: Prompts, emit: Emit, mode: str = "live",
                  replay_path: str | None = None, call_info: dict | None = None) -> None:
         self.call_info = call_info or {}
+        self.consent_basis = "rep confirmed"   # or "dialer disclosure"
+        self.joined_after = 0.0                # seconds of the call missed before coaching started
         self.cfg = cfg
         self.prompts = prompts
         self.emit = emit
@@ -251,6 +253,18 @@ class CallSession:
             await asyncio.sleep(1.5)
             await self.end()
 
+    def mark_joined_mid_call(self, seconds_missed: float) -> None:
+        """Coaching started partway through the call: tell the coach, summary, and scores."""
+        self.joined_after = max(0.0, float(seconds_missed))
+        self.metrics.partial_after = self.joined_after
+
+    def partial_note(self) -> str:
+        if not self.joined_after:
+            return ""
+        return (f"Note: coaching started about {fmt_clock(self.joined_after)} into the call, so the beginning "
+                "(intro, rapport, and any early discovery) was not transcribed. Don't treat anything missing "
+                "from that part as a mistake, and don't assume it didn't happen.")
+
     def set_live_mode(self, on: bool) -> None:
         self.live_mode = bool(on)
         if not on and self._turn_timer and not self._turn_timer.done():
@@ -322,6 +336,8 @@ class CallSession:
             "coach_model": self.engine.model,
             "coaching_cards": self._coaching_count,
             "consent_confirmed": True,
+            "consent_basis": self.consent_basis,
+            "joined_mid_call_after": fmt_clock(self.joined_after) if self.joined_after else None,
             "echo_lines_dropped": self.echo_dropped,
             "speakers_swapped": self._swap,
             "phone": self.call_info.get("phone"),
@@ -364,7 +380,8 @@ class CallSession:
             err = "No transcript was captured."
         else:
             try:
-                summary = await self.engine.post_call_summary(full, snap, self._coaching_count)
+                summary = await self.engine.post_call_summary(full, snap, self._coaching_count,
+                                                              note=self.partial_note())
             except CoachUnavailable as e:
                 err = str(e)
             except Exception as e:
@@ -412,7 +429,7 @@ class CallSession:
         flip = {REP: PROSPECT, PROSPECT: REP}
         for u in self.transcript.finals:
             u.speaker = flip[u.speaker]
-        m = Metrics()
+        m = Metrics(partial_after=self.metrics.partial_after)
         for u in self.transcript.finals:
             m.add_utterance(u)
             if u.speaker == PROSPECT:
@@ -605,7 +622,10 @@ class CallSession:
             self.emit("coach", {"state": "error", "question": req.question,
                                 "error": "Coach offline: ANTHROPIC_API_KEY is not set. Transcript and scoring still run."})
             return
-        user = self.engine.build_user_message(self._running_summary, self._recent_transcript(), req.prompt)
+        summary = self._running_summary
+        if self.joined_after:
+            summary = (self.partial_note() + "\n" + summary).strip()
+        user = self.engine.build_user_message(summary, self._recent_transcript(), req.prompt)
         t0 = time.monotonic()
         anchor = req.spoke_end_mono or req.created_mono
         first_card: dict = {}
