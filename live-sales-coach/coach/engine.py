@@ -21,6 +21,14 @@ log = logging.getLogger(__name__)
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
+LIVE_INSTRUCTION = (
+    "Live coach mode: Spencer will read your \"Say this next\" line out loud, word for word, right now. "
+    "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words, "
+    "responding directly to what the prospect just said and moving the call forward. "
+    "No stage directions or quotation marks. If the prospect is mid-thought and Spencer should stay quiet, "
+    "write: Say this next: (Stay quiet. Let them finish.) Keep Tactic and Watch-out to a few words each."
+)
+
 FORMAT_REMINDER = (
     "Reply in your default three-part format, one line each, with these exact labels:\n"
     "Say this next: ...\nTactic: ...\nWatch-out: ..."
@@ -55,6 +63,23 @@ def parse_coach(text: str) -> dict[str, str]:
     return out
 
 
+_WORD = re.compile(r"[a-z0-9']+")
+_STOP = {"the", "and", "that", "this", "with", "your", "you", "what", "would", "have", "about", "just",
+         "it's", "that's", "there", "they", "them", "then", "from", "like", "know", "really", "so", "for"}
+
+
+def said_it(suggestion: str, spoken: str) -> bool:
+    """Did Spencer (roughly) say the suggested line? Matches on content words."""
+    if suggestion.strip().startswith("("):        # "(Stay quiet...)" isn't a line to say
+        return False
+    want = [w for w in _WORD.findall(suggestion.lower()) if len(w) > 3 and w not in _STOP]
+    if len(want) < 3:
+        return False
+    got = set(_WORD.findall(spoken.lower()))
+    hits = sum(1 for w in set(want) if w in got)
+    return hits >= 3 and hits / len(set(want)) >= 0.5
+
+
 @dataclass
 class CoachRequest:
     reason: str                  # "auto" | "ask" | "hotkey" | "suggestion"
@@ -62,6 +87,7 @@ class CoachRequest:
     question: str                # short label for the card header
     spoke_end_mono: float | None = None   # when the prospect stopped talking (auto only)
     detection: dict | None = None
+    fast: bool = False                    # live coach: lowest-latency settings
     created_mono: float = field(default_factory=time.monotonic)
 
 
@@ -79,6 +105,7 @@ class CoachEngine:
         self.max_tokens = int(get(cfg, "coach.max_tokens", 2000))
         self.post_call_max_tokens = int(get(cfg, "coach.post_call_max_tokens", 8000))
         self.use_fallback = bool(get(cfg, "coach.server_fallback", True))
+        self.live_thinking = get(cfg, "coach.live_thinking", "between_tools")
         self.prompts = prompts
         self.client = None
         if api_key_present:
@@ -98,14 +125,16 @@ class CoachEngine:
             },
         ]
 
-    def _common(self, max_tokens: int, effort: str | None = None) -> dict:
+    def _common(self, max_tokens: int, effort: str | None = None, thinking: str | None = None) -> dict:
         kw: dict = {
             "model": self.model,
             "max_tokens": max_tokens,
             "system": self.system_blocks(),
             "output_config": {"effort": effort or self.effort},
         }
-        if self.thinking == "between_tools":
+        mode = thinking or self.thinking
+        # "between_tools" (no extended thinking) exists only on Sonnet 5.5.
+        if mode == "between_tools" and str(self.model).startswith("claude-sonnet-5-5"):
             kw["thinking"] = {"type": "between_tools"}
         else:
             kw["thinking"] = {"type": "adaptive"}
@@ -134,11 +163,14 @@ class CoachEngine:
         self,
         user_text: str,
         on_text: Callable[[str], Awaitable[None] | None],
+        fast: bool = False,
     ) -> dict:
-        """Stream a coaching reply. Calls on_text(full_text_so_far) as it grows."""
+        """Stream a coaching reply. Calls on_text(full_text_so_far) as it grows.
+        fast=True (live coach) uses the live_thinking setting and low effort."""
         if self.client is None:
             raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
-        kw = self._common(self.max_tokens)
+        kw = self._common(self.max_tokens, effort="low" if fast else None,
+                          thinking=self.live_thinking if fast else None)
         kw["messages"] = [{"role": "user", "content": user_text}]
         try:
             return await self._do_stream(kw, self._extra(), on_text)

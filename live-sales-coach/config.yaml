@@ -45,9 +45,18 @@ coach:
   effort: low                # low | medium | high
   max_tokens: 2000           # includes any thinking tokens; replies are ~80 words
   server_fallback: true      # retry declined requests on a fallback model (server-side)
+  # Live coach ("parrot" mode): a fresh line to read out loud after every prospect
+  # turn, not only on objections. Toggle it in the app header too.
+  live_mode: true
+  live_thinking: between_tools   # fastest: no extended thinking (Sonnet 5.5). Or "adaptive".
   transcript_window_minutes: 4   # last N minutes of transcript sent with each request
   summary_refresh_seconds: 90    # how often the running summary absorbs older lines
   post_call_max_tokens: 8000
+
+live_coach:
+  min_prospect_words: 3      # skip "yeah", "mm-hmm" (unless it's a question or an objection)
+  min_gap_seconds: 2         # at most one new line every 2 seconds
+  turn_end_wait_ms: 900      # if speech-to-text doesn't mark the end of a turn, wait this long
 
 triggers:
   auto: true

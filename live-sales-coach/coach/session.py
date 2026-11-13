@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from .config import Prompts, get, keys_status
-from .engine import CoachEngine, CoachRequest, CoachUnavailable, parse_coach
+from .engine import LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, parse_coach, said_it
 from .metrics import Metrics
 from .callfilter import judge
 from .storage import CallStore
@@ -54,6 +54,15 @@ class CallSession:
             float(get(cfg, "triggers.same_kind_cooldown_seconds", 45)),
         )
         self.auto = bool(get(cfg, "triggers.auto", True))
+        # Live coach: a fresh "say this next" after every prospect turn.
+        self.live_mode = bool(get(cfg, "coach.live_mode", True))
+        self.live_min_words = int(get(cfg, "live_coach.min_prospect_words", 3))
+        self.live_min_gap = float(get(cfg, "live_coach.min_gap_seconds", 2))
+        self.live_turn_wait = float(get(cfg, "live_coach.turn_end_wait_ms", 900)) / 1000
+        self._turn_timer: asyncio.Task | None = None
+        self._turn_det = None
+        self._last_live_fire = -1e9
+        self._last_say = ""
         self.window_s = float(get(cfg, "coach.transcript_window_minutes", 4)) * 60
         self.summary_every = float(get(cfg, "coach.summary_refresh_seconds", 90))
         self.lookback = float(get(cfg, "hotkey.lookback_seconds", 20))
@@ -221,6 +230,11 @@ class CallSession:
             await asyncio.sleep(1.5)
             await self.end()
 
+    def set_live_mode(self, on: bool) -> None:
+        self.live_mode = bool(on)
+        if not on and self._turn_timer and not self._turn_timer.done():
+            self._turn_timer.cancel()
+
     def pause(self) -> None:
         if not self.running or self.paused:
             return
@@ -362,6 +376,8 @@ class CallSession:
 
         turn = self._open_turn.get(sp)
         if not ev.final:
+            if sp == PROSPECT and self._turn_timer and not self._turn_timer.done():
+                self._turn_timer.cancel()          # still talking: wait for the end of the turn
             self._partial[sp] = ev.text
             base = turn.text + " " if turn else ""
             line_id = turn.id if turn else f"p-{sp}"
@@ -384,8 +400,16 @@ class CallSession:
             turn.duration = max(turn.duration, ev.start + ev.duration - turn.t)
             turn.spoke_end_mono = ev.spoke_end_mono
             self.emit("line", {"id": turn.id, "speaker": sp, "text": turn.text, "t": fmt_clock(turn.t), "final": True})
+        live_turn = turn
         if ev.speech_final:
             self._close_turn(sp)
+
+        if sp == REP:
+            if self._last_say and said_it(self._last_say, live_turn.text):
+                self._last_say = ""
+                self.emit("coach", {"state": "used"})
+            if len(ev.text.split()) >= 3 and self._turn_timer and not self._turn_timer.done():
+                self._turn_timer.cancel()          # Spencer already answered that turn
 
         if sp == PROSPECT:
             det = detect(ev.text)
@@ -393,6 +417,11 @@ class CallSession:
                 if det.kind == OBJECTION:
                     self.metrics.add_objection(det.key, det.label, ev.start)
                 self.emit("signal", {"kind": det.kind, "label": det.label, "quote": ev.text})
+            if self.live_mode:
+                if det and (self._turn_det is None or det.kind == OBJECTION):
+                    self._turn_det = det
+                self._schedule_live(live_turn, 0 if ev.speech_final else self.live_turn_wait, received)
+            elif det:
                 if self.auto and self.debouncer.should_fire(det, ev.start + ev.duration):
                     kind_word = "buying signal" if det.kind == BUYING else det.kind.replace("_", " ")
                     await self.request_coach(CoachRequest(
@@ -406,6 +435,40 @@ class CallSession:
                                    "stt_latency_s": round(received - ev.spoke_end_mono, 2)},
                     ))
         self.emit("metrics", self.metrics.snapshot())
+
+    # ------------------------------------------------------------ live coach
+    def _schedule_live(self, turn: Utterance, wait: float, received: float) -> None:
+        if self._turn_timer and not self._turn_timer.done():
+            self._turn_timer.cancel()
+        self._turn_timer = asyncio.create_task(self._live_after(turn, wait, received))
+
+    async def _live_after(self, turn: Utterance, wait: float, received: float) -> None:
+        if wait > 0:
+            await asyncio.sleep(wait)
+        if not self.running or not self.live_mode:
+            return
+        text = turn.text.strip()
+        det, self._turn_det = self._turn_det, None
+        if len(text.split()) < self.live_min_words and det is None and not text.endswith("?"):
+            return                                   # "yeah", "mm-hmm", "okay"
+        now = self.elapsed()
+        if det is None and now - self._last_live_fire < self.live_min_gap:
+            return
+        self._last_live_fire = now
+        flag = ""
+        if det is not None:
+            kind_word = "buying signal" if det.kind == BUYING else det.kind.replace("_", " ")
+            flag = f"\nA local keyword check flagged this as a {kind_word}: {det.label}."
+        short = text if len(text) <= 70 else "\u2026" + text[-68:]
+        await self.request_coach(CoachRequest(
+            reason="live",
+            question=f"Prospect: \u201c{short}\u201d",
+            prompt=f'The prospect just finished saying: "{text}"{flag}\n\n{LIVE_INSTRUCTION}',
+            spoke_end_mono=turn.spoke_end_mono,
+            detection=({"key": det.key, "kind": det.kind, "label": det.label} if det else {})
+            | {"stt_latency_s": round(received - turn.spoke_end_mono, 2)},
+            fast=True,
+        ))
 
     # ------------------------------------------------------------ coaching
     async def ask(self, question: str) -> None:
@@ -467,7 +530,7 @@ class CallSession:
                                 "latency_s": round(first_card.get("latency", 0), 2) or None})
 
         try:
-            result = await self.engine.stream_coaching(user, on_text)
+            result = await self.engine.stream_coaching(user, on_text, fast=req.fast)
         except asyncio.CancelledError:
             raise
         except CoachUnavailable as e:
@@ -506,11 +569,13 @@ class CallSession:
             "cache_write_tokens": result.get("cache_write_tokens"),
         }
         self._coaching_count += 1
+        say = parsed.get("say", "")
+        self._last_say = "" if say.startswith("(") else say
         record = {"timestamp": datetime.now().isoformat(timespec="seconds"), **record}
         self._coaching_log.append(record)
         if self.store:
             self.store.log_coaching(record, stamp=False)
-        self.emit("coach", {"state": "done", "question": req.question, **parsed,
+        self.emit("coach", {"state": "done", "question": req.question, "live": req.fast, **parsed,
                             "latency_s": record["latency_s"], "latency_complete_s": record["latency_complete_s"],
                             "measured_from": "prospect stopped talking" if req.spoke_end_mono else "your request",
                             "stt_latency_s": (req.detection or {}).get("stt_latency_s"),

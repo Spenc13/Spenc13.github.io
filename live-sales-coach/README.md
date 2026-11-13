@@ -92,7 +92,7 @@ python main.py
 
 1. Pick **Live call** (or a replay) in the dropdown and press **Start call**.
 2. The **recording notice** appears. Tick "I will tell the prospect this call is recorded" to enable Start. Every call starts with this, and it's noted in `metrics.json`. Say the line it shows at the top of the call, and stop if they say no.
-3. Talk. Coaching appears automatically when the prospect raises an objection or a buying signal. You can also:
+3. Talk. With **Live coach** on (the default, toggled in the header), a new "Say this next" line streams in **every time the prospect finishes talking**. It's written as your exact words, so you can read it out loud. If they keep talking, the coach drops the half-written line and starts over with what they just said. When you say the line, the card dims and shows **✓ You said it**, so a bright card always means a fresh line. With Live coach off, cards appear only on objections and buying signals. You can also:
    - Type a question in the ask bar and press **Enter**.
    - Press **Ctrl+Shift+Space** (Cmd+Shift+Space on Mac) from any app to ask about the last ~20 seconds.
    - Click a quick prompt: *Ask a deeper question*, *Pause and let them talk*, *Confirm the pain*.
@@ -149,13 +149,15 @@ In each sample, Spencer makes realistic mistakes, so you can see whether the coa
 
 **Recordings:** `--replay mycall.wav` streams a 16-bit WAV to Deepgram in real time. A **stereo** file uses the left channel as Rep and the right as Prospect. A **mono** file uses Deepgram diarization, which assumes the first voice is Rep.
 
+**Live coach cost:** one short request per prospect turn. The prompts are cached, so each costs about a third of a cent on Sonnet 5.5, roughly $0.20 to $0.40 for a 30-minute call. Settings are under `live_coach` and `coach.live_mode` / `coach.live_thinking` in `config.yaml`.
+
 ## 8. Latency
 
 Every coaching card shows how long it took, measured from **when the prospect stopped talking** to when the first line of the card appeared. That total includes Deepgram's finalization time. The header shows the last value against the **3-second target**, and every card's latency is logged in `coaching.jsonl` (`latency_s`, `latency_complete_s`, `api_seconds`).
 
 Settings that affect speed, in `config.yaml`:
 - `coach.effort: low` (the default) keeps thinking short.
-- `coach.thinking: between_tools` turns extended thinking off on Sonnet 5.5, which is the fastest option.
+- `coach.thinking: between_tools` turns extended thinking off on Sonnet 5.5, which is the fastest option. Live coach lines already use it (`coach.live_thinking`).
 - `stt.endpointing_ms` sets how long Deepgram waits after speech stops before finalizing (default 300 ms).
 - **Prompt caching:** the instructions, playbook, and offer reference are cached after the first request. A card that hit the cache says "prompt cache hit."
 

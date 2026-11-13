@@ -113,6 +113,9 @@ class MainWindow(QMainWindow):
             )
             self.phone_bridge.start()
         self.settings = QSettings("OllyOlly", "LiveSalesCoach")
+        saved_live = self.settings.value("live_mode")
+        if saved_live is not None:
+            cfg.setdefault("coach", {})["live_mode"] = saved_live in (True, "true")
 
         self.setWindowTitle("Live Sales Coach")
         self.resize(int(get(cfg, "window.width", 1440)), int(get(cfg, "window.height", 960)))
@@ -255,6 +258,7 @@ class MainWindow(QMainWindow):
                 "default_mode": default_mode,
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
+                "live_mode": bool(get(self.cfg, "coach.live_mode", True)),
                 "phone_bridge": {"enabled": self.phone_bridge is not None,
                                  "error": self.phone_bridge.error if self.phone_bridge else None,
                                  "linked": self.phone_linked},
@@ -305,6 +309,12 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "info", "text": "Summary copied. Paste it into HubSpot notes."})
             else:
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
+        elif cmd == "live_mode":
+            on = bool(msg.get("on"))
+            self.cfg.setdefault("coach", {})["live_mode"] = on      # next calls too
+            self.settings.setValue("live_mode", on)
+            if self.session and self.session.running:
+                self.runner.call(self.session.set_live_mode, on)
         elif cmd == "on_top":
             self.set_on_top(bool(msg.get("on")))
 

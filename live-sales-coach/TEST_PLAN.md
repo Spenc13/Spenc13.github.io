@@ -26,6 +26,13 @@ For each card, check:
 - [ ] The three quick-prompt buttons each get a relevant card.
 - [ ] The talk ratio, question count, and scores change as the call plays, and the summary appears after it ends.
 
+## B2. Live coach (parrot mode)
+
+- [ ] With **Live coach** checked, replay a sample. A new line appears after each prospect turn, streaming in within about 1 to 2 seconds of them finishing.
+- [ ] Read a line out loud on a practice call. The card dims and shows **✓ You said it**.
+- [ ] Short replies ("yeah", "okay") don't produce a new card, unless they're a question or an objection.
+- [ ] Uncheck **Live coach**. Cards now appear only on objections and buying signals.
+
 ## C. Audio routing (10 min)
 
 - [ ] `python main.py --list-devices` shows your headset mic and a LOOPBACK device for your headset or speakers.

@@ -299,6 +299,12 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .coach-card .latency.slow { color: var(--warn); }
 .coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
 .coach-card.thinking .say { color: var(--muted); }
+.coach-card.live .say { font-size: 19px; line-height: 1.4; }
+.coach-card.used { opacity: 0.55; border-color: var(--line); background: var(--panel-2); }
+.coach-card .used-tag { display: inline-block; margin-left: 6px; color: var(--good); font-weight: 600; }
+.live-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; font-weight: 600; font-size: 12px;
+  background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; }
+.live-toggle input { accent-color: var(--accent); }
 .coach-history { margin-top: 4px; display: grid; gap: 6px; }
 .coach-history .old { font-size: 12px; color: var(--muted); border-left: 2px solid var(--line); padding: 2px 0 2px 8px; }
 .bar-row .detail { grid-column: 2 / 4; font-size: 11px; color: var(--muted); margin-top: -6px; }
@@ -412,6 +418,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <span class="pill idle" id="hotkeyPill">Hotkey: –</span>
   <span class="pill idle" id="dialerPill"><span class="dot"></span><span id="dialerText">Dialer: not linked</span></span>
   <span class="spacer"></span>
+  <label class="live-toggle" title="On: a fresh line to say after every prospect turn. Off: only on objections and buying signals."><input type="checkbox" id="liveMode" checked> Live coach</label>
   <label class="toggle"><input type="checkbox" id="onTop"> Stay on top</label>
 </div>
 
@@ -650,7 +657,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   function renderCard(c) {
     var box = $("coachFeed");
     box.innerHTML = "";
-    var card = el("div", "coach-card" + (c.state === "error" ? " error" : "") + (c.state === "thinking" ? " thinking" : ""));
+    var card = el("div", "coach-card" + (c.state === "error" ? " error" : "") + (c.state === "thinking" ? " thinking" : "") +
+      ($("liveMode").checked ? " live" : ""));
     card.appendChild(el("div", "q", c.question ? ("Say this next · " + c.question) : "Say this next"));
     if (c.state === "error") {
       card.appendChild(el("p", "say", c.error || "Coach unavailable."));
@@ -676,6 +684,15 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   }
 
   function onCoach(c) {
+    if (c.state === "used") {
+      var cur = document.querySelector("#coachFeed .coach-card");
+      if (cur && !cur.classList.contains("used")) {
+        cur.classList.add("used");
+        var q = cur.querySelector(".q");
+        if (q) q.appendChild(el("span", "used-tag", "✓ You said it"));
+      }
+      return;
+    }
     if (c.state === "thinking" && lastCard && lastCard.say) {
       var hist = $("coachHistory");
       var old = el("div", "old", lastCard.say);
@@ -848,7 +865,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("coachFeed").innerHTML = "";
     var c = el("div", "coach-card");
     c.appendChild(el("div", "q", "Listening"));
-    c.appendChild(el("p", "say", "Coaching appears when the prospect raises a concern or a buying signal."));
+    c.appendChild(el("p", "say", $("liveMode").checked ? "Your next line appears here each time the prospect finishes talking." : "Coaching appears when the prospect raises a concern or a buying signal."));
     c.appendChild(el("div", "meta", "Or type a question above, or press the hotkey."));
     $("coachFeed").appendChild(c);
     $("coachHistory").innerHTML = "";
@@ -874,6 +891,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         $("repTitle").textContent = d.rep_title || "Sales Rep";
         $("hotkeyPill").textContent = "Hotkey: " + (d.hotkey_label || "–") + " asks about the last few seconds";
         $("onTop").checked = !!d.on_top;
+        $("liveMode").checked = d.live_mode !== false;
         var sel = $("mode");
         sel.innerHTML = "";
         var live = el("option", null, "Live call (mic + system audio)"); live.value = "live"; sel.appendChild(live);
@@ -1111,6 +1129,10 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
   $("endBtn").addEventListener("click", function () { send("end"); });
   $("onTop").addEventListener("change", function () { send("on_top", { on: this.checked }); });
+  $("liveMode").addEventListener("change", function () {
+    send("live_mode", { on: this.checked });
+    toast(this.checked ? "Live coach on: a new line after every prospect turn." : "Live coach off: coaching only on objections and buying signals.");
+  });
   $("ask").addEventListener("keydown", function (e) {
     if (e.key !== "Enter") return;
     var q = this.value.trim();
