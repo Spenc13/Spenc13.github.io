@@ -624,3 +624,80 @@ def test_audio_system_starts_once(monkeypatch):
     mic2 = audio.open_mic({"backend": "wasapi", "mic_device": "USB Headset"}, lambda b: None)
     assert mic2.device_name == "USB Headset Mic" and len(inits) == 2     # rescanned once for the new device
     audio.shutdown()
+
+
+# ---------------------------------------------------------------- follow the call audio
+def test_follower_finds_the_speaker_with_the_other_person(monkeypatch):
+    import types
+    import numpy as _np
+    import coach.audio as audio
+
+    devices = [
+        {"index": 0, "name": "Headset Microphone (Jabra)", "maxInputChannels": 1, "maxOutputChannels": 0,
+         "defaultSampleRate": 16000, "hostApi": 0},
+        {"index": 1, "name": "Headphones (Jabra Stereo) [Loopback]", "maxInputChannels": 2, "maxOutputChannels": 0,
+         "defaultSampleRate": 48000, "hostApi": 0, "isLoopbackDevice": True},
+        {"index": 2, "name": "Headset (Jabra Hands-Free) [Loopback]", "maxInputChannels": 1, "maxOutputChannels": 0,
+         "defaultSampleRate": 16000, "hostApi": 0, "isLoopbackDevice": True},
+        {"index": 3, "name": "Speakers (Realtek) [Loopback]", "maxInputChannels": 2, "maxOutputChannels": 0,
+         "defaultSampleRate": 44100, "hostApi": 0, "isLoopbackDevice": True},
+    ]
+    callbacks = {}
+
+    class FakeStream:
+        def start_stream(self): pass
+        def stop_stream(self): pass
+        def close(self): pass
+
+    class FakePA:
+        def get_device_count(self): return len(devices)
+        def get_device_info_by_index(self, i): return devices[i]
+        def get_host_api_info_by_index(self, i): return {"name": "Windows WASAPI"}
+        def get_host_api_info_by_type(self, t): return {"defaultInputDevice": 0}
+        def get_default_wasapi_loopback(self): return devices[1]        # Windows default = stereo headphones
+        def open(self, input_device_index, stream_callback, **kw):
+            callbacks[input_device_index] = (stream_callback, kw["channels"], kw["rate"])
+            return FakeStream()
+        def terminate(self): pass
+
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch",
+                        types.SimpleNamespace(PyAudio=FakePA, paWASAPI=13, paInt16=8, paContinue=0))
+    audio.shutdown()
+    fed = []
+    f = audio.CallAudioFollower(fed.append, chunk_ms=100)
+    f.HOLD_S = 0
+    f.start()
+    assert f.active == 1 and set(callbacks) == {1, 2, 3}
+
+    def chunk(idx, loud):
+        cb, ch, rate = callbacks[idx]
+        n = int(rate * 0.1)
+        a = (_np.sin(_np.arange(n * ch) / 7) * (8000 if loud else 0)).astype(_np.int16)
+        cb(a.tobytes(), n, None, 0)
+
+    mic_loud = (_np.ones(1600) * 6000).astype(_np.int16).tobytes()
+    for turn in range(6):
+        for _ in range(10):                     # Spencer talks: his sidetone hits the stereo device
+            f.note_mic(audio._rms(mic_loud))
+            chunk(1, True); chunk(2, False); chunk(3, False)
+        for _ in range(10):                     # colleague talks on the Hands-Free device, mic quiet
+            f.note_mic(0.0); f._mic = 0.0
+            chunk(1, False); chunk(2, True); chunk(3, False)
+        if f.pick():
+            break
+    assert f.active == 2, f.scores               # followed the colleague, not the sidetone
+    fed.clear()
+    chunk(2, True)
+    assert len(fed) == 1 and len(fed[0]) == 1600 * 2       # 100 ms at 16 kHz, mono
+    chunk(1, True)
+    assert len(fed) == 1                         # other speakers aren't sent to speech-to-text
+    f.set_active(3)                              # manual pick locks it
+    for _ in range(30):
+        f._mic = 0.0; chunk(2, True)
+    assert not f.pick() and f.active == 3 and f.locked
+    f.set_active(None)
+    assert not f.locked
+    names = [d["name"] for d in f.device_list()]
+    assert "Headset (Jabra Hands-Free)" in names and all("[Loopback]" not in n for n in names)
+    f.stop()
+    audio.shutdown()

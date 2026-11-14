@@ -84,6 +84,7 @@ class CallSession:
         self._peak = {REP: 0.0, PROSPECT: 0.0}   # loudest level seen this call
         self._silence_warned = False
         self._loopback_name = ""
+        self._follower = None                    # CallAudioFollower when following all speakers
         self.window_s = float(get(cfg, "coach.transcript_window_minutes", 4)) * 60
         self.summary_every = float(get(cfg, "coach.summary_refresh_seconds", 90))
         self.lookback = float(get(cfg, "hotkey.lookback_seconds", 20))
@@ -202,14 +203,28 @@ class CallSession:
         self.emit("health", self.health)
 
     async def _start_live(self, loop: asyncio.AbstractEventLoop) -> None:
-        from .audio import open_loopback, open_mic
+        from .audio import CallAudioFollower, _backend, open_loopback, open_mic
 
         audio_cfg = self.cfg.get("audio") or {}
         stt_cfg = dict(self.cfg.get("stt") or {})
         provider = stt_cfg.pop("provider", "deepgram")
         self._set_health("stt", "connecting", "Connecting to speech-to-text")
 
-        for speaker, opener in ((REP, open_mic), (PROSPECT, open_loopback)):
+        follow = (_backend(audio_cfg.get("backend", "auto")) == "wasapi"
+                  and bool(audio_cfg.get("follow_call_audio", True))
+                  and not audio_cfg.get("loopback_device"))
+
+        def open_call_audio(cfg_audio, cb):
+            if follow:
+                try:
+                    f = CallAudioFollower(cb, int(cfg_audio.get("chunk_ms", 100)))
+                    self._follower = f
+                    return f
+                except Exception as e:
+                    log.warning("following all speakers unavailable (%s); using the default speaker", e)
+            return open_loopback(cfg_audio, cb)
+
+        for speaker, opener in ((REP, open_mic), (PROSPECT, open_call_audio)):
             holder: dict = {}
 
             def on_chunk(pcm: bytes, holder=holder, sp=speaker) -> None:   # audio thread
@@ -218,6 +233,8 @@ class CallSession:
                     if a.size:
                         rms = float(np.sqrt(np.mean(a * a))) / 32768.0
                         self._levels[sp] = max(rms, self._levels[sp] * 0.7)
+                        if sp == REP and self._follower is not None:
+                            self._follower.note_mic(rms)
                 except Exception:
                     pass
                 s = holder.get("stream")
@@ -721,10 +738,32 @@ class CallSession:
                             "cached": bool(result.get("cache_read_tokens"))})
 
     # ------------------------------------------------------------ background
+    def set_call_audio(self, value) -> None:
+        """Picker: "auto" or a speaker index to lock to."""
+        if self._follower is None:
+            return
+        self._follower.set_active(None if value in (None, "auto") else int(value))
+        self._loopback_name = self._follower.device_name
+        self._emit_devices()
+
+    def _emit_devices(self) -> None:
+        if self._follower is not None:
+            self.emit("audio_devices", {"devices": self._follower.device_list(), "locked": self._follower.locked})
+
     async def _level_loop(self) -> None:
         """Send You / Them sound levels to the UI a few times a second."""
+        n = 0
         while self.running:
             await asyncio.sleep(0.25)
+            n += 1
+            if self._follower is not None and n % 4 == 0:
+                if self._follower.pick():
+                    self._loopback_name = self._follower.device_name
+                    name = self._loopback_name.replace(" [Loopback]", "")
+                    self.emit("toast", {"level": "info", "text": f"Call audio is playing on \u201c{name}\u201d. Listening there now."})
+                    if self._silence_warned and self.health["stt"]["state"] == "down":
+                        self._set_health("stt", "ok", "")
+                self._emit_devices()
             for sp in (REP, PROSPECT):
                 self._peak[sp] = max(self._peak[sp], self._levels[sp])
             if (not self._silence_warned and not self.paused and self.elapsed() > 25
@@ -733,9 +772,14 @@ class CallSession:
                 # probably playing through a different speaker than we record.
                 self._silence_warned = True
                 dev = self._loopback_name or "your default speakers"
-                msg = (f"Not hearing the other side. The app records call audio from \u201c{dev}\u201d. "
-                       "In Google Meet: \u22ee \u2192 Settings \u2192 Audio \u2192 Speakers, pick that device "
-                       "(or set audio.loopback_device to the one Meet uses).")
+                if self._follower is not None:
+                    msg = ("Not hearing the other side on any speaker. Check that the call is playing on this "
+                           "PC (dialer or Meet speaker setting). If you connected a headset after opening the "
+                           "app, end the call and use View \u2192 Rescan audio devices.")
+                else:
+                    msg = (f"Not hearing the other side. The app records call audio from \u201c{dev}\u201d. "
+                           "In Google Meet: \u22ee \u2192 Settings \u2192 Audio \u2192 Speakers, pick that device "
+                           "(or set audio.loopback_device to the one Meet uses).")
                 self.emit("toast", {"level": "error", "text": msg})
                 self._set_health("stt", "down", "No audio from the other side: check the call's speaker device")
             lv = {sp: min(1.0, (self._levels[sp] * 6) ** 0.6) for sp in (REP, PROSPECT)}

@@ -312,3 +312,153 @@ def open_loopback(cfg_audio: dict, on_chunk: ChunkCallback) -> Capture:
         raise RuntimeError(f"Loopback device '{want}' not found. Run: python main.py --list-devices")
     return SoundDeviceCapture("prospect", on_chunk, dev.index, chunk_ms)
 
+
+
+# ------------------------------------------------------- follow the call audio
+def resample_int16(pcm: bytes, src_rate: int, dst_rate: int = 16000) -> bytes:
+    """Linear resample of 16-bit mono PCM (plenty for speech-to-text)."""
+    if src_rate == dst_rate or not pcm:
+        return pcm
+    a = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+    n = max(1, int(round(a.size * dst_rate / src_rate)))
+    x = np.linspace(0, a.size - 1, n)
+    return np.interp(x, np.arange(a.size), a).astype(np.int16).tobytes()
+
+
+def _rms(pcm: bytes) -> float:
+    a = np.frombuffer(pcm, dtype=np.int16).astype(np.float32)
+    return float(np.sqrt(np.mean(a * a))) / 32768.0 if a.size else 0.0
+
+
+class CallAudioFollower(Capture):
+    """Listens to every speaker on the PC (WASAPI loopback) and feeds speech-to-text
+    from the one actually carrying the other person's voice.
+
+    Why: the call can play through a different speaker than the Windows default.
+    Bluetooth headsets switch to a "Hands-Free" speaker during calls; Meet and the
+    dialer each have their own speaker setting. A speaker that only carries the
+    rep's own voice (sidetone, "Listen to this device") is ignored, because audio
+    is only scored while the rep's mic is quiet.
+    """
+
+    MIC_QUIET = 0.012          # mic RMS below this = the rep isn't talking
+    MIN_SCORE = 0.002          # a speaker needs at least this much "other side" audio
+    SWITCH_RATIO = 2.0         # and must beat the current one by this much
+    HOLD_S = 3.0               # don't flip-flop
+
+    def __init__(self, on_chunk: ChunkCallback, chunk_ms: int = 100, out_rate: int = 16000) -> None:
+        super().__init__("prospect", on_chunk)
+        import time as _time
+
+        self._time = _time
+        self.rate = out_rate
+        self._lock = threading.Lock()
+        self._mic = 0.0
+        self.levels: dict[int, float] = {}
+        self.scores: dict[int, float] = {}
+        self.names: dict[int, str] = {}
+        self.caps: dict[int, "WasapiCapture"] = {}
+        self.locked = False
+        self._last_switch = 0.0
+        loopbacks = [d for d in list_devices("wasapi") if d.is_loopback]
+        try:
+            default = _shared_pa().get_default_wasapi_loopback()["index"]
+        except Exception:
+            default = loopbacks[0].index if loopbacks else None
+        for d in loopbacks:
+            try:
+                cap = WasapiCapture("prospect", self._make_cb(d.index, d.rate), d.index,
+                                    max(1, d.in_channels), d.rate, d.name, chunk_ms)
+            except Exception as e:
+                log.info("skipping speaker %s: %s", d.name, type(e).__name__)
+                continue
+            self.caps[d.index] = cap
+            self.names[d.index] = d.name
+            self.levels[d.index] = 0.0
+            self.scores[d.index] = 0.0
+        if not self.caps:
+            raise RuntimeError("No speakers found to record call audio from. Run: python main.py --list-devices")
+        self.active = default if default in self.caps else next(iter(self.caps))
+
+    @property
+    def device_name(self) -> str:          # type: ignore[override]
+        return self.names.get(self.active, "")
+
+    @device_name.setter
+    def device_name(self, _v) -> None:
+        pass
+
+    def note_mic(self, rms: float) -> None:
+        """Called with the rep's mic level (audio thread)."""
+        self._mic = max(rms, self._mic * 0.8)
+
+    def _make_cb(self, idx: int, rate: int):
+        def cb(pcm: bytes) -> None:           # audio thread, mono int16 at the device rate
+            r = _rms(pcm)
+            with self._lock:
+                self.levels[idx] = max(r, self.levels[idx] * 0.7)
+                heard = r if self._mic < self.MIC_QUIET else 0.0
+                self.scores[idx] = self.scores[idx] * 0.97 + heard * 0.03
+                forward = idx == self.active
+            if forward:
+                self.on_chunk(resample_int16(pcm, rate, self.rate))
+        return cb
+
+    def start(self) -> None:
+        started = {}
+        for idx, cap in self.caps.items():
+            try:
+                cap.start()
+                started[idx] = cap
+            except Exception as e:
+                log.info("couldn't open speaker %s: %s", self.names[idx], type(e).__name__)
+        if not started:
+            raise RuntimeError("Couldn't open any speaker for call audio")
+        self.caps = started
+        if self.active not in self.caps:
+            self.active = next(iter(self.caps))
+
+    def stop(self) -> None:
+        for cap in self.caps.values():
+            try:
+                cap.stop()
+            except Exception:
+                pass
+
+    def pick(self) -> bool:
+        """Switch to the speaker carrying the other side, if it's clearly a different one.
+        Returns True when it switched."""
+        now = self._time.monotonic()
+        with self._lock:
+            # Speakers that went quiet stop sending audio entirely, so age everything here.
+            for i in self.scores:
+                self.scores[i] *= 0.9
+                self.levels[i] *= 0.5
+        if self.locked:
+            return False
+        with self._lock:
+            best = max(self.scores, key=self.scores.get)
+            cur = self.scores.get(self.active, 0.0)
+            if (best != self.active and self.scores[best] >= self.MIN_SCORE
+                    and self.scores[best] >= self.SWITCH_RATIO * max(cur, 1e-6)
+                    and now - self._last_switch >= self.HOLD_S):
+                self.active = best
+                self._last_switch = now
+                return True
+        return False
+
+    def set_active(self, idx: int | None) -> None:
+        """idx=None: automatic. Otherwise lock to that speaker."""
+        with self._lock:
+            if idx is None:
+                self.locked = False
+            elif idx in self.caps:
+                self.active = idx
+                self.locked = True
+                self._last_switch = self._time.monotonic()
+
+    def device_list(self) -> list[dict]:
+        with self._lock:
+            return [{"index": i, "name": self.names[i].replace(" [Loopback]", ""),
+                     "level": round(min(1.0, (self.levels[i] * 6) ** 0.6), 2), "active": i == self.active}
+                    for i in self.caps]

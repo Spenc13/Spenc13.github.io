@@ -410,6 +410,8 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "swap_speakers" and self.session and self.session.running:
             self.runner.call(self.session.swap_speakers)
+        elif cmd == "call_audio" and self.session and self.session.running:
+            self.runner.call(self.session.set_call_audio, msg.get("value", "auto"))
         elif cmd == "echo_filter" and self.session and self.session.running:
             self.runner.call(self.session.set_echo_filter, bool(msg.get("on")))
             if not msg.get("on"):

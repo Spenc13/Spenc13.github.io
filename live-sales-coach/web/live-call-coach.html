@@ -295,13 +295,15 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .toggle input { accent-color: var(--accent); }
 .avatar .initials { width: 100%; height: 100%; display: grid; place-items: center; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
 .line.partial p { color: var(--muted); font-style: italic; }
-.t-tools { display: flex; align-items: center; gap: 10px; }
+.t-tools { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin: -4px 0 10px; }
+.t-tools:not(:has(> :not([hidden]))) { display: none; }
 .meters { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
 .meter { display: inline-flex; align-items: center; gap: 4px; }
 .meter .m-track { display: inline-block; width: 40px; height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; }
 .meter .m-fill { display: block; height: 100%; width: 0%; border-radius: 999px; transition: width 0.2s linear; }
 .meter.rep .m-fill { background: var(--rep); }
 .meter.pro .m-fill { background: var(--prospect); }
+.audio-pick { max-width: 100%; flex: 1 1 180px; font-size: 12px; padding: 5px 8px; }
 .coach-card .latency { margin-top: 8px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .coach-card .latency.slow { color: var(--warn); }
 .coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
@@ -435,15 +437,16 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <section class="card span-4" aria-labelledby="t-h">
     <div class="card-head">
       <h2 id="t-h">Live transcript</h2>
-      <div class="t-tools">
+      <span class="timer" id="timer">00:00</span>
+    </div>
+    <div class="t-tools" id="tTools">
         <div class="meters" id="meters" hidden title="Sound levels: when you talk, only You should move">
           <span class="meter rep">You <span class="m-track"><span class="m-fill" id="lvRep"></span></span></span>
           <span class="meter pro">Them <span class="m-track"><span class="m-fill" id="lvPro"></span></span></span>
         </div>
+        <select class="select audio-pick" id="callAudio" hidden title="Which speaker the other person's voice comes from. Auto follows it for you."></select>
         <button class="btn small" id="echoBtn" type="button" hidden title="Lines heard in both your mic and the call audio were hidden as echo. Click to show everything for the rest of this call."></button>
         <button class="btn small" id="swapBtn" type="button" hidden title="Labels backwards? Swap Rep and Prospect for this call">⇄ Swap</button>
-        <span class="timer" id="timer">00:00</span>
-      </div>
     </div>
     <div class="transcript" id="transcript" aria-live="polite">
       <div class="empty" id="transcriptEmpty">Pick "Live call" or a replay, then press Start. Your mic is labeled Rep; the call audio is labeled Prospect.</div>
@@ -632,7 +635,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("pauseBtn").textContent = paused ? "Resume" : "Pause";
     $("endBtn").hidden = !(live || paused);
     $("swapBtn").hidden = !(live || paused);
-    if (!(live || paused)) $("echoBtn").hidden = true;
+    if (!(live || paused)) { $("echoBtn").hidden = true; $("callAudio").hidden = true; }
     if (!(live || paused)) $("meters").hidden = true;
     if (live) setPill("status", "live", "Live", "statusText");
     else if (paused) setPill("status", "idle", "Paused", "statusText");
@@ -962,6 +965,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         $("echoBtn").hidden = false;
         $("echoBtn").textContent = d.hidden + " echo line" + (d.hidden === 1 ? "" : "s") + " hidden · Show all";
         break;
+      case "audio_devices": renderAudioPick(d); break;
       case "hotkey_start":
         if (callState !== "live" && callState !== "paused" && callState !== "ending" && callState !== "starting" && $("consent").hidden) $("startBtn").click();
         break;
@@ -975,6 +979,26 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "consent_mode": consentMode = d.mode === "dialer" ? "dialer" : "ask"; break;
       case "call_detail": renderCallDetail(d); break;
     }
+  }
+
+  // ---------------------------------------------------------------- call audio picker
+  function renderAudioPick(d) {
+    var sel = $("callAudio");
+    if (document.activeElement === sel) return;          // don't rebuild while it's open
+    var devs = d.devices || [];
+    if (devs.length < 2) { sel.hidden = true; return; }   // nothing to choose from
+    var active = devs.filter(function (x) { return x.active; })[0];
+    sel.innerHTML = "";
+    var auto = el("option", null, "Call audio: Auto" + (active && !d.locked ? " (" + active.name + ")" : ""));
+    auto.value = "auto";
+    sel.appendChild(auto);
+    devs.forEach(function (x) {
+      var o = el("option", null, (x.level > 0.15 ? "\ud83d\udd0a " : "") + x.name);
+      o.value = String(x.index);
+      sel.appendChild(o);
+    });
+    sel.value = d.locked && active ? String(active.index) : "auto";
+    sel.hidden = false;
   }
 
   // ---------------------------------------------------------------- dialer link
@@ -1212,6 +1236,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     send("start", { mode: $("mode").value, consent: true });
   });
   $("swapBtn").addEventListener("click", function () { send("swap_speakers"); });
+  $("callAudio").addEventListener("change", function () { send("call_audio", { value: this.value }); this.blur(); });
   $("echoBtn").addEventListener("click", function () { send("echo_filter", { on: false }); this.hidden = true; });
   $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
   $("endBtn").addEventListener("click", function () { send("end"); });
