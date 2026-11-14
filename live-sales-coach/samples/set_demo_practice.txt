@@ -1,0 +1,13 @@
+# title: Roofer: setting the demo
+# Practice landing the plane: Spencer books the demo but forgets the reschedule ask.
+Rep: Hey Mike, Spencer with Olly Olly. Thanks for picking up. What made you take the call?
+Prospect: We're slammed with insurance jobs but the retail roofing calls have dried up this year.
+Rep: What happens if retail stays this slow through next spring?
+Prospect: Honestly I'd have to cut a crew. I don't want to do that.
+Rep: That makes sense. I'd like to show you exactly how we'd fix that. Do you have twenty minutes on Thursday at two for a Google Meet?
+Prospect: Thursday at two works for me.
+Rep: Great. Is it just you making the call on marketing, or is anyone else involved?
+Prospect: It's just me, I own the company.
+Rep: Perfect. I'm sending a calendar invite now. Can you accept it so it's blocked on your calendar?
+Prospect: Yep, I'll accept it.
+Rep: Awesome. Thanks for your time Mike, talk soon.

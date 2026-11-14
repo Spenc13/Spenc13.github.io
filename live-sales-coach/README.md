@@ -110,6 +110,26 @@ The `extension/` folder has **Olly Coach Bridge**, a small Chrome extension that
 
 Install it from `chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension` folder. Full steps are in [`extension/README.md`](extension/README.md). The header shows **Dialer: linked** when it's working.
 
+### Landing the plane
+
+Every call should end with one outcome. The **Landing the plane** panel tracks it live:
+
+| Path | What has to happen |
+|---|---|
+| **Set the demo** | ① a date and time, by phone or Google Meet ② decision maker confirmed (they're the only one, or the other person gets on the invite) ③ ask them to accept the calendar invite and to give reasonable notice if they need to reschedule |
+| **Go OTF** | they have time now, and you send a Google Meet link |
+| **Off the phone** | no time within 48 business hours, so set a later date; or not interested, so close politely |
+
+How it works:
+- **Automatic ticks:** a background check reads the conversation and ticks items as they're actually agreed (details like "Thu 2pm · Google Meet" or "Also needs: his partner" appear under them). **Click any item** to tick or untick it yourself. Your choice wins.
+- **The coach steers toward the close.** Every suggested line knows what's still missing.
+- **10-minute nudge:** if no outcome is in progress by then, the coach suggests a transition (`landing.nudge_after_minutes`).
+- **"Before you hang up":** if you start saying goodbye ("talk soon", "thanks for your time") with something missing, the coach fires a card with the exact line to close the loop.
+- **✈ Land it** asks for the closing line any time.
+- **Saved with the call:** the outcome sets **Next-step clarity**, appears in `summary.md` with its checklist, and shows as a badge in **Past calls** (for example "✓ Demo set: Thu 2pm"). Missing steps lead the post-call summary's next steps.
+
+Practice it with `samples/set_demo_practice.txt`, where Spencer forgets the reschedule ask.
+
 ### Google Meet
 
 The same extension also watches **Google Meet**:

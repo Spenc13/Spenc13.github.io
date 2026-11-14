@@ -62,6 +62,13 @@ coach:
   summary_refresh_seconds: 90    # how often the running summary absorbs older lines
   post_call_max_tokens: 8000
 
+landing:
+  # "Landing the plane": every call should end with an outcome (set the demo,
+  # go on-the-fly with a Meet link, or set a later date / not interested).
+  nudge_after_minutes: 10    # coach nudges you to land it if no outcome is in progress by then
+  renudge_minutes: 5         # and again this often
+  tracker_delay_seconds: 4   # after closing talk, wait this long before re-checking the outcome
+
 live_coach:
   min_prospect_words: 3      # skip "yeah", "mm-hmm" (unless it's a question or an objection)
   min_gap_seconds: 2         # at most one new line every 2 seconds

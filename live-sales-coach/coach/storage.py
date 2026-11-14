@@ -63,6 +63,14 @@ class CallStore:
         lines.append(f"- Length: {meta.get('length', '')}")
         lines.append(f"- Mode: {meta.get('mode', '')}")
         lines.append(f"- Overall score: {meta.get('overall', '–')}")
+        out = meta.get("outcome") or {}
+        if out.get("outcome"):
+            lines.append(f"- Outcome: {out['outcome']}")
+            for item in (out.get("items") or {}).values():
+                if item.get("path") == out.get("path"):
+                    mark = "x" if item.get("done") else " "
+                    det = f" ({item['detail']})" if item.get("detail") else ""
+                    lines.append(f"  - [{mark}] {item.get('label', '')}{det}")
         lines.append("")
         if summary:
             if summary.get("overview"):
@@ -123,6 +131,8 @@ def list_calls(calls_dir: str = "calls", limit: int = 200) -> list[dict]:
             "objections": m.get("objection_count"),
             "questions": m.get("questions"),
             "has_summary": (d / "summary.md").exists(),
+            "outcome": ((meta.get("outcome") or {}).get("outcome")),
+            "landed": bool((meta.get("outcome") or {}).get("complete")),
         })
     return out
 

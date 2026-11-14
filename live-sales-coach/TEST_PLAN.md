@@ -33,6 +33,13 @@ For each card, check:
 - [ ] Short replies ("yeah", "okay") don't produce a new card, unless they're a question or an objection.
 - [ ] Uncheck **Live coach**. Cards now appear only on objections and buying signals.
 
+## B3. Landing the plane
+
+- [ ] Replay **Roofer: setting the demo**. The panel ticks the date/time ("Thu 2pm · Google Meet") and **Sole decision maker**. The invite item shows "reschedule notice ✗". At "talk soon", a **Before you hang up** card appears with the reschedule line.
+- [ ] After it ends, Past calls shows **Setting the demo (2 of 3)**, and the summary's next steps start with the missing reschedule ask.
+- [ ] On a practice call, click an item to tick it yourself. It shows "(you)".
+- [ ] Click **✈ Land it**. You get a closing line for whatever's missing.
+
 ## C. Audio routing (10 min)
 
 - [ ] `python main.py --list-devices` shows your headset mic and a LOOPBACK device for your headset or speakers.

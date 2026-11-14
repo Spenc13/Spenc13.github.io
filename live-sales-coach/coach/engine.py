@@ -141,10 +141,12 @@ class CoachEngine:
         return kw
 
     @staticmethod
-    def build_user_message(summary: str, recent: str, ask: str) -> str:
+    def build_user_message(summary: str, recent: str, ask: str, landing: str = "") -> str:
         parts = []
         parts.append("Call summary so far:\n" + (summary.strip() or "(call just started)"))
         parts.append("Recent transcript:\n" + (recent.strip() or "(nothing transcribed yet)"))
+        if landing:
+            parts.append(landing.strip())
         parts.append(ask.strip())
         parts.append(FORMAT_REMINDER)
         return "\n\n".join(parts)
@@ -234,6 +236,27 @@ class CoachEngine:
         }]
         msg = await self._create(kw)
         return self._text_of(msg).strip()
+
+    async def track_close(self, summary: str, transcript: str) -> dict:
+        """Landing-the-plane tracker: which outcome, and which steps happened (JSON)."""
+        from .closing import TRACKER_PROMPT, TRACKER_SCHEMA
+
+        if self.client is None:
+            raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        kw = self._common(1500, effort="low", thinking=self.live_thinking)
+        kw["output_config"]["format"] = {"type": "json_schema", "schema": TRACKER_SCHEMA}
+        kw["messages"] = [{
+            "role": "user",
+            "content": (f"Call summary so far:\n{summary or '(none)'}\n\n"
+                        f"Transcript:\n{transcript or '(empty)'}\n\n{TRACKER_PROMPT}"),
+        }]
+        msg = await self._create(kw)
+        if getattr(msg, "stop_reason", None) == "refusal":
+            return {}
+        try:
+            return json.loads(self._text_of(msg))
+        except json.JSONDecodeError:
+            return {}
 
     async def post_call_summary(self, transcript: str, metrics: dict, coaching_count: int,
                                 note: str = "") -> dict:
