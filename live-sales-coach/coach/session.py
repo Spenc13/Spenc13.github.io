@@ -77,6 +77,9 @@ class CallSession:
         self.echo_dropped = 0
         self._swap = False
         self._levels = {REP: 0.0, PROSPECT: 0.0}
+        self._peak = {REP: 0.0, PROSPECT: 0.0}   # loudest level seen this call
+        self._silence_warned = False
+        self._loopback_name = ""
         self.window_s = float(get(cfg, "coach.transcript_window_minutes", 4)) * 60
         self.summary_every = float(get(cfg, "coach.summary_refresh_seconds", 90))
         self.lookback = float(get(cfg, "hotkey.lookback_seconds", 20))
@@ -184,7 +187,10 @@ class CallSession:
             self._tasks.append(asyncio.create_task(self._run_replay()))
         else:
             who = self.call_info.get("contact") or self.call_info.get("phone")
-            self.title = f"Call with {who}" if who else "Live call"
+            if self.call_info.get("source") == "meet":
+                self.title = f"Meet: {who or self.call_info.get('callId') or 'Google Meet'}"
+            else:
+                self.title = f"Call with {who}" if who else "Live call"
             await self._start_live(loop)
 
         self._tasks.append(asyncio.create_task(self._tick()))
@@ -236,6 +242,8 @@ class CallSession:
                 self._set_health("stt", "down", f"{LABELS[speaker]} audio device: {e}")
                 continue
             self._captures.append(cap)
+            if speaker == PROSPECT:
+                self._loopback_name = cap.device_name
             self.emit("toast", {"level": "info", "text": f"{LABELS[speaker]}: {cap.device_name} @ {cap.rate} Hz"})
         if not self.keys["deepgram"]:
             self._set_health("stt", "down", "DEEPGRAM_API_KEY not set: no live transcript")
@@ -342,6 +350,7 @@ class CallSession:
             "speakers_swapped": self._swap,
             "phone": self.call_info.get("phone"),
             "direction": self.call_info.get("direction"),
+            "source": self.call_info.get("source"),
         }
         self._final_meta, self._final_snap = meta, snap
         verdict = judge(self.transcript, self._accum, self.cfg.get("call_filter") or {})
@@ -694,6 +703,19 @@ class CallSession:
         """Send You / Them sound levels to the UI a few times a second."""
         while self.running:
             await asyncio.sleep(0.25)
+            for sp in (REP, PROSPECT):
+                self._peak[sp] = max(self._peak[sp], self._levels[sp])
+            if (not self._silence_warned and not self.paused and self.elapsed() > 25
+                    and self._peak[REP] > 0.02 and self._peak[PROSPECT] < 0.003):
+                # Spencer has been heard, the other side never has: the call is
+                # probably playing through a different speaker than we record.
+                self._silence_warned = True
+                dev = self._loopback_name or "your default speakers"
+                msg = (f"Not hearing the other side. The app records call audio from \u201c{dev}\u201d. "
+                       "In Google Meet: \u22ee \u2192 Settings \u2192 Audio \u2192 Speakers, pick that device "
+                       "(or set audio.loopback_device to the one Meet uses).")
+                self.emit("toast", {"level": "error", "text": msg})
+                self._set_health("stt", "down", "No audio from the other side: check the call's speaker device")
             lv = {sp: min(1.0, (self._levels[sp] * 6) ** 0.6) for sp in (REP, PROSPECT)}
             if self._swap:
                 lv = {REP: lv[PROSPECT], PROSPECT: lv[REP]}

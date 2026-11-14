@@ -516,3 +516,31 @@ def test_joined_mid_call_is_marked_everywhere(tmp_path):
     metrics = json.loads((Path(s.store.dir) / "metrics.json").read_text())
     assert metrics["partial_call"] is True and metrics["joined_after_seconds"] == 130
     assert metrics["meta"]["joined_mid_call_after"] == "02:10"
+
+
+# ---------------------------------------------------------------- Google Meet
+def test_warns_when_other_side_is_silent():
+    events = []
+
+    async def run():
+        s, _ = _live_session(events)
+        s._loopback_name = "Speakers (Realtek Audio)"
+        s.elapsed = lambda: 30.0
+        s._levels = {REP: 0.2, PROSPECT: 0.0}
+        task = asyncio.create_task(s._level_loop())
+        await asyncio.sleep(0.6)
+        s.running = False
+        await asyncio.sleep(0.3)
+        task.cancel()
+
+    asyncio.run(run())
+    toasts = [d["text"] for k, d in events if k == "toast"]
+    assert any("Not hearing the other side" in t and "Realtek" in t for t in toasts)
+    assert len([t for t in toasts if "Not hearing" in t]) == 1        # warns once
+
+
+def test_call_labels():
+    from coach.desktop import call_label
+    assert call_label({"phone": "+15125550123"}) == "(512) 555-0123"
+    assert call_label({"source": "meet", "contact": "Mike's Roofing", "callId": "abc-defg-hij"}) == "Google Meet · Mike's Roofing"
+    assert call_label({"source": "meet", "callId": "abc-defg-hij"}) == "Google Meet (abc-defg-hij)"

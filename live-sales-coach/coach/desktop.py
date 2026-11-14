@@ -83,6 +83,9 @@ class Bridge(QObject):
 
 
 def call_label(info: dict) -> str:
+    if info.get("source") == "meet":
+        name = info.get("contact")
+        return f"Google Meet \u00b7 {name}" if name else f"Google Meet ({info.get('callId') or 'meeting'})"
     phone = info.get("phone") or ""
     digits = "".join(ch for ch in phone if ch.isdigit())
     if len(digits) == 11 and digits.startswith("1"):
@@ -119,6 +122,10 @@ class MainWindow(QMainWindow):
         saved_consent = self.settings.value("consent_mode")
         self.consent_mode = saved_consent if saved_consent in ("ask", "dialer") else \
             ("dialer" if get(cfg, "recording.consent_mode", "ask") == "dialer" else "ask")
+        # Google Meet doesn't announce recording the way the dialer does, so Meet
+        # calls ask by default even in "dialer" mode. "announced" = your Meets are
+        # recorded by Meet itself (which notifies everyone), so start right away.
+        self.meet_consent_mode = "announced" if get(cfg, "recording.meet_consent_mode", "ask") == "announced" else "ask"
         saved_live = self.settings.value("live_mode")
         if saved_live is not None:
             cfg.setdefault("coach", {})["live_mode"] = saved_live in (True, "true")
@@ -243,6 +250,8 @@ class MainWindow(QMainWindow):
             self.phone_linked = True
             self.bridge.post("phone_link", {"connected": True})
         info = {k: ev.get(k) for k in ("phone", "contact", "direction", "callId") if ev.get(k)}
+        src = "meet" if ev.get("source") == "meet" else "dialer"
+        info["source"] = src
         if kind == "ringing":
             if busy:
                 return
@@ -255,15 +264,24 @@ class MainWindow(QMainWindow):
             self.showNormal()
             self.raise_()
             self.activateWindow()
-            auto = self.consent_mode == "dialer" and self.prompts is not None
-            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call), "auto": auto})
+            if src == "meet":
+                auto, basis = self.meet_consent_mode == "announced", "meet"
+            else:
+                auto, basis = self.consent_mode == "dialer", "dialer"
+            auto = auto and self.prompts is not None
+            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call),
+                                       "auto": auto, "source": src})
             if auto:
-                self.start_call({"mode": "live", "consent": True, "basis": "dialer"})
+                self.start_call({"mode": "live", "consent": True, "basis": basis})
         elif kind == "ended":
-            self.pending_call = None
-            self.bridge.post("phone", {"state": "ended"})
+            # A Meet ending shouldn't stop a dialer call (or the reverse).
+            if self.pending_call and self.pending_call.get("source", "dialer") == src:
+                self.pending_call = None
+            self.bridge.post("phone", {"state": "ended", "source": src})
             if busy and self.session.mode == "live":
-                self.runner.submit(self.session.end())
+                sess_src = self.session.call_info.get("source")
+                if sess_src in (None, src):
+                    self.runner.submit(self.session.end())
 
     # ------------------------------------------------------------ commands from JS
     def handle_command(self, msg: dict) -> None:
@@ -286,6 +304,7 @@ class MainWindow(QMainWindow):
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
                 "consent_mode": self.consent_mode,
+                "meet_consent_mode": self.meet_consent_mode,
                 "live_mode": bool(get(self.cfg, "coach.live_mode", True)),
                 "phone_bridge": {"enabled": self.phone_bridge is not None,
                                  "error": self.phone_bridge.error if self.phone_bridge else None,
@@ -351,10 +370,18 @@ class MainWindow(QMainWindow):
             self.set_on_top(bool(msg.get("on")))
 
     def start_call(self, msg: dict) -> None:
-        if not msg.get("consent") and self.consent_mode != "dialer":
+        meet_now = bool(self.pending_call and self.pending_call.get("source") == "meet"
+                        and time.monotonic() - self.pending_call.get("at", 0) < 2 * 3600)
+        skip_ok = (self.meet_consent_mode == "announced") if meet_now else (self.consent_mode == "dialer")
+        if not msg.get("consent") and not skip_ok:
             self.bridge.post("toast", {"level": "error", "text": "Confirm the recording notice first."})
             return
-        basis = "dialer disclosure" if (msg.get("basis") == "dialer" or self.consent_mode == "dialer") else "rep confirmed"
+        if msg.get("basis") == "meet" or (meet_now and skip_ok and not msg.get("basis")):
+            basis = "meet recording notice"
+        elif msg.get("basis") == "dialer" or (not meet_now and self.consent_mode == "dialer"):
+            basis = "dialer disclosure"
+        else:
+            basis = "rep confirmed"
         if self.prompts is None:
             self.bridge.post("toast", {"level": "error", "text": self.prompts_error})
             self.bridge.post("call", {"state": "idle"})

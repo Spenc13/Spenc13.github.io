@@ -110,6 +110,18 @@ The `extension/` folder has **Olly Coach Bridge**, a small Chrome extension that
 
 Install it from `chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension` folder. Full steps are in [`extension/README.md`](extension/README.md). The header shows **Dialer: linked** when it's working.
 
+### Google Meet
+
+The same extension also watches **Google Meet**:
+- **When you join a meeting,** the coach pops up with "You joined: Google Meet · (meeting name)".
+- **When you leave,** coaching ends and the call is saved, unless it went nowhere.
+
+Meet doesn't announce recording the way your dialer does, so **Meet calls always show the recording notice**, even with "Don't ask again" on for the dialer. If your Meets are recorded by Meet itself (Meet tells everyone when recording or note-taking starts), set `recording.meet_consent_mode: announced` in `config.yaml` to skip it.
+
+**If the other person isn't transcribed on Meet,** Meet is probably playing through a different speaker than the app records. After about 25 seconds, the app warns you and names the device it's listening to. Fix it either way:
+- In Meet: **⋮ → Settings → Audio → Speakers**, choose that device (or your Windows default).
+- In `config.yaml`: set `audio.loopback_device` to the speaker Meet uses (see `python main.py --list-devices`).
+
 ### Starting partway through a call
 
 You can press **Start call** at any point. If the dialer shows the call was answered more than 15 seconds earlier, the call is marked **Partial call (joined at m:ss)**. The coach and the post-call summary are told the beginning wasn't heard, so a "missing" intro isn't counted against you. The scores are labeled partial, and the caller's number is kept even if you canceled the "They picked up" prompt.

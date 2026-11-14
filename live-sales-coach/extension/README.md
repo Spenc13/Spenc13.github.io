@@ -1,6 +1,8 @@
 # Olly Coach Bridge (Chrome extension)
 
-A small companion extension that runs **alongside Olly Phone**, which it doesn't change or replace. It tells the Live Sales Coach app on your computer when a HubSpot/Aloware call:
+A small companion extension that runs **alongside Olly Phone**, which it doesn't change or replace. It also watches **Google Meet**: when you join a meeting the coach pops up, and when you leave, coaching ends. It only checks whether Meet's in-call controls are on screen and reads the meeting name from the tab title.
+
+It tells the Live Sales Coach app on your computer when a HubSpot/Aloware call:
 
 - **rings:** the coach shows "Dialer: calling (512) 555-0123"
 - **is answered:** the coach pops up with "They picked up: …" and the recording notice. One click starts coaching.
@@ -18,7 +20,9 @@ It only reads the *type* of the messages HubSpot and Aloware already pass around
 
 Open the coach app (`python main.py`) and then HubSpot. The coach's header should say **Dialer: linked**.
 
-After a `git pull` that changes this folder, click the **↻ reload** icon on the extension card in `chrome://extensions`.
+After a `git pull` that changes this folder, click the **↻ reload** icon on the extension card in `chrome://extensions`, then reload your HubSpot and Meet tabs. Chrome may show that the extension now also reads `meet.google.com`. That's the Meet watcher.
+
+**Meet in another language:** the watcher looks for Meet's "Leave call" button. If your Meet is in a language other than English and the coach doesn't pop up when you join, tell Claude which language it is.
 
 ## If "answered" or "ended" doesn't trigger
 
