@@ -41,6 +41,7 @@ For each card, check:
 - [ ] Play a YouTube video of someone talking through the same output Meet uses. It appears as **Prospect**.
 - [ ] Your voice doesn't also appear as Prospect, and the video doesn't appear as Rep.
 - [ ] Watch the **You / Them** meters in the transcript header. Talking moves only **You**, and the video moves only **Them**. If **Them** moves when you talk, follow README → Troubleshooting → "Your words show up as Prospect."
+- [ ] **Bluetooth headset:** call a colleague who's on their own phone, somewhere else. Within a few seconds of them talking, a toast says "Call audio is playing on …", and their lines appear as **Prospect**. The **Call audio** picker in the transcript header shows which speaker is used. Pick another to test, then set it back to **Auto**.
 - [ ] Click **⇄ Swap** once. All labels flip. Click it again to flip them back.
 
 ## D. Practice call with a colleague (15 min)

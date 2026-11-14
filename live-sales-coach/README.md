@@ -235,6 +235,7 @@ The tests run offline, with no keys or audio. They cover reply parsing, trigger 
 ## Troubleshooting
 
 - **"Missing prompt files":** see step 2.
+- **The other person isn't transcribed, or your own voice shows up as Prospect (Bluetooth headsets especially):** on Windows the app **listens to every speaker and follows the one playing the other person**. When it switches, a toast says "Call audio is playing on …". That covers Bluetooth headsets that switch to a separate "Hands-Free" speaker during calls, and Meet or Aloware set to a different speaker. A speaker that only carries your own voice (sidetone) is ignored. To choose by hand, use **Call audio** in the transcript header. It shows 🔊 next to whichever speaker has sound. If you connected the headset after opening the app, use **View → Rescan audio devices** between calls.
 - **Prospect side is silent:** run `--list-devices`, make sure Meet or your dialer plays through the device named in `loopback_device` (or your default output on Windows), and check that call volume isn't muted.
 - **Your words show up as Prospect:** your voice is getting into the PC's sound output. The app filters out repeats of what you just said, and the **You / Them meters** in the transcript header show it live: while you talk, only **You** should move. If **Them** moves too, fix it at the source:
   1. **Windows "Listen to this device":** Settings → System → Sound → More sound settings → **Recording** tab → your headset mic → **Properties** → **Listen** tab. Untick **Listen to this device**.

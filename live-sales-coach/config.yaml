@@ -26,6 +26,10 @@ audio:
   # "Listen to this device", or echo from the prospect's phone), drop those
   # repeats instead of labeling them Prospect.
   echo_filter: true
+  # Windows: listen to every speaker and follow the one playing the other person
+  # (Bluetooth "Hands-Free" switching, Meet/dialer speaker settings). Ignored if
+  # loopback_device is set. Pick a speaker by hand in the transcript header.
+  follow_call_audio: true
   echo_hold_ms: 700          # how long to wait for your own line before deciding
 
 stt:
