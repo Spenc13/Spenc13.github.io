@@ -48,9 +48,9 @@
   setInterval(() => {
     const now = inCall();
     if (now) { onStreak++; offStreak = 0; } else { offStreak++; onStreak = 0; }
-    if (!joined && onStreak >= 2) { joined = true; send('answered'); }         // in the call for ~2 s
-    else if (joined && offStreak >= 3) { joined = false; send('ended'); }      // gone for ~3 s
-  }, 1000);
+    if (!joined && onStreak >= 2) { joined = true; send('answered'); }         // in the call for ~1 s
+    else if (joined && offStreak >= 6) { joined = false; send('ended'); }      // gone for ~3 s
+  }, 500);
 
   window.addEventListener('pagehide', () => { if (joined) { joined = false; send('ended'); } });
 })();

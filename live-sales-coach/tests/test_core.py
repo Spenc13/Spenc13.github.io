@@ -544,3 +544,83 @@ def test_call_labels():
     assert call_label({"phone": "+15125550123"}) == "(512) 555-0123"
     assert call_label({"source": "meet", "contact": "Mike's Roofing", "callId": "abc-defg-hij"}) == "Google Meet · Mike's Roofing"
     assert call_label({"source": "meet", "callId": "abc-defg-hij"}) == "Google Meet (abc-defg-hij)"
+
+
+def test_echo_filter_keeps_real_replies_by_timing():
+    import time as _time
+    from coach.stt.base import SttEvent
+    events = []
+
+    async def run():
+        s, _ = _live_session(events)
+        t0 = _time.monotonic()
+
+        def at(sp, text, start_offset, dur):
+            # A line that started start_offset s after t0 and lasted dur s.
+            return SttEvent(sp, text, True, start_offset, dur, t0 + start_offset + dur, True)
+
+        await s.on_stt(at(REP, "What would one extra job a month be worth to you?", 0, 3.0))
+        # Real reply that mirrors his words, starting 0.6 s after he finished: kept.
+        await s.on_stt(at(PROSPECT, "One extra job a month would be worth a lot to us", 3.6, 3.0))
+        await s.on_stt(at(REP, "Can you hear me okay?", 8, 1.2))
+        await s.on_stt(at(PROSPECT, "Yes I can hear you", 9.8, 1.0))          # short reply: kept
+        # True echo: overlaps his speech (sidetone).
+        await s.on_stt(at(REP, "Let me walk you through how the tracking reports work", 12, 3.0))
+        await s.on_stt(at(PROSPECT, "Let me walk you through how the tracking reports work", 12.1, 3.0))
+        return s
+
+    s = asyncio.run(run())
+    pros = [u.text for u in s.transcript.finals if u.speaker == PROSPECT]
+    assert "One extra job a month would be worth a lot to us" in pros
+    assert "Yes I can hear you" in pros
+    assert "Let me walk you through how the tracking reports work" not in pros
+    assert s.echo_dropped == 1 and any(k == "echo" and d["hidden"] == 1 for k, d in events)
+
+
+# ---------------------------------------------------------------- Start doesn't freeze the window
+def test_audio_system_starts_once(monkeypatch):
+    import types
+    import coach.audio as audio
+
+    inits = []
+    devices = [
+        {"index": 0, "name": "Headset Microphone (Jabra)", "maxInputChannels": 1, "maxOutputChannels": 0,
+         "defaultSampleRate": 48000, "hostApi": 0},
+        {"index": 1, "name": "Headset Earphone (Jabra) [Loopback]", "maxInputChannels": 2, "maxOutputChannels": 0,
+         "defaultSampleRate": 48000, "hostApi": 0, "isLoopbackDevice": True},
+    ]
+
+    class FakeStream:
+        def start_stream(self): pass
+        def stop_stream(self): pass
+        def close(self): pass
+
+    class FakePA:
+        def __init__(self):
+            inits.append(1)
+            self.terminated = False
+        def get_device_count(self): return len(devices)
+        def get_device_info_by_index(self, i): return devices[i]
+        def get_host_api_info_by_index(self, i): return {"name": "Windows WASAPI"}
+        def get_host_api_info_by_type(self, t): return {"defaultInputDevice": 0}
+        def get_default_wasapi_loopback(self): return devices[1]
+        def open(self, **kw): return FakeStream()
+        def terminate(self): self.terminated = True
+
+    fake = types.SimpleNamespace(PyAudio=FakePA, paWASAPI=13, paInt16=8, paContinue=0)
+    monkeypatch.setitem(sys.modules, "pyaudiowpatch", fake)
+    audio.shutdown()
+
+    audio.warm_up("wasapi")                                  # app opens
+    for _ in range(3):                                       # three calls
+        mic = audio.open_mic({"backend": "wasapi"}, lambda b: None)
+        lb = audio.open_loopback({"backend": "wasapi"}, lambda b: None)
+        mic.start(); lb.start(); mic.stop(); lb.stop()
+    assert len(inits) == 1, "audio system should start once, not on every call"
+    assert mic.device_name.startswith("Headset Microphone") and "Loopback" in lb.device_name
+
+    devices.append({"index": 2, "name": "USB Headset Mic", "maxInputChannels": 1, "maxOutputChannels": 0,
+                    "defaultSampleRate": 16000, "hostApi": 0})
+    mic2 = audio.open_mic({"backend": "wasapi", "mic_device": "USB Headset"}, lambda b: None)
+    assert mic2.device_name == "USB Headset Mic" and len(inits) == 2     # rescanned once for the new device
+    audio.shutdown()

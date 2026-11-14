@@ -46,6 +46,9 @@ class CallSession:
         self.call_info = call_info or {}
         self.consent_basis = "rep confirmed"   # or "dialer disclosure"
         self.joined_after = 0.0                # seconds of the call missed before coaching started
+        # Detected calls this session covers ("dialer", "meet"). An on-the-fly move
+        # from the phone to a Meet adds "meet"; the session ends when none remain.
+        self.active_sources: set[str] = {self.call_info["source"]} if self.call_info.get("source") else set()
         self.cfg = cfg
         self.prompts = prompts
         self.emit = emit
@@ -74,6 +77,7 @@ class CallSession:
         self.echo_hold = float(get(cfg, "audio.echo_hold_ms", 700)) / 1000
         self._rep_recent: deque = deque(maxlen=12)       # (monotonic, text) of Rep finals
         self._rep_active_mono = 0.0
+        self._rep_last_end = 0.0                          # when Spencer's last finished line ended (monotonic)
         self.echo_dropped = 0
         self._swap = False
         self._levels = {REP: 0.0, PROSPECT: 0.0}
@@ -273,6 +277,9 @@ class CallSession:
                 "(intro, rapport, and any early discovery) was not transcribed. Don't treat anything missing "
                 "from that part as a mistake, and don't assume it didn't happen.")
 
+    def set_echo_filter(self, on: bool) -> None:
+        self.echo_filter = bool(on)
+
     def set_live_mode(self, on: bool) -> None:
         self.live_mode = bool(on)
         if not on and self._turn_timer and not self._turn_timer.done():
@@ -415,17 +422,24 @@ class CallSession:
 
     _ECHO_WORD = re.compile(r"[a-z0-9']+")
 
-    def _is_echo(self, text: str) -> bool:
-        """Does this "Prospect" text repeat what Spencer just said? (sidetone or line echo)"""
+    def _is_echo(self, text: str, p_start: float | None = None) -> bool:
+        """Does this "Prospect" text repeat what Spencer just said? (sidetone or line echo)
+
+        An echo overlaps Spencer's own speech (or trails it by a fraction of a second).
+        A real reply starts after he finishes, so a prospect who mirrors his words is kept."""
         now = time.monotonic()
+        if p_start is not None:
+            rep_end = now if self._partial.get(REP) else self._rep_last_end
+            if p_start > rep_end + 0.3:
+                return False
         recent = " ".join(t for (m, t) in self._rep_recent if now - m <= 6) + " " + self._partial.get(REP, "")
         rep_words = set(self._ECHO_WORD.findall(recent.lower()))
         words = [w for w in self._ECHO_WORD.findall(text.lower()) if len(w) > 2]
-        if len(words) < 2 or not rep_words:
+        # Short replies ("yeah, that works", "I can hear you") often reuse the rep's
+        # words, so they're never treated as echo.
+        if len(words) < 4 or not rep_words:
             return False
         hits = sum(1 for w in words if w in rep_words)
-        if len(words) <= 3:
-            return hits == len(words)
         return hits >= 3 and hits / len(words) >= 0.7
 
     def swap_speakers(self) -> None:
@@ -464,19 +478,27 @@ class CallSession:
             self._rep_active_mono = time.monotonic()
             if ev.final:
                 self._rep_recent.append((time.monotonic(), ev.text))
+                self._rep_last_end = max(self._rep_last_end, ev.spoke_end_mono)
         elif (self.echo_filter and self.mode != "replay_text"
               and time.monotonic() - self._rep_active_mono < 2.0):
             # Spencer spoke just now: this "prospect" audio may be his own voice coming
             # back (headset sidetone, Windows "Listen to this device", or line echo).
-            echo = self._is_echo(ev.text)
+            p_start = (ev.spoke_end_mono - ev.duration) if ev.final else None
+            echo = self._is_echo(ev.text, p_start)
             if ev.final and not echo and self._partial.get(REP):
                 # He's mid-sentence, so his own words aren't final yet. Wait briefly
                 # for them (only happens while both sides talk at once).
                 await asyncio.sleep(self.echo_hold)
-                echo = self._is_echo(ev.text)
+                echo = self._is_echo(ev.text, p_start)
             if echo:
                 if ev.final:
                     self.echo_dropped += 1
+                    self.emit("echo", {"hidden": self.echo_dropped})
+                    if self.echo_dropped == 3:
+                        self.emit("toast", {"level": "error", "text": (
+                            "Hiding lines heard in both your mic and the call audio. If the other person is in "
+                            "the same room as you, your mic hears them too: use separate rooms, or click "
+                            "\u201cShow all\u201d in the transcript header to turn the echo filter off.")})
                     if self._open_turn.get(PROSPECT) is None:
                         self.emit("line_remove", {"id": f"p-{PROSPECT}"})
                     self._partial[PROSPECT] = ""

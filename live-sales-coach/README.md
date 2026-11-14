@@ -122,6 +122,12 @@ Meet doesn't announce recording the way your dialer does, so **Meet calls always
 - In Meet: **⋮ → Settings → Audio → Speakers**, choose that device (or your Windows default).
 - In `config.yaml`: set `audio.loopback_device` to the speaker Meet uses (see `python main.py --list-devices`).
 
+### On-the-fly (OTF) presentations: phone to Meet
+
+If you're being coached on an Aloware call and move the prospect onto a Google Meet, **coaching carries straight over**: no prompt, no restart, one saved call. Hanging up the phone after you've joined the Meet doesn't stop it. Coaching ends when you leave the Meet.
+
+If nothing is running yet, **Ctrl+Shift+Space starts coaching from any app** (the same as clicking Start call). The recording notice is a single button, and **Enter** confirms it.
+
 ### Starting partway through a call
 
 You can press **Start call** at any point. If the dialer shows the call was answered more than 15 seconds earlier, the call is marked **Partial call (joined at m:ss)**. The coach and the post-call summary are told the beginning wasn't heard, so a "missing" intro isn't counted against you. The scores are labeled partial, and the caller's number is kept even if you canceled the "They picked up" prompt.
@@ -235,6 +241,8 @@ The tests run offline, with no keys or audio. They cover reply parsing, trigger 
   2. **Headset sidetone:** in your headset's app (Jabra Direct, Poly Lens, Logitech G HUB, and similar), turn sidetone off. Or use the headset's own hardware sidetone if it has one.
   3. **Same mic everywhere:** make Windows' default input the headset mic Aloware uses (Settings → System → Sound → Input), or name it in `audio.mic_device`.
   4. **Echo from the prospect's speakerphone** can't be fixed on your side. The echo filter catches most of it.
+- **The other person's lines are missing and the transcript header says "N echo lines hidden":** your mic is also hearing them, usually because they're in the same room during a test. Click **Show all** to turn the echo filter off for that call, or test from separate rooms. Real prospects aren't in your room, so this doesn't happen on real calls. Short replies, and replies that start after you finish talking, are never hidden.
+- **You just plugged in or switched a headset:** use **View → Rescan audio devices** (between calls).
 - **Labels are backwards on a call:** click **⇄ Swap** in the transcript header. It flips past lines, scores, and everything after for that call. If it happens on every call, your two devices are reversed: run `python main.py --list-devices` and set `audio.mic_device` and `audio.loopback_device` explicitly.
 - **The hotkey only works when the app has focus:** pynput couldn't register a global hotkey. The pill says "(window only)". On macOS, grant Accessibility permission.
 - **Fonts look different offline:** the page uses Inter from Google Fonts and falls back to Segoe UI.

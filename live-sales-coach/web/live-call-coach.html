@@ -440,6 +440,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
           <span class="meter rep">You <span class="m-track"><span class="m-fill" id="lvRep"></span></span></span>
           <span class="meter pro">Them <span class="m-track"><span class="m-fill" id="lvPro"></span></span></span>
         </div>
+        <button class="btn small" id="echoBtn" type="button" hidden title="Lines heard in both your mic and the call audio were hidden as echo. Click to show everything for the rest of this call."></button>
         <button class="btn small" id="swapBtn" type="button" hidden title="Labels backwards? Swap Rep and Prospect for this call">⇄ Swap</button>
         <span class="timer" id="timer">00:00</span>
       </div>
@@ -558,11 +559,11 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     <p id="consentCall" class="say-it" hidden></p>
     <p id="consentIntro">Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:</p>
     <div class="say-it" id="consentLine">"Quick heads-up: I record and transcribe my calls so I can follow up accurately. Is that okay with you?"</div>
-    <label><input type="checkbox" id="consentBox"> <span>I will tell the prospect this call is recorded, and I'll stop if they say no.</span></label>
+    <p class="muted" style="font-size:12px;margin:-4px 0 12px;">If they say no, end the recording.</p>
     <label class="muted" id="dialerConsentRow"><input type="checkbox" id="dialerConsent"> <span>Our dialer already announces recording on every call. Don't ask again. (Undo: Call menu → Ask before each recording.)</span></label>
     <div class="row">
       <button class="btn" id="consentCancel">Cancel</button>
-      <button class="btn primary" id="consentGo" disabled>Start recording</button>
+      <button class="btn primary" id="consentGo">I'll tell them. Start recording</button>
     </div>
   </div>
 </div>
@@ -624,17 +625,19 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 
   function setCallState(s) {
     callState = s;
-    var live = s === "live", paused = s === "paused", busy = live || paused || s === "ending";
+    var live = s === "live", paused = s === "paused", busy = live || paused || s === "ending" || s === "starting";
     $("startBtn").hidden = busy;
     $("mode").disabled = busy;
     $("pauseBtn").hidden = !(live || paused);
     $("pauseBtn").textContent = paused ? "Resume" : "Pause";
     $("endBtn").hidden = !(live || paused);
     $("swapBtn").hidden = !(live || paused);
+    if (!(live || paused)) $("echoBtn").hidden = true;
     if (!(live || paused)) $("meters").hidden = true;
     if (live) setPill("status", "live", "Live", "statusText");
     else if (paused) setPill("status", "idle", "Paused", "statusText");
     else if (s === "ending") setPill("status", "idle", "Wrapping up…", "statusText");
+    else if (s === "starting") setPill("status", "warn", "Starting…", "statusText");
     else if (s === "ended") setPill("status", "idle", "Call ended", "statusText");
     else setPill("status", "idle", "Not live", "statusText");
   }
@@ -955,6 +958,13 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         $("lvRep").style.width = Math.round(d.rep * 100) + "%";
         $("lvPro").style.width = Math.round(d.prospect * 100) + "%";
         break;
+      case "echo":
+        $("echoBtn").hidden = false;
+        $("echoBtn").textContent = d.hidden + " echo line" + (d.hidden === 1 ? "" : "s") + " hidden · Show all";
+        break;
+      case "hotkey_start":
+        if (callState !== "live" && callState !== "paused" && callState !== "ending" && callState !== "starting" && $("consent").hidden) $("startBtn").click();
+        break;
       case "line_remove": var gone = document.getElementById("line-" + d.id); if (gone) gone.remove(); break;
       case "transcript_reset":
         $("transcript").innerHTML = "";
@@ -979,6 +989,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     phonePending = false;
     resetAll();
     renderSuggestions();
+    setCallState("starting");
     send("start", { mode: $("mode").value, consent: true, basis: basis });
   }
   function showConsent(callLabel, source) {
@@ -989,13 +1000,12 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("consentIntro").textContent = mid
       ? "You're joining partway through the call. Tell the prospect you're starting to record and transcribe now:"
       : "Tell the prospect the call is being recorded and transcribed. Say it at the start of the call:";
-    $("consentBox").checked = false;
     $("dialerConsent").checked = false;
     $("consentGo").disabled = true;
     $("consentCall").hidden = !callLabel;
     $("consentCall").textContent = callLabel ? ((meet ? "You joined: " : "They picked up: ") + callLabel) : "";
     $("consent").hidden = false;
-    $("consentBox").focus();
+    $("consentGo").focus();               // Enter starts
   }
   function onPhone(d) {
     if (d.state === "ringing") {
@@ -1188,21 +1198,21 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     phonePending = false;
     showConsent(null);
   });
-  $("consentBox").addEventListener("change", function () { $("consentGo").disabled = !this.checked; });
   $("consentCancel").addEventListener("click", function () {
     $("consent").hidden = true;
     if (phonePending) { phonePending = false; send("dismiss_phone"); }
   });
   $("consentGo").addEventListener("click", function () {
-    if (!$("consentBox").checked) return;
     if ($("dialerConsent").checked && !$("dialerConsentRow").hidden) { consentMode = "dialer"; send("consent_mode", { mode: "dialer" }); }
     $("consent").hidden = true;
     phonePending = false;
     resetAll();
     renderSuggestions();
+    setCallState("starting");
     send("start", { mode: $("mode").value, consent: true });
   });
   $("swapBtn").addEventListener("click", function () { send("swap_speakers"); });
+  $("echoBtn").addEventListener("click", function () { send("echo_filter", { on: false }); this.hidden = true; });
   $("pauseBtn").addEventListener("click", function () { send(callState === "paused" ? "resume" : "pause"); });
   $("endBtn").addEventListener("click", function () { send("end"); });
   $("onTop").addEventListener("change", function () { send("on_top", { on: this.checked }); });
