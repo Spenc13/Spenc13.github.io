@@ -350,6 +350,24 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 .call-row .controls { gap: 12px; }
 .call-row .select { max-width: 260px; }
 .btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+/* Landing the plane */
+.path { background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; transition: opacity .2s; }
+.path.active { border-color: rgba(124,140,255,0.55); }
+.path.done { border-color: rgba(56,217,169,0.55); }
+.path.dim { opacity: 0.55; }
+.path h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.path h3 span { font-size: 11px; color: var(--muted); font-weight: 500; }
+.item { width: 100%; display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; background: none; border: 0;
+  text-align: left; padding: 5px 0; color: var(--fg); font-size: 13px; }
+.item .box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line); display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; margin-top: 1px; color: #0b0d14; }
+.item.done .box { background: var(--good); border-color: var(--good); }
+.item small { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+.item .you { color: var(--accent); font-size: 11px; margin-left: 4px; }
+.land-btn { width: 100%; margin-top: 2px; }
+.tag.landed { color: var(--good); background: rgba(56,217,169,0.12); }
+.call-item .outcome { grid-column: 1; font-size: 11px; color: var(--accent); }
+.call-item .outcome.landed { color: var(--good); }
 .sum-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 /* Past calls browser */
 .modal.wide { max-width: 1100px; height: min(86vh, 860px); display: flex; flex-direction: column; padding: 0; }
@@ -488,6 +506,28 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     </ol>
   </section>
 
+  <!-- Landing the plane -->
+  <section class="card span-5" aria-labelledby="l-h">
+    <div class="card-head">
+      <h2 id="l-h">Landing the plane</h2>
+      <span class="tag" id="landTag">No outcome yet</span>
+    </div>
+    <div id="paths"></div>
+    <button class="btn small land-btn" id="landBtn" type="button">✈ Land it: give me the closing line</button>
+  </section>
+
+  <!-- Scoring -->
+  <section class="card span-7" aria-labelledby="s-h">
+    <div class="card-head">
+      <h2 id="s-h">Call scoring</h2>
+      <span class="tag" id="scoreTag">Live score</span>
+    </div>
+    <div class="score-top">
+      <div class="big"><span id="overall">–</span><small> / 100</small></div>
+      <div class="bars" id="bars"></div>
+    </div>
+  </section>
+
   <!-- Talk ratio -->
   <section class="card span-5" aria-labelledby="r-h">
     <div class="card-head">
@@ -510,20 +550,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     </div>
   </section>
 
-  <!-- Scoring -->
-  <section class="card span-7" aria-labelledby="s-h">
-    <div class="card-head">
-      <h2 id="s-h">Call scoring</h2>
-      <span class="tag" id="scoreTag">Live score</span>
-    </div>
-    <div class="score-top">
-      <div class="big"><span id="overall">–</span><small> / 100</small></div>
-      <div class="bars" id="bars"></div>
-    </div>
-  </section>
-
   <!-- Recommendations -->
-  <section class="card span-5" aria-labelledby="i-h">
+  <section class="card span-7" aria-labelledby="i-h">
     <div class="card-head">
       <h2 id="i-h">Improvement recommendations</h2>
     </div>
@@ -533,7 +561,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   </section>
 
   <!-- Post call -->
-  <section class="card span-7" aria-labelledby="p-h">
+  <section class="card span-12" aria-labelledby="p-h">
     <div class="card-head">
       <h2 id="p-h">Post-call summary</h2>
       <div class="sum-actions">
@@ -902,6 +930,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("overview").hidden = true;
     ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Nothing yet.")); });
     $("sumMeta").textContent = "Generated when you end the call";
+    renderClosing(null);
     $("sumOpen").hidden = true;
     $("sumCopy").hidden = true;
     $("sumKeep").hidden = true;
@@ -966,6 +995,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         $("echoBtn").textContent = d.hidden + " echo line" + (d.hidden === 1 ? "" : "s") + " hidden · Show all";
         break;
       case "audio_devices": renderAudioPick(d); break;
+      case "closing": renderClosing(d); break;
       case "hotkey_start":
         if (callState !== "live" && callState !== "paused" && callState !== "ending" && callState !== "starting" && $("consent").hidden) $("startBtn").click();
         break;
@@ -979,6 +1009,61 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "consent_mode": consentMode = d.mode === "dialer" ? "dialer" : "ask"; break;
       case "call_detail": renderCallDetail(d); break;
     }
+  }
+
+  // ---------------------------------------------------------------- landing the plane
+  var PATH_DEFS = [
+    { key: "set_demo", title: "Set the demo", items: ["demo_time", "decision_maker", "invite"] },
+    { key: "otf", title: "Go OTF (present now)", items: ["otf"] },
+    { key: "later", title: "Off the phone: later date", items: ["followup"] },
+    { key: "not_interested", title: "Off the phone: not interested", items: ["not_interested"] }
+  ];
+  var ITEM_LABELS = {
+    demo_time: "Date & time confirmed (phone or Google Meet)",
+    decision_maker: "Decision maker confirmed",
+    invite: "Asked to accept the invite + give notice to reschedule",
+    otf: "Has time now · Google Meet link sent",
+    followup: "No time in 48 business hrs · later date set",
+    not_interested: "Not interested · closed politely"
+  };
+
+  function renderClosing(c) {
+    var box = $("paths");
+    box.innerHTML = "";
+    var active = c ? c.path : "none";
+    var tag = $("landTag");
+    tag.textContent = c ? c.outcome : "No outcome yet";
+    tag.className = "tag" + (c && c.complete ? " landed" : "");
+    PATH_DEFS.forEach(function (p) {
+      var items = p.items.map(function (k) {
+        return (c && c.items && c.items[k]) || { label: ITEM_LABELS[k], done: false, detail: "", manual: false };
+      });
+      var allDone = items.every(function (x) { return x.done; });
+      var cls = "path";
+      if (active === p.key) cls += allDone ? " done" : " active";
+      else if (active !== "none") cls += " dim";
+      var div = el("div", cls);
+      var h = el("h3", null, p.title);
+      if (p.items.length > 1) h.appendChild(el("span", null, items.filter(function (x) { return x.done; }).length + " of " + items.length));
+      div.appendChild(h);
+      p.items.forEach(function (k, i) {
+        var it = items[i];
+        var b = el("button", "item" + (it.done ? " done" : ""));
+        b.type = "button";
+        b.title = "Click to tick or untick this yourself";
+        b.appendChild(el("span", "box", it.done ? "✓" : ""));
+        var t = el("span", null, it.label || ITEM_LABELS[k]);
+        if (it.manual) t.appendChild(el("span", "you", "(you)"));
+        if (it.detail) t.appendChild(el("small", null, it.detail));
+        b.appendChild(t);
+        b.addEventListener("click", function () {
+          if (callState !== "live" && callState !== "paused") { toast("Start a call first."); return; }
+          send("close_mark", { key: k, value: !it.done });
+        });
+        div.appendChild(b);
+      });
+      box.appendChild(div);
+    });
   }
 
   // ---------------------------------------------------------------- call audio picker
@@ -1097,6 +1182,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       if (c.length) bits.push(c.length);
       if (c.objections != null) bits.push(c.objections + " obj");
       b.appendChild(el("small", null, bits.join(" · ")));
+      if (c.outcome) b.appendChild(el("span", "outcome" + (c.landed ? " landed" : ""), (c.landed ? "✓ " : "") + c.outcome));
       b.addEventListener("click", function () {
         openCall = c.name;
         renderCallList();
@@ -1255,6 +1341,11 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 
   buildBars();
   renderSuggestions();
+  renderClosing(null);
+  $("landBtn").addEventListener("click", function () {
+    if (callState !== "live" && callState !== "paused") { toast("Start a call first."); return; }
+    send("land_now");
+  });
 
   if (typeof QWebChannel !== "undefined" && window.qt && qt.webChannelTransport) {
     new QWebChannel(qt.webChannelTransport, function (channel) {

@@ -77,6 +77,9 @@ class Metrics:
     _next_step_t: float | None = None
     elapsed: float = 0.0
     partial_after: float = 0.0     # >0: coaching joined this many seconds into the call
+    close_score: int | None = None # next-step clarity from the landing-the-plane outcome
+    close_recs: list = field(default_factory=list)
+    outcome: dict | None = None
 
     # ---- updates -------------------------------------------------------
     def add_utterance(self, u: Utterance) -> None:
@@ -168,8 +171,10 @@ class Metrics:
             off = 0 if lo <= w <= hi else (lo - w if w < lo else w - hi)
             s["Pacing"] = max(0, 100 - 2 * off)
 
-        # Next-step clarity.
-        if self.next_step_asked:
+        # Next-step clarity: the landing-the-plane outcome when there is one.
+        if self.close_score is not None:
+            s["Next-step clarity"] = self.close_score
+        elif self.next_step_asked:
             s["Next-step clarity"] = 55 + (20 if self.next_step_specific else 0) + (25 if self.next_step_agreed else 0)
         elif self.elapsed >= 300:
             s["Next-step clarity"] = 25
@@ -189,14 +194,14 @@ class Metrics:
             "Listening": f"{self.rep_share}% you" if self.rep_share is not None else "",
             "Objection handling": f"{sum(o.handled for o in judged)}/{len(self.objections)} met with a question or label" if self.objections else "0 objections",
             "Pacing": f"{self.wpm} wpm" if self.wpm else "",
-            "Next-step clarity": (
+            "Next-step clarity": (self.outcome or {}).get("outcome") if self.close_score is not None else (
                 "agreed" if self.next_step_agreed else "specific time" if self.next_step_specific
                 else "asked" if self.next_step_asked else "not asked yet"
             ),
         }
 
     def recommendations(self) -> list[str]:
-        recs: list[str] = []
+        recs: list[str] = list(self.close_recs)
         share = self.rep_share
         minutes = self.elapsed / 60
         if share is not None and share > TALK_TARGET[1] and self.rep_seconds + self.prospect_seconds >= 30:
@@ -229,6 +234,7 @@ class Metrics:
             "elapsed_seconds": round(self.elapsed, 1),
             "partial_call": self.partial_after > 0,
             "joined_after_seconds": round(self.partial_after) if self.partial_after else None,
+            "outcome": self.outcome,
             "rep_talk_seconds": round(self.rep_seconds, 1),
             "prospect_talk_seconds": round(self.prospect_seconds, 1),
             "rep_share_pct": self.rep_share,

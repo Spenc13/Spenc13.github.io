@@ -701,3 +701,96 @@ def test_follower_finds_the_speaker_with_the_other_person(monkeypatch):
     assert "Headset (Jabra Hands-Free)" in names and all("[Loopback]" not in n for n in names)
     f.stop()
     audio.shutdown()
+
+
+# ---------------------------------------------------------------- landing the plane
+def test_close_state_rules():
+    from coach.closing import CloseState
+    c = CloseState()
+    assert c.active_path() == "none" and c.score() is None and c.outcome_label() == "No outcome yet"
+    assert "start landing the plane now" in c.status_text(11, 10)
+    c.apply_tracker({"path": "set_demo", "demo_time_confirmed": True, "demo_when": "Thu 2pm",
+                     "demo_format": "google_meet", "decision_maker": "sole", "invite_accept_asked": True})
+    assert c.outcome_label() == "Setting the demo (2 of 3)" and c.score() == 80
+    assert c.missing() == ["ask them to give reasonable notice if they need to reschedule"]
+    assert c.detail("demo_time") == "Thu 2pm · Google Meet"
+    c.apply_tracker({"path": "set_demo", "demo_time_confirmed": False})   # facts don't go backwards
+    assert c.done("demo_time")
+    c.mark("invite", True)                                                 # Spencer ticks it
+    assert c.complete() and c.outcome_label() == "Demo set: Thu 2pm" and c.score() == 100
+    c.mark("invite", None)
+    assert not c.complete()
+    o = CloseState()
+    o.mark("otf", True)
+    assert o.active_path() == "otf" and o.complete() and o.outcome_label() == "OTF"
+    n = CloseState()
+    n.apply_tracker({"path": "not_interested", "not_interested": True})
+    assert n.complete() and n.score() == 70
+
+
+class _CloseFakeMessages(_FakeMessages):
+    """Tracker answers from what's in the transcript so far."""
+
+    async def create(self, **kw):
+        content = kw["messages"][0]["content"]
+        if "Landing-the-plane tracker" in content:
+            self.calls.append(kw)
+            res = {"path": "none", "demo_time_confirmed": False, "demo_when": "", "demo_format": "unknown",
+                   "decision_maker": "unknown", "decision_maker_note": "", "invite_accept_asked": False,
+                   "reschedule_notice_asked": False, "otf_link_sent": False, "followup_set": False,
+                   "followup_when": "", "not_interested": False}
+            if "Thursday at two works" in content:
+                res.update(path="set_demo", demo_time_confirmed=True, demo_when="Thu 2pm", demo_format="google_meet")
+            if "It's just me" in content:
+                res.update(decision_maker="sole")
+            if "accept it" in content:
+                res.update(invite_accept_asked=True)
+
+            class B:
+                type = "text"
+                text = json.dumps(res)
+
+            class M:
+                stop_reason = "end_turn"
+                content = [B()]
+            return M()
+        return await super().create(**kw)
+
+
+def test_landing_the_plane_end_to_end(tmp_path):
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path)
+    cfg["replay"]["speed"] = 20
+    cfg["coach"]["live_mode"] = True
+    cfg["landing"]["tracker_delay_seconds"] = 0
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text",
+                        str(ROOT / "samples" / "set_demo_practice.txt"))
+        client = _FakeClient(REPLY)
+        client.messages = client.beta.messages = _CloseFakeMessages(REPLY)
+        s.engine.client = client
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=60)
+        return s
+
+    s = asyncio.run(run())
+    c = s.closing
+    assert c.active_path() == "set_demo" and c.done("demo_time") and c.decision_maker == "sole"
+    assert not c.complete() and "reschedule" in c.missing()[0]
+    # The coach got the landing status, and the goodbye triggered the guard.
+    contents = [k["messages"][0]["content"] for k in s.engine.client.messages.calls]
+    assert any("Landing the plane:" in t and "Live coach mode" in t for t in contents)
+    assert any("starting to wrap up the call" in t and "reschedule" in t for t in contents)
+    assert any(k == "closing" for k, _ in events)
+    metrics = json.loads((Path(s.store.dir) / "metrics.json").read_text())
+    assert metrics["outcome"]["outcome"] == "Setting the demo (2 of 3)"
+    assert metrics["scores"]["Next-step clarity"] == 80
+    assert any("Before you hang up" in r for r in metrics["recommendations"])
+    summary_md = (Path(s.store.dir) / "summary.md").read_text()
+    assert "- Outcome: Setting the demo (2 of 3)" in summary_md and "[x] Date & time confirmed" in summary_md
+    summary_req = [t for t in contents if "The call has ended" in t][0]
+    assert "Not done before the call ended" in summary_req
+    from coach.storage import list_calls
+    assert list_calls(str(tmp_path))[0]["outcome"] == "Setting the demo (2 of 3)"

@@ -410,6 +410,11 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "swap_speakers" and self.session and self.session.running:
             self.runner.call(self.session.swap_speakers)
+        elif cmd == "close_mark" and self.session and self.session.running:
+            v = msg.get("value")
+            self.runner.call(self.session.mark_close, str(msg.get("key", "")), None if v is None else bool(v))
+        elif cmd == "land_now" and self.session and self.session.running:
+            self.runner.submit(self.session.land_now())
         elif cmd == "call_audio" and self.session and self.session.running:
             self.runner.call(self.session.set_call_audio, msg.get("value", "auto"))
         elif cmd == "echo_filter" and self.session and self.session.running:

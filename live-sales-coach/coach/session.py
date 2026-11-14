@@ -23,6 +23,7 @@ from .config import Prompts, get, keys_status
 from .engine import LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, parse_coach, said_it
 from .metrics import Metrics
 from .callfilter import judge
+from .closing import CLOSE_HINT, WRAP_UP, CloseState
 from .storage import CallStore
 from .stt import make_stream
 from .stt.base import SttEvent
@@ -85,6 +86,17 @@ class CallSession:
         self._silence_warned = False
         self._loopback_name = ""
         self._follower = None                    # CallAudioFollower when following all speakers
+        # Landing the plane
+        self.closing = CloseState()
+        self.land_after = float(get(cfg, "landing.nudge_after_minutes", 10))
+        self.land_renudge = float(get(cfg, "landing.renudge_minutes", 5))
+        self.tracker_delay = float(get(cfg, "landing.tracker_delay_seconds", 4))
+        self._last_land_nudge = -1e9            # call seconds
+        self._last_wrap_guard = -1e9
+        self._tracker_task: asyncio.Task | None = None
+        self._tracker_token = 0
+        self._tracker_rerun = False
+        self._last_tracker_mono = 0.0
         self.window_s = float(get(cfg, "coach.transcript_window_minutes", 4)) * 60
         self.summary_every = float(get(cfg, "coach.summary_refresh_seconds", 90))
         self.lookback = float(get(cfg, "hotkey.lookback_seconds", 20))
@@ -282,6 +294,105 @@ class CallSession:
             await asyncio.sleep(1.5)
             await self.end()
 
+    # ------------------------------------------------------------ landing the plane
+    def _summary_note(self) -> str:
+        parts = [self.partial_note()]
+        c = self.closing
+        out = f"Call outcome (landing the plane): {c.outcome_label()}."
+        missing = c.missing() if c.active_path() != "none" else []
+        if missing:
+            out += " Not done before the call ended: " + "; ".join(missing) + "."
+        parts.append(out + " Treat a missing outcome or missing steps as a key missed opportunity, and "
+                     "make the first next step about closing that loop.")
+        return "\n".join(p for p in parts if p)
+
+    def _closing_changed(self, before_label: str, before_complete: bool) -> None:
+        c = self.closing
+        self.metrics.close_score = c.score()
+        self.metrics.outcome = c.to_dict()
+        recs = []
+        if c.active_path() != "none" and not c.complete():
+            recs = [f"Before you hang up: {m}." for m in c.missing()[:2]]
+        self.metrics.close_recs = recs
+        self.emit("closing", c.to_dict())
+        self.emit("metrics", self.metrics.snapshot())
+        if c.complete() and not before_complete:
+            self.emit("toast", {"level": "info", "text": f"\u2713 Plane landed: {c.outcome_label()}"})
+
+    def mark_close(self, key: str, value) -> None:
+        before = (self.closing.outcome_label(), self.closing.complete())
+        self.closing.mark(key, None if value is None else bool(value))
+        self._closing_changed(*before)
+
+    def _schedule_tracker(self, delay: float | None = None) -> None:
+        """Re-check the outcome a few seconds after closing talk (debounced)."""
+        if self.engine.client is None or not self.running:
+            return
+        if self._tracker_task and not self._tracker_task.done():
+            self._tracker_rerun = True
+            return
+        self._tracker_token += 1
+        token = self._tracker_token
+        delay = self.tracker_delay if delay is None else delay
+
+        async def go():
+            if delay:
+                await asyncio.sleep(delay)
+            if token != self._tracker_token or not self.running:
+                return
+            await self._run_tracker()
+            if self._tracker_rerun and self.running:
+                self._tracker_rerun = False
+                await asyncio.sleep(max(0.2, self.tracker_delay * 1.5))
+                await self._run_tracker()
+        self._tracker_task = asyncio.create_task(go())
+
+    async def _run_tracker(self) -> None:
+        self._last_tracker_mono = time.monotonic()
+        try:
+            res = await self.engine.track_close(self._running_summary, self._recent_transcript())
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.info("landing tracker skipped: %s", type(e).__name__)
+            return
+        if not res:
+            return
+        before = (self.closing.outcome_label(), self.closing.complete())
+        self.closing.apply_tracker(res)
+        self._closing_changed(*before)
+
+    async def land_now(self, auto: bool = False) -> None:
+        """Ask the coach for the line that lands the plane from here."""
+        c = self.closing
+        path = c.active_path()
+        if path == "none":
+            ask = ("Time to land the plane. Give Spencer the exact line to transition to setting the demo "
+                   "(date and time by phone or Google Meet), or to going on-the-fly now with a Google Meet link "
+                   "if they seem to have time.")
+        else:
+            missing = c.missing(path)
+            ask = ("Help Spencer land the plane. Still needed: " + "; ".join(missing) + ". Give him the exact "
+                   "line for the most important one.") if missing else \
+                  "The outcome is complete. Give Spencer a short, warm line to wrap up the call."
+        self.debouncer.note_manual(self.elapsed())
+        await self.request_coach(CoachRequest(
+            reason="land", question="Land the plane" + (" (time check)" if auto else ""), prompt=ask, fast=True))
+
+    async def _wrap_up_guard(self) -> None:
+        """Spencer is saying goodbye: if the outcome isn't nailed down, say what's missing first."""
+        el = self.elapsed()
+        c = self.closing
+        if c.complete() or el - self._last_wrap_guard < 45 or el < 30:
+            return
+        self._last_wrap_guard = el
+        missing = c.missing()
+        await self.request_coach(CoachRequest(
+            reason="wrap_guard", question="Before you hang up",
+            prompt=("Spencer is starting to wrap up the call, but the outcome isn't nailed down. Missing: "
+                    + "; ".join(missing) + ". Give him the exact line to close that loop before he hangs up."),
+            fast=True))
+
     def mark_joined_mid_call(self, seconds_missed: float) -> None:
         """Coaching started partway through the call: tell the coach, summary, and scores."""
         self.joined_after = max(0.0, float(seconds_missed))
@@ -372,6 +483,7 @@ class CallSession:
             "joined_mid_call_after": fmt_clock(self.joined_after) if self.joined_after else None,
             "echo_lines_dropped": self.echo_dropped,
             "speakers_swapped": self._swap,
+            "outcome": self.closing.to_dict(),
             "phone": self.call_info.get("phone"),
             "direction": self.call_info.get("direction"),
             "source": self.call_info.get("source"),
@@ -414,7 +526,7 @@ class CallSession:
         else:
             try:
                 summary = await self.engine.post_call_summary(full, snap, self._coaching_count,
-                                                              note=self.partial_note())
+                                                              note=self._summary_note())
             except CoachUnavailable as e:
                 err = str(e)
             except Exception as e:
@@ -469,7 +581,8 @@ class CallSession:
         flip = {REP: PROSPECT, PROSPECT: REP}
         for u in self.transcript.finals:
             u.speaker = flip[u.speaker]
-        m = Metrics(partial_after=self.metrics.partial_after)
+        m = Metrics(partial_after=self.metrics.partial_after, close_score=self.metrics.close_score,
+                    close_recs=list(self.metrics.close_recs), outcome=self.metrics.outcome)
         for u in self.transcript.finals:
             m.add_utterance(u)
             if u.speaker == PROSPECT:
@@ -556,6 +669,11 @@ class CallSession:
         live_turn = turn
         if ev.speech_final:
             self._close_turn(sp)
+
+        if CLOSE_HINT.search(ev.text):
+            self._schedule_tracker()
+        if sp == REP and WRAP_UP.search(ev.text):
+            await self._wrap_up_guard()
 
         if sp == REP:
             if self._last_say and said_it(self._last_say, live_turn.text):
@@ -673,7 +791,8 @@ class CallSession:
         summary = self._running_summary
         if self.joined_after:
             summary = (self.partial_note() + "\n" + summary).strip()
-        user = self.engine.build_user_message(summary, self._recent_transcript(), req.prompt)
+        landing = self.closing.status_text(self.elapsed() / 60, self.land_after)
+        user = self.engine.build_user_message(summary, self._recent_transcript(), req.prompt, landing)
         t0 = time.monotonic()
         anchor = req.spoke_end_mono or req.created_mono
         first_card: dict = {}
@@ -797,6 +916,13 @@ class CallSession:
             self.emit("timer", {"elapsed": fmt_clock(el)})
             if int(el) % 5 == 0:
                 self.emit("metrics", self.metrics.snapshot())
+            if el >= 120 and time.monotonic() - self._last_tracker_mono >= 90:
+                self._schedule_tracker(delay=0)
+            if (self.engine.client is not None and not self.paused
+                    and self.closing.active_path() == "none" and el >= self.land_after * 60
+                    and el - self._last_land_nudge >= self.land_renudge * 60):
+                self._last_land_nudge = el
+                await self.land_now(auto=True)
             if (self.engine.client is not None and not self.paused
                     and time.monotonic() - self._last_summary_mono >= self.summary_every
                     and (self._summary_task is None or self._summary_task.done())):
