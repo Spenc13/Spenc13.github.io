@@ -1,6 +1,7 @@
 """PySide6 desktop shell: QWebEngineView showing web/live-call-coach.html."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
@@ -83,6 +84,9 @@ class Bridge(QObject):
 
 
 def call_label(info: dict) -> str:
+    if info.get("source") == "meet":
+        name = info.get("contact")
+        return f"Google Meet \u00b7 {name}" if name else f"Google Meet ({info.get('callId') or 'meeting'})"
     phone = info.get("phone") or ""
     digits = "".join(ch for ch in phone if ch.isdigit())
     if len(digits) == 11 and digits.startswith("1"):
@@ -101,6 +105,10 @@ class MainWindow(QMainWindow):
         self.start_replay = start_replay
         self.runner = AsyncRunner()
         self.session: CallSession | None = None
+        self._starting = False
+        # Do the slow one-time setup now, in the background, so Start is instant:
+        # load the Claude/websocket libraries and start the audio system.
+        self.runner.submit(self._warm_up())
         self.calls_dir = get(cfg, "storage.calls_dir", "calls")
         self.pending_call: dict | None = None
         self.phone_linked = False
@@ -119,6 +127,10 @@ class MainWindow(QMainWindow):
         saved_consent = self.settings.value("consent_mode")
         self.consent_mode = saved_consent if saved_consent in ("ask", "dialer") else \
             ("dialer" if get(cfg, "recording.consent_mode", "ask") == "dialer" else "ask")
+        # Google Meet doesn't announce recording the way the dialer does, so Meet
+        # calls ask by default even in "dialer" mode. "announced" = your Meets are
+        # recorded by Meet itself (which notifies everyone), so start right away.
+        self.meet_consent_mode = "announced" if get(cfg, "recording.meet_consent_mode", "ask") == "announced" else "ask"
         saved_live = self.settings.value("live_mode")
         if saved_live is not None:
             cfg.setdefault("coach", {})["live_mode"] = saved_live in (True, "true")
@@ -150,9 +162,12 @@ class MainWindow(QMainWindow):
         self.on_top_action.toggled.connect(self.set_on_top)
         view_menu = self.menuBar().addMenu("&View")
         view_menu.addAction(self.on_top_action)
+        rescan = QAction("Rescan audio devices", self)
+        rescan.triggered.connect(self.rescan_audio)
+        view_menu.addAction(rescan)
         call_menu = self.menuBar().addMenu("&Call")
         self.combo = hotkey_for_platform(cfg)
-        ask_action = QAction(f"Ask about the last few seconds ({pretty(self.combo)})", self)
+        ask_action = QAction(f"Start coaching / ask about the last few seconds ({pretty(self.combo)})", self)
         ask_action.triggered.connect(self.trigger_hotkey)
         call_menu.addAction(ask_action)
         focus_ask = QAction("Type a question", self)
@@ -193,6 +208,27 @@ class MainWindow(QMainWindow):
             self.on_top_action.setChecked(bool(on))
         self.bridge.post("on_top", {"on_top": bool(on)})
 
+    async def _warm_up(self, refresh: bool = False) -> None:
+        def work():
+            try:
+                import anthropic  # noqa: F401
+                import websockets  # noqa: F401
+            except Exception:
+                pass
+            try:
+                from .audio import warm_up
+                warm_up(get(self.cfg, "audio.backend", "auto"), refresh=refresh)
+            except Exception as e:      # no audio hardware / driver issue: Start will report it
+                log.info("audio warm-up skipped: %s", type(e).__name__)
+        await asyncio.to_thread(work)
+
+    def rescan_audio(self) -> None:
+        if self.session and self.session.running:
+            self.bridge.post("toast", {"level": "info", "text": "End the call first, then rescan audio devices."})
+            return
+        fut = self.runner.submit(self._warm_up(refresh=True))
+        fut.add_done_callback(lambda f: self.bridge.post("toast", {"level": "info", "text": "Audio devices rescanned."}))
+
     def set_consent_mode(self, mode: str) -> None:
         mode = "dialer" if mode == "dialer" else "ask"
         if mode == self.consent_mode:
@@ -218,6 +254,11 @@ class MainWindow(QMainWindow):
             self.global_hotkey.stop()
         if self.phone_bridge:
             self.phone_bridge.stop()
+        try:
+            from .audio import shutdown
+            shutdown()
+        except Exception:
+            pass
         self.runner.stop()
         super().closeEvent(event)
 
@@ -226,6 +267,9 @@ class MainWindow(QMainWindow):
         # pynput calls this on its own thread; the session lives on the asyncio thread.
         if self.session and self.session.running:
             self.runner.submit(self.session.hotkey())
+        else:
+            # Nothing running: the hotkey starts coaching (same as clicking Start call).
+            self.bridge.post("hotkey_start", {})
 
     def trigger_hotkey(self) -> None:
         self.trigger_hotkey_from_thread()
@@ -243,6 +287,8 @@ class MainWindow(QMainWindow):
             self.phone_linked = True
             self.bridge.post("phone_link", {"connected": True})
         info = {k: ev.get(k) for k in ("phone", "contact", "direction", "callId") if ev.get(k)}
+        src = "meet" if ev.get("source") == "meet" else "dialer"
+        info["source"] = src
         if kind == "ringing":
             if busy:
                 return
@@ -250,20 +296,42 @@ class MainWindow(QMainWindow):
             self.bridge.post("phone", {"state": "ringing", "label": call_label(self.pending_call)})
         elif kind == "answered":
             if busy:
+                # Already coaching (e.g. an on-the-fly move from the phone to a Meet):
+                # keep the same session going instead of starting over.
+                if src not in self.session.active_sources:
+                    self.session.active_sources.add(src)
+                    if src == "meet":
+                        self.bridge.post("toast", {"level": "info", "text": "You joined the Meet. Coaching continues in the same call."})
+                    self.bridge.post("phone", {"state": "answered", "label": call_label({**info}), "source": src, "handoff": True})
                 return
             self.pending_call = {**(self.pending_call or {}), **info, "state": "answered", "at": time.monotonic()}
             self.showNormal()
             self.raise_()
             self.activateWindow()
-            auto = self.consent_mode == "dialer" and self.prompts is not None
-            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call), "auto": auto})
+            if src == "meet":
+                auto, basis = self.meet_consent_mode == "announced", "meet"
+            else:
+                auto, basis = self.consent_mode == "dialer", "dialer"
+            auto = auto and self.prompts is not None
+            self.bridge.post("phone", {"state": "answered", "label": call_label(self.pending_call),
+                                       "auto": auto, "source": src})
             if auto:
-                self.start_call({"mode": "live", "consent": True, "basis": "dialer"})
+                self.start_call({"mode": "live", "consent": True, "basis": basis})
         elif kind == "ended":
-            self.pending_call = None
-            self.bridge.post("phone", {"state": "ended"})
+            # A Meet ending shouldn't stop a dialer call (or the reverse).
+            if self.pending_call and self.pending_call.get("source", "dialer") == src:
+                self.pending_call = None
+            self.bridge.post("phone", {"state": "ended", "source": src})
             if busy and self.session.mode == "live":
-                self.runner.submit(self.session.end())
+                active = self.session.active_sources
+                if src in active:
+                    active.discard(src)
+                    if not active:
+                        self.runner.submit(self.session.end())
+                    elif src == "dialer":
+                        self.bridge.post("toast", {"level": "info", "text": "Phone call ended. Still coaching the Meet."})
+                elif not active:
+                    self.runner.submit(self.session.end())     # session started by hand
 
     # ------------------------------------------------------------ commands from JS
     def handle_command(self, msg: dict) -> None:
@@ -286,6 +354,7 @@ class MainWindow(QMainWindow):
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
                 "consent_mode": self.consent_mode,
+                "meet_consent_mode": self.meet_consent_mode,
                 "live_mode": bool(get(self.cfg, "coach.live_mode", True)),
                 "phone_bridge": {"enabled": self.phone_bridge is not None,
                                  "error": self.phone_bridge.error if self.phone_bridge else None,
@@ -341,6 +410,10 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "swap_speakers" and self.session and self.session.running:
             self.runner.call(self.session.swap_speakers)
+        elif cmd == "echo_filter" and self.session and self.session.running:
+            self.runner.call(self.session.set_echo_filter, bool(msg.get("on")))
+            if not msg.get("on"):
+                self.bridge.post("toast", {"level": "info", "text": "Echo filter off for this call. Every line from the call audio is shown."})
         elif cmd == "live_mode":
             on = bool(msg.get("on"))
             self.cfg.setdefault("coach", {})["live_mode"] = on      # next calls too
@@ -351,15 +424,23 @@ class MainWindow(QMainWindow):
             self.set_on_top(bool(msg.get("on")))
 
     def start_call(self, msg: dict) -> None:
-        if not msg.get("consent") and self.consent_mode != "dialer":
+        meet_now = bool(self.pending_call and self.pending_call.get("source") == "meet"
+                        and time.monotonic() - self.pending_call.get("at", 0) < 2 * 3600)
+        skip_ok = (self.meet_consent_mode == "announced") if meet_now else (self.consent_mode == "dialer")
+        if not msg.get("consent") and not skip_ok:
             self.bridge.post("toast", {"level": "error", "text": "Confirm the recording notice first."})
             return
-        basis = "dialer disclosure" if (msg.get("basis") == "dialer" or self.consent_mode == "dialer") else "rep confirmed"
+        if msg.get("basis") == "meet" or (meet_now and skip_ok and not msg.get("basis")):
+            basis = "meet recording notice"
+        elif msg.get("basis") == "dialer" or (not meet_now and self.consent_mode == "dialer"):
+            basis = "dialer disclosure"
+        else:
+            basis = "rep confirmed"
         if self.prompts is None:
             self.bridge.post("toast", {"level": "error", "text": self.prompts_error})
             self.bridge.post("call", {"state": "idle"})
             return
-        if self.session and self.session.running:
+        if self._starting or (self.session and self.session.running):
             return
         mode_value = msg.get("mode", "live")
         if mode_value.startswith("replay:"):
@@ -371,15 +452,24 @@ class MainWindow(QMainWindow):
         fresh = self.pending_call and time.monotonic() - self.pending_call.get("at", 0) < 2 * 3600
         if mode == "live" and fresh:
             info = {k: v for k, v in self.pending_call.items() if k not in ("state", "at")}
-        self.session = CallSession(self.cfg, self.prompts, self.bridge.post, mode, path, info)
-        self.session.consent_basis = basis
+        missed = 0.0
         if info and self.pending_call.get("state") == "answered":
             missed = time.monotonic() - self.pending_call.get("at", time.monotonic())
+
+        async def create_and_start():
+            # Built on the background thread so the window never freezes.
+            s = CallSession(self.cfg, self.prompts, self.bridge.post, mode, path, info)
+            s.consent_basis = basis
             if missed > 15:
-                self.session.mark_joined_mid_call(missed)
-        fut = self.runner.submit(self.session.start())
+                s.mark_joined_mid_call(missed)
+            self.session = s
+            await s.start()
+
+        self._starting = True
+        fut = self.runner.submit(create_and_start())
 
         def done(f):
+            self._starting = False
             exc = f.exception()
             if exc:
                 self.bridge.post("toast", {"level": "error", "text": f"Couldn't start: {exc}"})

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from dataclasses import dataclass
 from typing import Callable
 
@@ -20,6 +21,51 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 ChunkCallback = Callable[[bytes], None]
+
+# One PortAudio instance for the whole app. Starting PortAudio scans every audio
+# device, which can take seconds (Bluetooth headsets especially) and blocks the
+# window, so it's done once in the background (warm_up) instead of on every Start.
+_PA = None
+_PA_LOCK = threading.RLock()
+_WASAPI_DEVICES: list | None = None
+
+
+def _shared_pa(refresh: bool = False):
+    global _PA, _WASAPI_DEVICES
+    with _PA_LOCK:
+        if refresh and _PA is not None:
+            try:
+                _PA.terminate()
+            except Exception:
+                pass
+            _PA, _WASAPI_DEVICES = None, None
+        if _PA is None:
+            import pyaudiowpatch as pyaudio
+
+            _PA = pyaudio.PyAudio()
+        return _PA
+
+
+def warm_up(cfg_backend: str = "auto", refresh: bool = False) -> None:
+    """Start the audio system and read the device list ahead of time.
+    refresh=True rescans (new headset plugged in, default device changed)."""
+    if _backend(cfg_backend) == "wasapi":
+        with _PA_LOCK:
+            _shared_pa(refresh)
+            list_devices("wasapi")
+    else:
+        import sounddevice  # noqa: F401  (loads PortAudio)
+
+
+def shutdown() -> None:
+    global _PA, _WASAPI_DEVICES
+    with _PA_LOCK:
+        if _PA is not None:
+            try:
+                _PA.terminate()
+            except Exception:
+                pass
+        _PA, _WASAPI_DEVICES = None, None
 
 
 @dataclass
@@ -114,7 +160,7 @@ class WasapiCapture(Capture):
         import pyaudiowpatch as pyaudio
 
         self.pa_mod = pyaudio
-        self.pa = pyaudio.PyAudio()
+        self.pa = _shared_pa()
         self.index = device_index
         self.channels = max(1, channels)
         self.rate = rate
@@ -139,7 +185,7 @@ class WasapiCapture(Capture):
             self.stream.stop_stream()
             self.stream.close()
             self.stream = None
-        self.pa.terminate()
+        # The shared PortAudio instance stays up for the next call.
 
 
 # ------------------------------------------------------------------- helpers
@@ -156,13 +202,14 @@ def _backend(cfg_backend: str) -> str:
 
 
 def list_devices(cfg_backend: str = "auto") -> list[DeviceInfo]:
+    global _WASAPI_DEVICES
     backend = _backend(cfg_backend)
     out: list[DeviceInfo] = []
     if backend == "wasapi":
-        import pyaudiowpatch as pyaudio
-
-        pa = pyaudio.PyAudio()
-        try:
+        with _PA_LOCK:
+            if _WASAPI_DEVICES is not None:
+                return list(_WASAPI_DEVICES)
+            pa = _shared_pa()
             for i in range(pa.get_device_count()):
                 d = pa.get_device_info_by_index(i)
                 host = pa.get_host_api_info_by_index(d["hostApi"])["name"]
@@ -171,8 +218,8 @@ def list_devices(cfg_backend: str = "auto") -> list[DeviceInfo]:
                     out_channels=int(d["maxOutputChannels"]), rate=int(d["defaultSampleRate"]),
                     host_api=host, is_loopback=bool(d.get("isLoopbackDevice", False)),
                 ))
-        finally:
-            pa.terminate()
+            _WASAPI_DEVICES = out
+            return list(out)
     else:
         import sounddevice as sd
 
@@ -205,16 +252,21 @@ def open_mic(cfg_audio: dict, on_chunk: ChunkCallback) -> Capture:
     if backend == "wasapi":
         import pyaudiowpatch as pyaudio
 
-        devices = list_devices("wasapi")
-        dev = _match(devices, want, lambda d: d.in_channels > 0 and not d.is_loopback)
+        def find():
+            devices = list_devices("wasapi")
+            dev = _match(devices, want, lambda d: d.in_channels > 0 and not d.is_loopback)
+            if dev is None and not want:
+                wasapi = _shared_pa().get_host_api_info_by_type(pyaudio.paWASAPI)
+                idx = wasapi["defaultInputDevice"]
+                dev = next((x for x in devices if x.index == idx), None)
+            return dev
+
+        dev = find()
+        if dev is None:                      # newly plugged in? rescan once
+            warm_up("wasapi", refresh=True)
+            dev = find()
         if dev is None:
-            pa = pyaudio.PyAudio()
-            try:
-                wasapi = pa.get_host_api_info_by_type(pyaudio.paWASAPI)
-                d = pa.get_device_info_by_index(wasapi["defaultInputDevice"])
-            finally:
-                pa.terminate()
-            dev = next(x for x in devices if x.index == d["index"])
+            raise RuntimeError(f"Microphone '{want}' not found. Run: python main.py --list-devices")
         return WasapiCapture("rep", on_chunk, dev.index, min(dev.in_channels, 2), dev.rate, dev.name, chunk_ms)
     device = None
     if want not in (None, ""):
@@ -230,22 +282,25 @@ def open_loopback(cfg_audio: dict, on_chunk: ChunkCallback) -> Capture:
     chunk_ms = int(cfg_audio.get("chunk_ms", 100))
     want = cfg_audio.get("loopback_device") or None
     if backend == "wasapi":
-        import pyaudiowpatch as pyaudio
+        def find():
+            devices = list_devices("wasapi")
+            dev = _match(devices, want, lambda d: d.is_loopback)
+            if dev is None and want:
+                # User named the speakers/headset; find its loopback twin.
+                out = _match(devices, want, lambda d: d.out_channels > 0 and not d.is_loopback)
+                if out:
+                    dev = next((d for d in devices if d.is_loopback and out.name in d.name), None)
+            if dev is None and not want:
+                lb = _shared_pa().get_default_wasapi_loopback()
+                dev = next((x for x in devices if x.index == lb["index"]), None)
+            return dev
 
-        devices = list_devices("wasapi")
-        dev = _match(devices, want, lambda d: d.is_loopback)
-        if dev is None and want:
-            # User named the speakers/headset; find its loopback twin.
-            out = _match(devices, want, lambda d: d.out_channels > 0 and not d.is_loopback)
-            if out:
-                dev = next((d for d in devices if d.is_loopback and out.name in d.name), None)
+        dev = find()
+        if dev is None:                      # newly plugged in? rescan once
+            warm_up("wasapi", refresh=True)
+            dev = find()
         if dev is None:
-            pa = pyaudio.PyAudio()
-            try:
-                lb = pa.get_default_wasapi_loopback()
-            finally:
-                pa.terminate()
-            dev = next(x for x in devices if x.index == lb["index"])
+            raise RuntimeError(f"Speaker '{want}' not found for call audio. Run: python main.py --list-devices")
         return WasapiCapture("prospect", on_chunk, dev.index, max(1, dev.in_channels), dev.rate, dev.name, chunk_ms)
     if want in (None, ""):
         raise RuntimeError(

@@ -87,6 +87,10 @@ recording:
   #           starts immediately (and automatically when a dialer call is answered).
   # You can also switch this in the app: Call menu → Ask before each recording.
   consent_mode: ask
+  # Google Meet doesn't announce recording, so Meets show the notice even in
+  # "dialer" mode. Set to "announced" only if your Meets are recorded by Meet
+  # itself (Meet tells everyone when recording or note-taking starts).
+  meet_consent_mode: ask
 
 call_filter:
   # Calls that go nowhere (no answer, quick hang-up, voicemail) are not saved

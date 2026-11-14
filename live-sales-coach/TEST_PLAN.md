@@ -65,6 +65,20 @@ Call a teammate on **Google Meet**, or through your dialer for phone calls. Give
 - [ ] Dial a number that won't answer, or that goes to voicemail. Nothing records, or the call ends with **"Not saved because it reached voicemail."**
 - [ ] If "picked up" or "ended" never triggered, send Claude the lines in `calls/.phone-events.log`.
 
+## D2b. Google Meet
+
+- [ ] After reloading the extension, join a test Meet with a colleague. The coach pops up with **"You joined: Google Meet · …"** and the recording notice, even if "Don't ask again" is on for the dialer.
+- [ ] Both of you are transcribed and labeled correctly, and the **Them** meter moves when they talk.
+- [ ] If the other side is silent, the app warns after about 25 seconds and names the device. Fix Meet's speaker setting as the warning says.
+- [ ] Leave the meeting. Coaching ends by itself and the call is saved as **"Meet: (meeting name)"**.
+
+## D2c. On-the-fly to Meet
+
+- [ ] Start coaching on an Aloware call, then join a Meet with the same colleague. A toast says coaching continues, and nothing restarts.
+- [ ] Hang up the phone. Coaching keeps going. Leave the Meet, and it ends and saves once.
+- [ ] With nothing running, press **Ctrl+Shift+Space** in Meet. The coach starts (or shows the one-button notice; press Enter).
+- [ ] Click **Start call**. The status shows **Starting…** right away, and the window never freezes.
+
 ## D3. Consent mode and joining late
 
 - [ ] On a dialer call, click **Cancel** on "They picked up", wait 30 seconds, then press **Start call**. The notice shows the mid-call line, the call is titled with the number, and the score card says **Partial call (joined at 0:3x)**.
