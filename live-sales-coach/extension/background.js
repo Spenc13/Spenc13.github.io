@@ -11,6 +11,7 @@ function shouldSend(msg) {
   let key, ttl;
   if (msg.event === 'seen') { key = "seen:" + msg.type; ttl = SEEN_TTL; }
   else if (msg.event === 'hello') { key = "hello"; ttl = 60 * 1000; }
+  else if (msg.event === 'context') { key = 'context:' + (msg.contact || '') + '|' + (msg.company || ''); ttl = 30 * 1000; }
   else { key = msg.event + ":" + (msg.callId || ""); ttl = 3000; }
   const last = lastSent.get(key) || 0;
   if (now - last < ttl) return false;
@@ -22,7 +23,7 @@ function shouldSend(msg) {
 chrome.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.kind !== 'call-event' || !shouldSend(msg)) return;
   const body = {};
-  for (const k of ['event', 'type', 'source', 'phone', 'contact', 'callId', 'direction']) {
+  for (const k of ['event', 'type', 'source', 'phone', 'contact', 'company', 'callId', 'direction']) {
     if (msg[k]) body[k] = String(msg[k]).slice(0, 120);
   }
   fetch(COACH_URL, {

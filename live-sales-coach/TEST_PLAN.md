@@ -40,6 +40,16 @@ For each card, check:
 - [ ] On a practice call, click an item to tick it yourself. It shows "(you)".
 - [ ] Click **✈ Land it**. You get a closing line for whatever's missing.
 
+## B4. v2 checks (from the 11/16 review)
+
+- [ ] **Stages:** on a practice call, the stage bar moves from Cold / Discovery to Presenting when you share a screen, and to Confirming once a time is agreed. Click a stage to pin it, and click **Auto** to unpin.
+- [ ] **No cards on fragments:** while the other person is mid-sentence, the panel shows **Listening…**, and a card appears only after they finish.
+- [ ] **Side talk:** have your colleague talk about something unrelated for 30 seconds. The panel shows **Side conversation: coaching paused**, and coaching resumes when business talk returns.
+- [ ] **Typed input:** type "His name is …" during the call. It appears as **You (typed)**, and the coach uses that name.
+- [ ] **HubSpot names:** call from a contact record. A toast shows the confirmed name and company.
+- [ ] **Land the plane:** hidden at the start. **✈ Land the plane** opens it.
+- [ ] **Coach notes:** add one during the call. After the call it's waiting for review, along with proposed notes that cite timestamps. Approve one and check that it's in `spencer-selling-style.md`.
+
 ## C. Audio routing (10 min)
 
 - [ ] `python main.py --list-devices` shows your headset mic and a LOOPBACK device for your headset or speakers.

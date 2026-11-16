@@ -110,9 +110,59 @@ The `extension/` folder has **Olly Coach Bridge**, a small Chrome extension that
 
 Install it from `chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension` folder. Full steps are in [`extension/README.md`](extension/README.md). The header shows **Dialer: linked** when it's working.
 
+### Call stages (v2)
+
+The coach works out which stage the call is in from the conversation: whether a demo has started, whether you're reviewing a package or screen, and whether a meeting has been agreed. The current stage shows under the header, and **one click pins it** (**Auto** hands it back).
+
+| Stage | What the coach focuses on |
+|---|---|
+| **Cold / Discovery** | NEPQ discovery questions (situation, problem, consequence, budget); no pitching, no scheduling |
+| **Presenting** | checking-for-agreement questions (target **about 25 per presentation**, counted live), recapping their problems in their words, transitions; no discovery questions |
+| **Confirming** | the calendar invite, the decision maker and any approval steps (for example, a franchisor sign-off), and the reschedule-notice ask; no pitch content |
+| **Side conversation** | coaching **pauses** ("Side conversation: coaching paused") and resumes when the business topic returns |
+
+**Scheduling prompts only appear in Confirming.** Rapport small talk isn't a side conversation, and the coach never pushes to close during rapport. **Coaching on** turns cards off entirely; the transcript and scores keep running. **Every turn** switches between a line after every finished prospect turn and keyword-only cards.
+
+### How cards are timed
+
+A card is generated only after a **finished prospect turn**: a complete sentence at a pause, or about **1.5 s of silence**. It's never generated on a fragment. While they're still talking, the coaching panel shows **Listening…**. Each request includes:
+- the last 4 minutes of both speakers
+- your last few lines, marked "already covered"
+- the last card it showed you
+- anything you typed
+- the confirmed names
+
+That way it doesn't repeat itself, or ask for something you already did.
+
+### Typing during the call
+
+The box at the top is always available. Type **what you said, what they said, what the transcript missed, or a question**. It's treated as **ground truth**, used right away, and logged in the transcript as **"You (typed)"**.
+
+### Names (pre-call glossary)
+
+When you call from a HubSpot record, the companion extension reads the contact's **name and company** from the open record. The coach uses **only confirmed names**: from HubSpot, or names you type, such as "His name is Fred Terry". Names it merely hears in the transcript are never trusted. The names are also passed to speech-to-text, which helps it spell them.
+
+### Coach notes (selling style)
+
+- **Anytime:** type how you sell in **Coach notes** (for example, "I never give pricing before budget").
+- **After each call:** the coach proposes notes from the transcript, **each citing the [mm:ss] it came from**, plus anything you typed. **Approve, edit, or reject** each one.
+- **Saved only on approval:** nothing is saved during a call. Approved notes go to `spencer-selling-style.md`, which is kept on this computer (it's gitignored), and load into every future call, separate from the playbook.
+- **The transcript wins:** if a note conflicts with the transcript, it's **flagged** and can't be approved until you edit it. Edited notes are re-checked against the transcript before they're saved.
+
+### Transcript and scoring rules
+
+- **Lines are sorted by audio time,** and consecutive lines from the same speaker merge into one turn.
+- **Backchannels** ("mhmm", "yeah", "right?") aren't turns. They show as a small aside on the other person's line, and don't count toward talk time or trigger cards.
+- **Listening:** target **30–45% you**.
+- **Pacing:** target **140–165 wpm**.
+- **Discovery:** counts **real questions** only. Tag questions and fragments don't count, and open questions are weighted more.
+- **Objections:** count as handled when a coach card responded to them.
+- **The outcome follows one path at a time.**
+- **The summary** lists **specific moments to fix**, with timestamps (missed consequence questions, skipped budget checks).
+
 ### Landing the plane
 
-Every call should end with one outcome. The **Landing the plane** panel tracks it live:
+Every call should end with one outcome. The **Landing the plane** panel is **hidden until you click ✈ Land the plane**. The coach only suggests it after about **3 minutes off the sale** (rapport doesn't count). It tracks the outcome in the background either way, for the score and summary:
 
 | Path | What has to happen |
 |---|---|
@@ -123,8 +173,7 @@ Every call should end with one outcome. The **Landing the plane** panel tracks i
 How it works:
 - **Automatic ticks:** a background check reads the conversation and ticks items as they're actually agreed (details like "Thu 2pm · Google Meet" or "Also needs: his partner" appear under them). **Click any item** to tick or untick it yourself. Your choice wins.
 - **The coach steers toward the close.** Every suggested line knows what's still missing.
-- **10-minute nudge:** if no outcome is in progress by then, the coach suggests a transition (`landing.nudge_after_minutes`).
-- **"Before you hang up":** if you start saying goodbye ("talk soon", "thanks for your time") with something missing, the coach fires a card with the exact line to close the loop.
+- **"Before you hang up"** (Confirming stage): if you start saying goodbye ("talk soon", "thanks for your time") with something missing, the coach fires a card with the exact line to close the loop.
 - **✈ Land it** asks for the closing line any time.
 - **Saved with the call:** the outcome sets **Next-step clarity**, appears in `summary.md` with its checklist, and shows as a badge in **Past calls** (for example "✓ Demo set: Thu 2pm"). Missing steps lead the post-call summary's next steps.
 

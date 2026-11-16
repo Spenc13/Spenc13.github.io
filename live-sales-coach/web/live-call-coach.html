@@ -350,6 +350,40 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 .call-row .controls { gap: 12px; }
 .call-row .select { max-width: 260px; }
 .btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+/* v2: stage bar, statuses, notes */
+.stage-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 14px; }
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { background: none; border: 0; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg button.on { background: var(--accent-soft); color: var(--fg); }
+.seg button.auto-on { box-shadow: inset 0 0 0 1px rgba(124,140,255,0.45); color: var(--fg); }
+.stage-label { font-size: 12px; color: var(--muted); }
+.stage-row .grow { flex: 1; }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.switch input { accent-color: var(--accent); }
+.coach-status { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; min-height: 18px; }
+.coach-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s infinite; }
+.coach-status.paused { color: var(--warn); }
+.coach-status.paused .dot { background: var(--warn); animation: none; }
+.coach-feed-paused .coach-card { opacity: 0.5; }
+.checkins { font-size: 12px; color: var(--muted); margin: -2px 0 8px; }
+.land-suggest { background: rgba(245,196,81,0.10); border: 1px solid rgba(245,196,81,0.4); border-radius: 10px; padding: 8px 10px;
+  font-size: 12px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.line .asides { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.speaker.typed { background: rgba(56,217,169,0.14); color: var(--good); }
+.line.typed p { font-style: italic; }
+.note { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; border-left: 3px solid var(--accent); }
+.note.flagged { border-left-color: var(--warn); }
+.note .cite { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.note .why { font-size: 12px; color: var(--warn); margin-top: 4px; }
+.note .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.note textarea { width: 100%; min-height: 54px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 6px 8px; font: inherit; font-size: 13px; }
+.notes-input { display: flex; gap: 8px; margin-bottom: 10px; }
+.notes-input input { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--fg); font: inherit; font-size: 13px; }
+.notes-foot { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-top: 4px; }
+.moments { margin-top: 12px; }
+.moments h3 { margin: 0 0 8px; font-size: 13px; }
+.moment { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; }
+.moment b { color: var(--warn); font-weight: 600; }
 /* Landing the plane */
 .path { background: var(--panel-2); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; transition: opacity .2s; }
 .path.active { border-color: rgba(124,140,255,0.55); }
@@ -423,7 +457,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <div class="call-row">
     <label class="search" aria-label="Ask the coach a question">
       <span class="muted" aria-hidden="true">⌕</span>
-      <input id="ask" type="text" placeholder="Ask the coach: e.g. 'they said send me something'" autocomplete="off">
+      <input id="ask" type="text" placeholder="Type anything: what you said, what they said, what was missed, or a question" autocomplete="off">
       <span class="kbd" id="askHint">Enter</span>
     </label>
     <div class="controls">
@@ -436,6 +470,20 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <button id="endBtn" class="btn danger" hidden>End call</button>
     </div>
   </div>
+  <div class="stage-row">
+    <span class="stage-label">Stage</span>
+    <div class="seg" id="stageSeg" role="group" aria-label="Call stage">
+      <button type="button" data-stage="auto" class="on" title="Detect the stage from the conversation">Auto</button>
+      <button type="button" data-stage="discovery">Cold / Discovery</button>
+      <button type="button" data-stage="presenting">Presenting</button>
+      <button type="button" data-stage="confirming">Confirming</button>
+      <button type="button" data-stage="side">Side convo</button>
+    </div>
+    <span class="grow"></span>
+    <label class="switch" title="Turn coaching cards on or off. The transcript and scores keep running."><input type="checkbox" id="coachingOn" checked> Coaching on</label>
+    <label class="switch" title="On: a fresh line after every finished prospect turn. Off: only on objections and buying signals."><input type="checkbox" id="liveMode" checked> Every turn</label>
+    <button class="btn small" id="landToggle" type="button">✈ Land the plane</button>
+  </div>
 </header>
 
 <div class="healthbar" aria-live="polite">
@@ -445,7 +493,6 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <span class="pill idle" id="hotkeyPill">Hotkey: –</span>
   <span class="pill idle" id="dialerPill"><span class="dot"></span><span id="dialerText">Dialer: not linked</span></span>
   <span class="spacer"></span>
-  <label class="live-toggle" title="On: a fresh line to say after every prospect turn. Off: only on objections and buying signals."><input type="checkbox" id="liveMode" checked> Live coach</label>
   <label class="toggle"><input type="checkbox" id="onTop"> Stay on top</label>
 </div>
 
@@ -477,6 +524,9 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <h2 id="c-h">AI coaching</h2>
       <span class="tag">Live guidance</span>
     </div>
+    <div class="coach-status" id="coachStatus"></div>
+    <div class="land-suggest" id="landSuggest" hidden><span id="landSuggestText">Off the sale for a few minutes.</span><button class="btn small" type="button" id="landSuggestBtn">Land the plane</button></div>
+    <div class="checkins" id="checkins" hidden></div>
     <div id="coachFeed">
       <div class="coach-card" id="coachNow">
         <div class="q">Waiting for the call</div>
@@ -507,7 +557,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   </section>
 
   <!-- Landing the plane -->
-  <section class="card span-5" aria-labelledby="l-h">
+  <section class="card span-5" aria-labelledby="l-h" id="landCard" hidden>
     <div class="card-head">
       <h2 id="l-h">Landing the plane</h2>
       <span class="tag" id="landTag">No outcome yet</span>
@@ -517,7 +567,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   </section>
 
   <!-- Scoring -->
-  <section class="card span-7" aria-labelledby="s-h">
+  <section class="card span-12" aria-labelledby="s-h" id="scoreCard">
     <div class="card-head">
       <h2 id="s-h">Call scoring</h2>
       <span class="tag" id="scoreTag">Live score</span>
@@ -532,7 +582,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <section class="card span-5" aria-labelledby="r-h">
     <div class="card-head">
       <h2 id="r-h">Talk-to-listen ratio</h2>
-      <span class="muted" style="font-size:12px;">Target: 40–60% you</span>
+      <span class="muted" style="font-size:12px;" id="talkTarget">Target: 30–45% you</span>
     </div>
     <div class="ratio">
       <svg class="ring" viewBox="0 0 140 140" role="img" aria-label="Rep talk share">
@@ -561,7 +611,21 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   </section>
 
   <!-- Post call -->
-  <section class="card span-12" aria-labelledby="p-h">
+  <section class="card span-5" aria-labelledby="n-h">
+    <div class="card-head">
+      <h2 id="n-h">Coach notes</h2>
+      <span class="tag" id="notesTag">Saved after you approve</span>
+    </div>
+    <div class="notes-input">
+      <input id="noteInput" type="text" placeholder="How you sell, e.g. &quot;I never give pricing before budget&quot;" autocomplete="off">
+      <button class="btn small" id="noteAdd" type="button">Add</button>
+    </div>
+    <div id="notesPending" class="muted" style="font-size:12px;margin-bottom:8px;" hidden></div>
+    <div id="notesReview"><p class="muted" style="font-size:12px;margin:0;">After each call, the coach proposes notes from the transcript (with timestamps). Approve, edit, or reject each one. Only approved notes are saved and load into future calls.</p></div>
+    <div class="notes-foot"><span id="notesSaved">0 saved notes</span><button class="btn small" id="notesOpen" type="button">Open notes file</button></div>
+  </section>
+
+  <section class="card span-7" aria-labelledby="p-h">
     <div class="card-head">
       <h2 id="p-h">Post-call summary</h2>
       <div class="sum-actions">
@@ -577,6 +641,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <div class="sum miss"><h3>Missed opportunities</h3><ul id="miss"><li class="muted">Nothing yet.</li></ul></div>
       <div class="sum next"><h3>Next steps</h3><ul id="next"><li class="muted">Nothing yet.</li></ul></div>
     </div>
+    <div class="moments" id="moments" hidden><h3>Specific moments to fix</h3><div id="momentList"></div></div>
   </section>
 
 </main>
@@ -690,17 +755,32 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     var row = document.getElementById("line-" + m.id);
     var atBottom = tr.scrollHeight - tr.scrollTop - tr.clientHeight < 40;
     if (!row) {
-      row = el("div", "line flash");
+      row = el("div", "line flash" + (m.typed ? " typed" : ""));
       row.id = "line-" + m.id;
+      row.dataset.ts = String(m.ts == null ? 1e9 : m.ts);
       row.appendChild(el("time", null, m.t));
       var body = el("div");
-      body.appendChild(el("span", "speaker " + m.speaker, m.speaker === "rep" ? "Rep" : "Prospect"));
-      body.appendChild(el("p"));
+      body.appendChild(el("span", "speaker " + (m.typed ? "typed" : m.speaker),
+        m.typed ? "You (typed)" : (m.speaker === "rep" ? "Rep" : "Prospect")));
+      var para = el("p");
+      body.appendChild(para);
       row.appendChild(body);
-      tr.appendChild(row);
+      // Insert by audio time (the two streams can arrive out of order).
+      var ts = parseFloat(row.dataset.ts), next = null;
+      for (var i = tr.children.length - 1; i >= 0; i--) {
+        var c = tr.children[i];
+        if (!c.dataset || c.dataset.ts == null) continue;
+        if (parseFloat(c.dataset.ts) > ts) next = c; else break;
+      }
+      tr.insertBefore(row, next);
     }
     row.classList.toggle("partial", !m.final);
-    row.querySelector("p").textContent = m.text;
+    var p = row.querySelector("p");
+    p.textContent = m.text;
+    if (m.asides && m.asides.length) {
+      p.appendChild(el("span", "asides", m.asides.map(function (a) {
+        return (a.speaker === "rep" ? "Rep" : "Prospect") + ": " + a.text; }).join(" · ")));
+    }
     if (atBottom) tr.scrollTop = tr.scrollHeight;
   }
 
@@ -734,7 +814,28 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     box.appendChild(card);
   }
 
+  function setCoachStatus(text, paused) {
+    var st = $("coachStatus");
+    st.innerHTML = "";
+    st.className = "coach-status" + (paused ? " paused" : "");
+    if (text) { st.appendChild(el("span", "dot")); st.appendChild(el("span", null, text)); }
+    $("coachFeed").classList.toggle("coach-feed-paused", !!paused);
+  }
+  var currentQ = null;
+
   function onCoach(c) {
+    if (c.state === "listening") { if (!coachPaused) setCoachStatus("Listening\u2026"); return; }
+    if (c.state === "paused") { coachPaused = true; setCoachStatus(c.reason || "Coaching paused", true); return; }
+    if (c.state === "resumed") { coachPaused = false; setCoachStatus(""); return; }
+    if (c.state === "streaming" || c.state === "done") {
+      if (!coachPaused) setCoachStatus("");
+      if (c.state === "streaming" && c.question !== currentQ && lastCard && lastCard.say) {
+        var h = $("coachHistory");
+        h.insertBefore(el("div", "old", lastCard.say), h.firstChild);
+        while (h.children.length > 3) h.lastChild.remove();
+      }
+      currentQ = c.question;
+    }
     if (c.state === "used") {
       var cur = document.querySelector("#coachFeed .coach-card");
       if (cur && !cur.classList.contains("used")) {
@@ -744,7 +845,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       }
       return;
     }
-    if (c.state === "thinking" && lastCard && lastCard.say) {
+    if (c.state === "thinking" && false) {
       var hist = $("coachHistory");
       var old = el("div", "old", lastCard.say);
       hist.insertBefore(old, hist.firstChild);
@@ -818,6 +919,11 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   function fmtSecs(n) { n = Math.max(0, Math.round(n || 0)); return Math.floor(n / 60) + ":" + ("0" + (n % 60)).slice(-2); }
 
   function onMetrics(m) {
+    if (m.talk_target) $("talkTarget").textContent = "Target: " + m.talk_target[0] + "\u2013" + m.talk_target[1] + "% you";
+    if (currentStage === "presenting") {
+      $("checkins").hidden = false;
+      $("checkins").textContent = "Check-ins this presentation: " + (m.checkins || 0) + " / " + (m.checkin_target || 25);
+    } else { $("checkins").hidden = true; }
     var rep = m.rep_share_pct, pros = m.prospect_share_pct;
     $("repPct").textContent = rep == null ? "0%" : rep + "%";
     $("prosPct").textContent = pros == null ? "0%" : pros + "%";
@@ -903,6 +1009,16 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     fillList("wins", sum.key_wins);
     fillList("miss", sum.missed_opportunities);
     fillList("next", sum.next_steps);
+    var mlist = $("momentList");
+    mlist.innerHTML = "";
+    (sum.missed_moments || []).forEach(function (m) {
+      var d = el("div", "moment");
+      d.appendChild(el("b", null, "[" + String(m.time || "").replace(/[\[\]]/g, "") + "] " + (m.missed || "")));
+      d.appendChild(el("div", null, "\u201c" + (m.quote || "") + "\u201d"));
+      d.appendChild(el("div", "muted", "Try: \u201c" + (m.better_line || "") + "\u201d"));
+      mlist.appendChild(d);
+    });
+    $("moments").hidden = !(sum.missed_moments || []).length;
   }
 
   // ---------------------------------------------------------------- reset
@@ -931,6 +1047,12 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Nothing yet.")); });
     $("sumMeta").textContent = "Generated when you end the call";
     renderClosing(null);
+    showLand(false);
+    $("landSuggest").hidden = true;
+    coachPaused = false; setCoachStatus("");
+    $("moments").hidden = true;
+    onStage({ stage: "discovery", pinned: null, label: "Cold / Discovery" });
+    $("coachingOn").checked = true;
     $("sumOpen").hidden = true;
     $("sumCopy").hidden = true;
     $("sumKeep").hidden = true;
@@ -996,6 +1118,12 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         break;
       case "audio_devices": renderAudioPick(d); break;
       case "closing": renderClosing(d); break;
+      case "stage": onStage(d); break;
+      case "land_suggest": onLandSuggest(d); break;
+      case "coach_notes": onPendingNotes(d); break;
+      case "notes_proposed": onNotesProposed(d); break;
+      case "notes_review": renderNotes(d.notes || [], d.saved_count); break;
+      case "glossary": toast("Confirmed names from HubSpot: " + Object.keys(d).map(function (k) { return k + ": " + d[k]; }).join(", ")); break;
       case "hotkey_start":
         if (callState !== "live" && callState !== "paused" && callState !== "ending" && callState !== "starting" && $("consent").hidden) $("startBtn").click();
         break;
@@ -1009,6 +1137,106 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       case "consent_mode": consentMode = d.mode === "dialer" ? "dialer" : "ask"; break;
       case "call_detail": renderCallDetail(d); break;
     }
+  }
+
+  // ---------------------------------------------------------------- v2: stage, landing, notes
+  var currentStage = "discovery", coachPaused = false;
+  function onStage(d) {
+    currentStage = d.stage;
+    Array.prototype.forEach.call($("stageSeg").children, function (b) {
+      var st = b.getAttribute("data-stage");
+      b.className = "";
+      if (d.pinned ? st === d.pinned : st === "auto") b.className = "on";
+      if (!d.pinned && st === d.stage) b.className = "auto-on";
+    });
+    var autoBtn = $("stageSeg").querySelector('[data-stage="auto"]');
+    autoBtn.textContent = d.pinned ? "Auto" : "Auto";
+  }
+  function showLand(on) {
+    $("landCard").hidden = !on;
+    $("scoreCard").className = "card " + (on ? "span-7" : "span-12");
+    $("landToggle").textContent = on ? "✈ Hide Land the plane" : "✈ Land the plane";
+  }
+  function onLandSuggest(d) {
+    $("landSuggestText").textContent = "Off the sale for about " + (d.minutes || 3) + " minutes. Land the plane?";
+    $("landSuggest").hidden = false;
+  }
+  function onPendingNotes(d) {
+    var n = (d.pending || []).length;
+    $("notesPending").hidden = !n;
+    $("notesPending").textContent = n + " note" + (n === 1 ? "" : "s") + " waiting. You'll approve them after the call.";
+  }
+  function onNotesProposed(d) {
+    if (d.state === "pending") {
+      $("notesReview").innerHTML = "";
+      $("notesReview").appendChild(el("p", "muted", "Proposing notes from the call…"));
+      return;
+    }
+    $("notesPending").hidden = true;
+    renderNotes(d.notes || [], null);
+  }
+  function renderNotes(notes, savedCount) {
+    var box = $("notesReview");
+    box.innerHTML = "";
+    if (savedCount != null) $("notesSaved").textContent = savedCount + " saved note" + (savedCount === 1 ? "" : "s");
+    notes = notes.filter(function (n) { return n.status !== "saved" && n.status !== "rejected"; });
+    $("notesTag").textContent = notes.length ? notes.length + " to review" : "Saved after you approve";
+    if (!notes.length) { box.appendChild(el("p", "muted", "Nothing to review.")); return; }
+    notes.forEach(function (n) {
+      var d = el("div", "note" + (n.flagged ? " flagged" : ""));
+      var text = el("div", null, n.text);
+      d.appendChild(text);
+      var cite = (n.source === "typed" ? "You typed" : "From the call") + (n.timestamp ? " at [" + n.timestamp + "]" : "") +
+        (n.quote ? " · “" + n.quote + "”" : "");
+      d.appendChild(el("div", "cite", cite));
+      if (n.flagged) d.appendChild(el("div", "why", "Conflicts with the transcript (the transcript wins): " + (n.reason || "")));
+      if (n.status === "checking") d.appendChild(el("div", "cite", "Checking against the transcript…"));
+      var acts = el("div", "acts");
+      var ap = el("button", "btn small primary", "Approve"); ap.type = "button"; ap.disabled = !!n.flagged || n.status === "checking";
+      var ed = el("button", "btn small", "Edit"); ed.type = "button";
+      var rj = el("button", "btn small", "Reject"); rj.type = "button";
+      ap.addEventListener("click", function () { send("note_decision", { id: n.id, action: "approve" }); });
+      rj.addEventListener("click", function () { send("note_decision", { id: n.id, action: "reject" }); });
+      ed.addEventListener("click", function () {
+        var ta = el("textarea"); ta.value = n.text;
+        d.replaceChild(ta, text);
+        ed.textContent = "Save edit";
+        ed.onclick = function () { send("note_decision", { id: n.id, action: "edit", text: ta.value }); };
+      });
+      acts.appendChild(ap); acts.appendChild(ed); acts.appendChild(rj);
+      d.appendChild(acts);
+      box.appendChild(d);
+    });
+  }
+  function wireV2() {
+    Array.prototype.forEach.call($("stageSeg").children, function (b) {
+      b.addEventListener("click", function () {
+        if (callState !== "live" && callState !== "paused") { toast("Start a call first."); return; }
+        send("set_stage", { stage: b.getAttribute("data-stage") });
+      });
+    });
+    $("coachingOn").addEventListener("change", function () {
+      if (callState !== "live" && callState !== "paused") { this.checked = true; return; }
+      send("coaching", { on: this.checked });
+    });
+    $("landToggle").addEventListener("click", function () {
+      var on = $("landCard").hidden;
+      showLand(on);
+      if (callState === "live" || callState === "paused") send("land_open", { on: on });
+    });
+    $("landSuggestBtn").addEventListener("click", function () {
+      $("landSuggest").hidden = true; showLand(true); send("land_open", { on: true });
+    });
+    function addNote() {
+      var v = $("noteInput").value.trim();
+      if (!v) return;
+      $("noteInput").value = "";
+      send("coach_note", { text: v });
+    }
+    $("noteAdd").addEventListener("click", addNote);
+    $("noteInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addNote(); });
+    $("notesOpen").addEventListener("click", function () { send("open_style_file"); });
+    showLand(false);
   }
 
   // ---------------------------------------------------------------- landing the plane
@@ -1342,6 +1570,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   buildBars();
   renderSuggestions();
   renderClosing(null);
+  wireV2();
   $("landBtn").addEventListener("click", function () {
     if (callState !== "live" && callState !== "paused") { toast("Start a call first."); return; }
     send("land_now");

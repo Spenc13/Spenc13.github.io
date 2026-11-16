@@ -9,6 +9,7 @@ Pipeline (the same for live audio, WAV replay, and text replay):
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -23,6 +24,9 @@ from .config import Prompts, get, keys_status
 from .engine import LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, parse_coach, said_it
 from .metrics import Metrics
 from .callfilter import judge
+from .notes import load_style, new_proposal
+from .stage import LABELS as STAGE_LABELS, STAGE_HINT, StageState
+from .turns import is_backchannel, is_checkin, is_complete
 from .closing import CLOSE_HINT, WRAP_UP, CloseState
 from .storage import CallStore
 from .stt import make_stream
@@ -91,6 +95,17 @@ class CallSession:
         self.land_after = float(get(cfg, "landing.nudge_after_minutes", 10))
         self.land_renudge = float(get(cfg, "landing.renudge_minutes", 5))
         self.tracker_delay = float(get(cfg, "landing.tracker_delay_seconds", 4))
+        # v2: call stage, typed ground truth, coach notes, glossary
+        self.stage_state = StageState()
+        self.check_every = float(get(cfg, "stage.check_every_seconds", 20))
+        self.land_derail = float(get(cfg, "landing.derail_minutes", 3)) * 60
+        self._land_suggested_for: float | None = None
+        self.coaching_on = True
+        self.land_open = False                     # Spencer opened the Land the plane panel
+        self.typed_notes: list[dict] = []          # ground truth typed during the call
+        self.coach_notes: list[dict] = []          # standing-rule notes typed during the call (saved after)
+        self.glossary: dict = dict(self.call_info.get("glossary") or {})
+        self._last_card_text = ""
         self._last_land_nudge = -1e9            # call seconds
         self._last_wrap_guard = -1e9
         self._tracker_task: asyncio.Task | None = None
@@ -162,6 +177,8 @@ class CallSession:
     # ------------------------------------------------------------ lifecycle
     async def start(self) -> None:
         self.started_at = datetime.now()
+        self.engine.style_notes = load_style(self.cfg)       # approved notes, loaded fresh each call
+        self.proposed_notes: list[dict] = []
         self.store = CallStore(get(self.cfg, "storage.calls_dir", "calls"), self.started_at)
         self.running = True
         self.paused = False
@@ -203,7 +220,8 @@ class CallSession:
             self._set_health("stt", "connecting", "Connecting to Deepgram")
             self._tasks.append(asyncio.create_task(self._run_replay()))
         else:
-            who = self.call_info.get("contact") or self.call_info.get("phone")
+            who = (self.call_info.get("contact") or (self.call_info.get("glossary") or {}).get("Prospect")
+                   or self.call_info.get("phone"))
             if self.call_info.get("source") == "meet":
                 self.title = f"Meet: {who or self.call_info.get('callId') or 'Google Meet'}"
             else:
@@ -220,6 +238,9 @@ class CallSession:
         audio_cfg = self.cfg.get("audio") or {}
         stt_cfg = dict(self.cfg.get("stt") or {})
         provider = stt_cfg.pop("provider", "deepgram")
+        extra_terms = [v for k, v in self.glossary.items() if v and k in ("Prospect", "Company")]
+        if extra_terms:      # help speech-to-text spell the confirmed names
+            stt_cfg["keyterms"] = list(stt_cfg.get("keyterms") or []) + extra_terms
         self._set_health("stt", "connecting", "Connecting to speech-to-text")
 
         follow = (_backend(audio_cfg.get("backend", "auto")) == "wasapi"
@@ -361,6 +382,9 @@ class CallSession:
         before = (self.closing.outcome_label(), self.closing.complete())
         self.closing.apply_tracker(res)
         self._closing_changed(*before)
+        old, new = self.stage_state.apply(res, self.elapsed())
+        self._emit_stage()
+        self._stage_changed(old, new)
 
     async def land_now(self, auto: bool = False) -> None:
         """Ask the coach for the line that lands the plane from here."""
@@ -385,6 +409,8 @@ class CallSession:
         c = self.closing
         if c.complete() or el - self._last_wrap_guard < 45 or el < 30:
             return
+        if self.stage() != "confirming" and not self.land_open:
+            return                                   # scheduling prompts only while confirming
         self._last_wrap_guard = el
         missing = c.missing()
         await self.request_coach(CoachRequest(
@@ -404,6 +430,97 @@ class CallSession:
         return (f"Note: coaching started about {fmt_clock(self.joined_after)} into the call, so the beginning "
                 "(intro, rapport, and any early discovery) was not transcribed. Don't treat anything missing "
                 "from that part as a mistake, and don't assume it didn't happen.")
+
+    # ------------------------------------------------------------ v2 controls
+    def stage(self) -> str:
+        return self.stage_state.effective_for(self.elapsed())
+
+    def _emit_stage(self) -> None:
+        st = self.stage()
+        self.emit("stage", {"stage": st, "label": STAGE_LABELS[st], "pinned": self.stage_state.pinned,
+                            "auto": self.stage_state.auto, "mode": self.stage_state.mode})
+
+    def set_stage(self, stage: str | None) -> None:
+        """Header override: pin a stage, or None for automatic."""
+        before = self.stage()
+        self.stage_state.pin(stage)
+        self._emit_stage()
+        self._stage_changed(before, self.stage())
+
+    def _stage_changed(self, old: str, new: str) -> None:
+        if old == new:
+            return
+        if new == "side":
+            self.emit("coach", {"state": "paused", "reason": "Side conversation: coaching paused"})
+            if self._turn_timer and not self._turn_timer.done():
+                self._turn_timer.cancel()
+        elif old == "side":
+            self.emit("coach", {"state": "resumed"})
+
+    def set_coaching(self, on: bool) -> None:
+        self.coaching_on = bool(on)
+        self.emit("coach", {"state": "resumed"} if on else {"state": "paused", "reason": "Coaching off"})
+
+    def set_land_open(self, on: bool) -> None:
+        self.land_open = bool(on)
+
+    def set_glossary(self, g: dict) -> None:
+        self.glossary.update({k: v for k, v in (g or {}).items() if v})
+        self.emit("glossary", self.glossary)
+
+    async def add_typed(self, text: str) -> None:
+        """Spencer typed something during the call: ground truth. Logged to the
+        transcript with its own label and used by the coach immediately."""
+        text = text.strip()
+        if not text:
+            return
+        t = self.elapsed()
+        u = Utterance(REP, text, t, 0.0, True, time.monotonic(), typed=True)
+        self.transcript.add(u)
+        self.typed_notes.append({"t": fmt_clock(t), "text": text})
+        self._emit_line(u)
+        self.debouncer.note_manual(t)
+        self._schedule_tracker(delay=0)
+        await self.request_coach(CoachRequest(
+            reason="ask", question=text if len(text) <= 70 else text[:68] + "\u2026",
+            prompt=(f'Spencer typed this (ground truth; it overrides the transcript): "{text}"\n'
+                    "If it's a question, answer it. If it's what he or the prospect said, a fact, or something the "
+                    "transcript missed, use it now and give him the best next line.")))
+
+    def add_coach_note(self, text: str) -> None:
+        """A standing-rule note ("I never give pricing before budget"). Not saved during
+        the call; it's proposed for approval after the call."""
+        text = text.strip()
+        if text:
+            self.coach_notes.append({"t": fmt_clock(self.elapsed()), "text": text})
+            self.emit("coach_notes", {"pending": self.coach_notes})
+
+    def _context_block(self, reason: str) -> str:
+        """Stage focus, confirmed names, typed ground truth, what's covered, last card."""
+        el = self.elapsed()
+        st = self.stage()
+        parts = [self.stage_state.guidance(el, self.metrics.checkins, 25)]
+        if st == "confirming" or self.land_open or reason in ("land", "wrap_guard"):
+            parts.append(self.closing.status_text(el / 60, 1e9))
+        names = {k: v for k, v in self.glossary.items() if v}
+        if names:
+            parts.append("Confirmed names and terms (from HubSpot or typed by Spencer): " +
+                         "; ".join(f"{k}: {v}" for k, v in names.items()) +
+                         ". Use ONLY these names. Names heard in the transcript may be misheard; don't use a name "
+                         "that isn't confirmed here.")
+        else:
+            parts.append("No confirmed prospect name yet: don't address the prospect by a name heard in the "
+                         "transcript (it may be misheard).")
+        if self.typed_notes:
+            parts.append("Spencer typed during the call (ground truth, overrides the transcript):\n" +
+                         "\n".join(f"[{n['t']}] {n['text']}" for n in self.typed_notes[-8:]))
+        rep_turns = [u for u in self.transcript.finals if u.speaker == REP and not u.typed][-5:]
+        if rep_turns:
+            parts.append("Already covered by Spencer (his last turns). Don't repeat these points or ask for "
+                         "something he already asked or did:\n" + "\n".join(u.line() for u in rep_turns))
+        if self._last_card_text:
+            parts.append(f'Your last card to Spencer was: "{self._last_card_text}". Don\'t repeat it; build on it.')
+        return "\n\n".join(parts)
 
     def set_echo_filter(self, on: bool) -> None:
         self.echo_filter = bool(on)
@@ -498,6 +615,8 @@ class CallSession:
             self.discarded_reason = verdict.reason
             self.emit("summary", {"state": "discarded", "reason": verdict.reason, "meta": meta})
             self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode})
+            if self.coach_notes:
+                await self._propose_notes(None)
             self._ended.set()
             return
         await self._save()
@@ -536,16 +655,47 @@ class CallSession:
         final_dir = self.store.finalize(keep=True)
         self.emit("summary", {"state": "done" if summary else "error", "summary": summary, "error": err,
                               "meta": meta, "dir": str(final_dir), "name": final_dir.name})
+        await self._propose_notes(final_dir)
+
+    async def _propose_notes(self, call_dir) -> None:
+        """After the call only: propose selling-note updates for Spencer to approve."""
+        name = call_dir.name if call_dir else None
+        notes: list[dict] = []
+        if call_dir is not None and self.engine.client is not None and self.transcript.finals:
+            self.emit("notes_proposed", {"state": "pending"})
+            try:
+                raw = await self.engine.propose_notes(self.transcript.text(), self.coach_notes,
+                                                      self.engine.style_notes)
+                notes = [new_proposal(n, name) for n in raw if str(n.get("text", "")).strip()]
+            except Exception as e:
+                log.info("note proposals skipped: %s", type(e).__name__)
+        if not notes and self.coach_notes:
+            # No transcript check possible: offer Spencer's typed rules as they are.
+            notes = [new_proposal({"text": n["text"], "source": "typed", "timestamp": n["t"]}, name)
+                     for n in self.coach_notes]
+        if call_dir is not None and notes:
+            try:
+                (call_dir / "notes-proposed.json").write_text(json.dumps(notes, indent=2), encoding="utf-8")
+            except OSError:
+                pass
+        self.proposed_notes = notes
+        self.emit("notes_proposed", {"state": "done", "notes": notes, "call": name})
 
     async def wait_ended(self) -> None:
         await self._ended.wait()
 
     # ------------------------------------------------------------ transcript
+    def _emit_line(self, u: Utterance, replaces: str | None = None, final: bool = True) -> None:
+        d = {"id": u.id, "speaker": u.speaker, "text": u.text, "t": fmt_clock(u.t), "ts": u.t,
+             "final": final, "asides": [{"speaker": s, "text": t} for s, t in u.asides], "typed": u.typed}
+        if replaces:
+            d["replaces"] = replaces
+        self.emit("line", d)
+
     def _close_turn(self, speaker: str) -> None:
         turn = self._open_turn.get(speaker)
         if turn is not None:
-            self.emit("line", {"id": turn.id, "speaker": speaker, "text": turn.text,
-                               "t": fmt_clock(turn.t), "final": True})
+            self._emit_line(turn)
         self._open_turn[speaker] = None
         self._partial[speaker] = ""
 
@@ -635,43 +785,66 @@ class CallSession:
                 return
         sp = ev.speaker
         other = PROSPECT if sp == REP else REP
-        if ev.final or ev.text:
+        bc = is_backchannel(ev.text)
+        if (ev.final or ev.text) and not bc:
             # The other speaker started talking: their open turn is done.
+            # ("mhmm" / "yeah" doesn't end anyone's turn.)
             if self._open_turn.get(other) is not None and not self._partial.get(other):
                 self._close_turn(other)
 
         turn = self._open_turn.get(sp)
         if not ev.final:
+            if bc and turn is None:
+                return                             # don't flash a line for "mhmm"
             if sp == PROSPECT and self._turn_timer and not self._turn_timer.done():
                 self._turn_timer.cancel()          # still talking: wait for the end of the turn
+            if sp == PROSPECT and not bc:
+                self.emit("coach", {"state": "listening"})
             self._partial[sp] = ev.text
             base = turn.text + " " if turn else ""
             line_id = turn.id if turn else f"p-{sp}"
+            ts = turn.t if turn else ev.start
             self.emit("line", {"id": line_id, "speaker": sp, "text": base + ev.text,
-                               "t": fmt_clock(turn.t if turn else ev.start), "final": False})
+                               "t": fmt_clock(ts), "ts": ts, "final": False})
             return
 
         received = time.monotonic()
         self._partial[sp] = ""
+        if bc:
+            # Backchannel: not a turn. Keep it as a small aside on the other speaker's line,
+            # so a "Yes." to a direct question isn't lost.
+            host = self._open_turn.get(other) or self.transcript.merge_target(other, ev.start + ev.duration, 30)
+            if turn is None:
+                self.emit("line_remove", {"id": f"p-{sp}"})
+            if host is not None:
+                host.asides.append((sp, ev.text.strip()))
+                self._emit_line(host)
+            self.metrics.backchannels += 1
+            return
+
         seg = Utterance(sp, ev.text, ev.start, ev.duration, True, ev.spoke_end_mono)
-        self.metrics.add_utterance(seg)
+        self.metrics.add_utterance(seg, stage=self.stage())
+        if turn is None:
+            turn = self.transcript.merge_target(sp, ev.start)   # continue the same speaker's turn
+            if turn is not None:
+                self._open_turn[sp] = turn
+                self.emit("line_remove", {"id": f"p-{sp}"})
         if turn is None:
             turn = Utterance(sp, ev.text, ev.start, ev.duration, True, ev.spoke_end_mono)
             self.transcript.add(turn)
             self._open_turn[sp] = turn
-            self.emit("line", {"id": turn.id, "speaker": sp, "text": turn.text, "t": fmt_clock(turn.t),
-                               "final": True, "replaces": f"p-{sp}"})
+            self._emit_line(turn, replaces=f"p-{sp}")
         else:
             turn.text = f"{turn.text} {ev.text}".strip()
             turn.duration = max(turn.duration, ev.start + ev.duration - turn.t)
             turn.spoke_end_mono = ev.spoke_end_mono
-            self.emit("line", {"id": turn.id, "speaker": sp, "text": turn.text, "t": fmt_clock(turn.t), "final": True})
+            self._emit_line(turn)
         live_turn = turn
         if ev.speech_final:
             self._close_turn(sp)
 
-        if CLOSE_HINT.search(ev.text):
-            self._schedule_tracker()
+        if CLOSE_HINT.search(ev.text) or STAGE_HINT.search(ev.text):
+            self._schedule_tracker(delay=min(self.tracker_delay, 2.0))
         if sp == REP and WRAP_UP.search(ev.text):
             await self._wrap_up_guard()
 
@@ -691,7 +864,12 @@ class CallSession:
             if self.live_mode:
                 if det and (self._turn_det is None or det.kind == OBJECTION):
                     self._turn_det = det
-                self._schedule_live(live_turn, 0 if ev.speech_final else self.live_turn_wait, received)
+                # Only on a finished prospect turn: a complete sentence at a pause, or
+                # ~1.5 s of silence. Never on fragments.
+                done_now = ev.speech_final and is_complete(live_turn.text)
+                self._schedule_live(live_turn, 0 if done_now else self.live_turn_wait, received)
+                if not done_now:
+                    self.emit("coach", {"state": "listening"})
             elif det:
                 if self.auto and self.debouncer.should_fire(det, ev.start + ev.duration):
                     kind_word = "buying signal" if det.kind == BUYING else det.kind.replace("_", " ")
@@ -716,7 +894,10 @@ class CallSession:
     async def _live_after(self, turn: Utterance, wait: float, received: float) -> None:
         if wait > 0:
             await asyncio.sleep(wait)
-        if not self.running or not self.live_mode:
+        if not self.running or not self.live_mode or not self.coaching_on:
+            return
+        if self.stage() == "side":
+            self.emit("coach", {"state": "paused", "reason": "Side conversation: coaching paused"})
             return
         text = turn.text.strip()
         det, self._turn_det = self._turn_det, None
@@ -743,12 +924,7 @@ class CallSession:
 
     # ------------------------------------------------------------ coaching
     async def ask(self, question: str) -> None:
-        question = question.strip()
-        if not question:
-            return
-        self.debouncer.note_manual(self.elapsed())
-        await self.request_coach(CoachRequest(
-            reason="ask", question=question, prompt=f"Spencer asks: {question}"))
+        await self.add_typed(question)
 
     async def hotkey(self) -> None:
         self.debouncer.note_manual(self.elapsed())
@@ -783,7 +959,12 @@ class CallSession:
         return text + (("\n" + partial) if partial else "")
 
     async def _run_coach(self, req: CoachRequest) -> None:
-        self.emit("coach", {"state": "thinking", "question": req.question, "reason": req.reason})
+        manual = req.reason in ("ask", "hotkey", "suggestion", "land")
+        if not self.coaching_on and not manual:
+            return
+        if manual:
+            # Live cards keep the previous card up until new text streams in.
+            self.emit("coach", {"state": "thinking", "question": req.question, "reason": req.reason})
         if self.engine.client is None:
             self.emit("coach", {"state": "error", "question": req.question,
                                 "error": "Coach offline: ANTHROPIC_API_KEY is not set. Transcript and scoring still run."})
@@ -791,14 +972,22 @@ class CallSession:
         summary = self._running_summary
         if self.joined_after:
             summary = (self.partial_note() + "\n" + summary).strip()
-        landing = self.closing.status_text(self.elapsed() / 60, self.land_after)
-        user = self.engine.build_user_message(summary, self._recent_transcript(), req.prompt, landing)
+        user = self.engine.build_user_message(summary, self._recent_transcript(), req.prompt,
+                                              self._context_block(req.reason))
         t0 = time.monotonic()
         anchor = req.spoke_end_mono or req.created_mono
         first_card: dict = {}
 
         def on_text(text: str) -> None:
+            # Wait until the "Say this next:" label and the first real characters are in,
+            # so a "(Listening)" / "(Side conversation)" status never flashes as a card.
+            low = text.lower()
+            if "say this next" not in low and len(text) < 80:
+                return
             parsed = parse_coach(text)
+            say = parsed["say"].lstrip()
+            if not say or say.startswith("("):
+                return
             if parsed["say"] and "latency" not in first_card:
                 first_card["latency"] = time.monotonic() - anchor
             self.emit("coach", {"state": "streaming", "question": req.question, **parsed,
@@ -827,8 +1016,23 @@ class CallSession:
         parsed = parse_coach(result["text"])
         if result.get("stop_reason") == "refusal":
             parsed = {"say": "(The coach declined this one. Ask again in different words.)", "tactic": "", "watch": ""}
+        say = parsed.get("say", "")
+        if say.startswith("(") and result.get("stop_reason") != "refusal":
+            # Not a card: show a small status instead of "stay quiet".
+            if "side" in say.lower():
+                self.stage_state.quick_side(self.elapsed())
+                self._emit_stage()
+                self.emit("coach", {"state": "paused", "reason": "Side conversation: coaching paused"})
+            else:
+                self.emit("coach", {"state": "listening"})
+            return
+        det = req.detection or {}
+        if det.get("kind") == OBJECTION and det.get("key"):
+            self.metrics.mark_card_for_objection(det["key"], self.elapsed())
+        self._last_card_text = say
         latency_first = first_card.get("latency", done - anchor)
         record = {
+            "stage": self.stage(),
             "reason": req.reason,
             "question": req.question,
             "detection": req.detection,
@@ -916,13 +1120,15 @@ class CallSession:
             self.emit("timer", {"elapsed": fmt_clock(el)})
             if int(el) % 5 == 0:
                 self.emit("metrics", self.metrics.snapshot())
-            if el >= 120 and time.monotonic() - self._last_tracker_mono >= 90:
+            if el >= 15 and time.monotonic() - self._last_tracker_mono >= self.check_every:
                 self._schedule_tracker(delay=0)
-            if (self.engine.client is not None and not self.paused
-                    and self.closing.active_path() == "none" and el >= self.land_after * 60
-                    and el - self._last_land_nudge >= self.land_renudge * 60):
-                self._last_land_nudge = el
-                await self.land_now(auto=True)
+            # Suggest landing the plane only after a sustained off-sale stretch
+            # (rapport doesn't count), once per stretch.
+            since = self.stage_state.side_since
+            if (since is not None and self._land_suggested_for != since
+                    and self.stage_state.off_sale_seconds(el) >= self.land_derail):
+                self._land_suggested_for = since
+                self.emit("land_suggest", {"minutes": round(self.stage_state.off_sale_seconds(el) / 60)})
             if (self.engine.client is not None and not self.paused
                     and time.monotonic() - self._last_summary_mono >= self.summary_every
                     and (self._summary_task is None or self._summary_task.done())):
