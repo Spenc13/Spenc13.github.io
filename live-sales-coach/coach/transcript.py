@@ -1,6 +1,7 @@
 """Transcript model shared by live STT, replay, metrics, and the coach."""
 from __future__ import annotations
 
+import bisect
 import itertools
 import time
 from dataclasses import dataclass, field, asdict
@@ -27,6 +28,9 @@ class Utterance:
     # time.monotonic() when the speaker stopped talking (for latency measurement)
     spoke_end_mono: float = field(default_factory=time.monotonic)
     id: int = field(default_factory=lambda: next(_ids))
+    # Backchannels from the other speaker during this turn: [(speaker, text)]
+    asides: list = field(default_factory=list)
+    typed: bool = False                  # Spencer typed this (ground truth)
 
     @property
     def words(self) -> int:
@@ -37,7 +41,9 @@ class Utterance:
         return self.t + self.duration
 
     def line(self) -> str:
-        return f"[{fmt_clock(self.t)}] {LABELS[self.speaker]}: {self.text}"
+        who = "Spencer (typed)" if self.typed else LABELS[self.speaker]
+        extra = "".join(f" [{LABELS[s]}: {t}]" for s, t in self.asides)
+        return f"[{fmt_clock(self.t)}] {who}: {self.text}{extra}"
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -50,7 +56,20 @@ class Transcript:
         self.finals: list[Utterance] = []
 
     def add(self, utt: Utterance) -> None:
-        self.finals.append(utt)
+        """Insert in audio-time order (the two streams' results can arrive out of order)."""
+        keys = [u.t for u in self.finals]
+        self.finals.insert(bisect.bisect_right(keys, utt.t), utt)
+
+    def merge_target(self, speaker: str, start: float, max_gap: float = 12.0) -> Utterance | None:
+        """The turn a new segment continues: the same speaker's latest turn before it,
+        with no turn by the other speaker in between (typed notes don't count)."""
+        for u in reversed(self.finals):
+            if u.t > start or u.typed:
+                continue
+            if u.speaker != speaker:
+                return None
+            return u if start - u.end <= max_gap else None
+        return None
 
     def since(self, call_seconds: float) -> list[Utterance]:
         return [u for u in self.finals if u.end >= call_seconds]

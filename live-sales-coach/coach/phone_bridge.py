@@ -18,7 +18,7 @@ from typing import Callable
 
 log = logging.getLogger(__name__)
 
-EVENTS = {"hello", "ringing", "answered", "ended", "seen"}
+EVENTS = {"hello", "ringing", "answered", "ended", "seen", "context"}
 MAX_BODY = 4096
 
 
@@ -30,7 +30,7 @@ def clean_event(data: dict) -> dict | None:
     if ev not in EVENTS:
         return None
     out = {"event": ev}
-    for k in ("phone", "contact", "direction", "callId", "type", "source"):
+    for k in ("phone", "contact", "company", "direction", "callId", "type", "source"):
         v = data.get(k)
         if isinstance(v, (str, int)) and str(v).strip():
             out[k] = str(v).strip()[:120]

@@ -34,24 +34,37 @@ AGREE = re.compile(
     re.I,
 )
 
-TALK_TARGET = (40, 60)        # % of talk time for the rep
-WPM_TARGET = (140, 170)
+TALK_TARGET = (30, 45)        # % of talk time for the rep (the prospect should talk more)
+WPM_TARGET = (140, 165)
+CHECKIN_TARGET = 25           # checking-for-agreement questions per presentation (playbook)
 QUESTIONS_PER_5_MIN = 4.0
 WORDS_PER_SECOND_EST = 2.7    # used only if STT gave no duration
 
 
 def count_questions(text: str) -> tuple[int, int]:
-    """Return (questions, open_questions) in one rep utterance."""
+    """Return (real questions, open questions) in one rep utterance.
+
+    Real = an actual question of 4+ words. Tag questions ("right?", "make sense?",
+    "you know?") and fragments don't count."""
+    from .turns import is_checkin
+
     sentences = [s.strip() for s in re.split(r"(?<=[.?!])\s+", text) if s.strip()]
     has_punct = any(s[-1] in ".?!" for s in sentences)
     q = o = 0
     for s in sentences:
         is_q = s.endswith("?") if has_punct else bool(QUESTION_START.match(s))
-        if is_q:
-            q += 1
-            if OPEN_START.match(s):
-                o += 1
+        if not is_q or len(s.split()) < 4 or is_checkin(s):
+            continue
+        q += 1
+        if OPEN_START.match(s):
+            o += 1
     return q, o
+
+
+def count_checkins(text: str) -> int:
+    from .turns import is_checkin
+
+    return sum(1 for s in re.split(r"(?<=[.?!])\s+", text) if s.strip() and is_checkin(s))
 
 
 @dataclass
@@ -59,7 +72,8 @@ class ObjectionRecord:
     key: str
     label: str
     t: float
-    handled: bool | None = None   # None = waiting for Spencer's reply
+    handled: bool | None = None   # None = waiting
+    card: bool = False            # a coach card responded to it
 
 
 @dataclass
@@ -77,25 +91,36 @@ class Metrics:
     _next_step_t: float | None = None
     elapsed: float = 0.0
     partial_after: float = 0.0     # >0: coaching joined this many seconds into the call
+    backchannels: int = 0          # "mhmm", "yeah"... (not counted as talk)
+    checkins: int = 0              # checking-for-agreement questions while presenting
+    presenting_seconds: float = 0.0
+    cards_mark_handled: bool = True  # False when coaching is off (fall back to the rep's reply)
     close_score: int | None = None # next-step clarity from the landing-the-plane outcome
     close_recs: list = field(default_factory=list)
     outcome: dict | None = None
 
     # ---- updates -------------------------------------------------------
-    def add_utterance(self, u: Utterance) -> None:
+    def add_utterance(self, u: Utterance, stage: str = "discovery") -> None:
         dur = u.duration if u.duration > 0 else u.words / WORDS_PER_SECOND_EST
+        if stage == "presenting":
+            self.presenting_seconds += dur
         if u.speaker == REP:
             self.rep_seconds += dur
             self.rep_words += u.words
-            q, o = count_questions(u.text)
-            self.questions += q
-            self.open_questions += o
-            # An objection is "handled" if, within 30 seconds, Spencer asks a question
-            # (ask before you tell) or labels it (Voss). Otherwise tick() marks it missed.
-            engaged = q > 0 or bool(LABEL.search(u.text))
-            for ob in self.objections:
-                if ob.handled is None and -1 <= u.t - ob.t <= 30 and engaged:
-                    ob.handled = True
+            if stage == "presenting":
+                self.checkins += count_checkins(u.text)
+            else:
+                q, o = count_questions(u.text)
+                self.questions += q
+                self.open_questions += o
+            if not self.cards_mark_handled:
+                # Coaching off: an objection counts as handled if Spencer answered it with
+                # a question or a label within 30 seconds.
+                q_any, _ = count_questions(u.text)
+                engaged = q_any > 0 or bool(LABEL.search(u.text))
+                for ob in self.objections:
+                    if ob.handled is None and -1 <= u.t - ob.t <= 30 and engaged:
+                        ob.handled = True
             if NEXT_STEP.search(u.text) or (SPECIFIC_TIME.search(u.text) and MEETING.search(u.text)):
                 self.next_step_asked = True
                 self._next_step_t = u.end
@@ -110,6 +135,14 @@ class Metrics:
                 if SPECIFIC_TIME.search(u.text):
                     self.next_step_specific = True
         self.elapsed = max(self.elapsed, u.end)
+
+    def mark_card_for_objection(self, key: str, t: float) -> None:
+        """A coach card responded to an objection: that counts as handled."""
+        for ob in reversed(self.objections):
+            if ob.key == key and abs(t - ob.t) <= 30:
+                ob.card = True
+                ob.handled = True
+                return
 
     def add_objection(self, key: str, label: str, t: float) -> None:
         self.objections.append(ObjectionRecord(key, label, t))
@@ -139,15 +172,15 @@ class Metrics:
     def scores(self) -> dict[str, int | None]:
         s: dict[str, int | None] = {}
 
-        # Discovery: question rate vs. target, plus a bonus for open questions.
-        minutes = self.elapsed / 60
+        # Discovery: real-question rate (outside presenting) and how many are open.
+        minutes = max(0.0, self.elapsed - self.presenting_seconds) / 60
         if minutes < 1 and self.questions == 0:
             s["Discovery"] = None
         else:
             target = QUESTIONS_PER_5_MIN * max(minutes, 1) / 5
             rate = min(1.0, self.questions / target) if target else 1.0
             open_ratio = self.open_questions / self.questions if self.questions else 0
-            s["Discovery"] = round(80 * rate + 20 * open_ratio)
+            s["Discovery"] = round(50 * rate + 50 * open_ratio)
 
         # Listening: talk-to-listen ratio vs. the 40-60% band.
         share = self.rep_share
@@ -190,10 +223,11 @@ class Metrics:
         """Short raw values shown next to each bar."""
         judged = [o for o in self.objections if o.handled is not None]
         return {
-            "Discovery": f"{self.questions} Qs ({self.open_questions} open)",
-            "Listening": f"{self.rep_share}% you" if self.rep_share is not None else "",
-            "Objection handling": f"{sum(o.handled for o in judged)}/{len(self.objections)} met with a question or label" if self.objections else "0 objections",
-            "Pacing": f"{self.wpm} wpm" if self.wpm else "",
+            "Discovery": f"{self.questions} real questions ({self.open_questions} open)",
+            "Listening": (f"{self.rep_share}% you (target {TALK_TARGET[0]}\u2013{TALK_TARGET[1]}%)"
+                          if self.rep_share is not None else ""),
+            "Objection handling": f"{sum(o.handled for o in judged)}/{len(self.objections)} handled" if self.objections else "0 objections",
+            "Pacing": f"{self.wpm} wpm (target {WPM_TARGET[0]}\u2013{WPM_TARGET[1]})" if self.wpm else "",
             "Next-step clarity": (self.outcome or {}).get("outcome") if self.close_score is not None else (
                 "agreed" if self.next_step_agreed else "specific time" if self.next_step_specific
                 else "asked" if self.next_step_asked else "not asked yet"
@@ -221,10 +255,11 @@ class Metrics:
             recs.append(f"Pace is {w} wpm. Slow down and pause after key points.")
         elif w is not None and w < WPM_TARGET[0] - 20:
             recs.append(f"Pace is {w} wpm. Tighten it up a bit.")
-        if not self.next_step_asked and minutes >= 10:
-            recs.append("No next step yet. Propose a specific day and time.")
-        elif self.next_step_asked and not self.next_step_specific:
-            recs.append("Next step is vague. Put a day and time on it.")
+        if self.close_score is None:          # the outcome tracker covers next steps when it's active
+            if not self.next_step_asked and minutes >= 10:
+                recs.append("No next step yet. Propose a specific day and time.")
+            elif self.next_step_asked and not self.next_step_specific:
+                recs.append("Next step is vague. Put a day and time on it.")
         if not recs and self.elapsed > 0:
             recs.append("On track. Keep asking before you tell.")
         return recs[:5]
@@ -234,6 +269,11 @@ class Metrics:
             "elapsed_seconds": round(self.elapsed, 1),
             "partial_call": self.partial_after > 0,
             "joined_after_seconds": round(self.partial_after) if self.partial_after else None,
+            "backchannels": self.backchannels,
+            "checkins": self.checkins,
+            "checkin_target": CHECKIN_TARGET,
+            "talk_target": list(TALK_TARGET),
+            "wpm_target": list(WPM_TARGET),
             "outcome": self.outcome,
             "rep_talk_seconds": round(self.rep_seconds, 1),
             "prospect_talk_seconds": round(self.prospect_seconds, 1),

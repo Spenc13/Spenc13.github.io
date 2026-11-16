@@ -80,6 +80,13 @@ class CallStore:
                 lines.append(f"## {title}")
                 lines += [f"- {x}" for x in summary.get(key) or []] or ["- (none)"]
                 lines.append("")
+            moments = summary.get("missed_moments") or []
+            if moments:
+                lines.append("## Specific moments to fix")
+                for m in moments:
+                    lines.append(f"- [{str(m.get('time', '')).strip('[]')}] \u201c{m.get('quote', '')}\u201d: "
+                                 f"{m.get('missed', '')}. Try: \u201c{m.get('better_line', '')}\u201d")
+                lines.append("")
         else:
             lines.append(f"Summary unavailable: {error or 'unknown error'}")
         (self.dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")

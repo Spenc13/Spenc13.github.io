@@ -81,8 +81,10 @@ def test_debouncer():
 # ---------------------------------------------------------------- metrics
 def test_question_counting():
     assert count_questions("What got you looking? How long has that been going on?") == (2, 2)
-    assert count_questions("Is that right? Great.") == (1, 0)
+    assert count_questions("Is that right? Great.") == (0, 0)                 # tag question: not discovery
+    assert count_questions("Do you handle the marketing yourself? Right?") == (1, 0)
     assert count_questions("how are calls coming in right now") == (1, 1)   # no punctuation
+    assert count_questions("Make sense?") == (0, 0)
 
 
 def test_metrics_from_transcript():
@@ -91,6 +93,7 @@ def test_metrics_from_transcript():
     m.add_utterance(Utterance(PROSPECT, "The phone's not ringing like it used to and I'm worried about it.", 3, 5))
     m.add_objection("price", "Too expensive", 10)
     m.add_utterance(Utterance(REP, "What would one extra job a month be worth to you?", 12, 3))
+    m.mark_card_for_objection("price", 11)                 # a coach card responded
     m.add_utterance(Utterance(REP, "Let's book a follow-up call Thursday at 10am.", 40, 3))
     m.add_utterance(Utterance(PROSPECT, "Sure, that works.", 44, 1))
     s = m.snapshot()
@@ -117,8 +120,8 @@ def test_unanswered_objection_counts_against():
     assert m.scores()["Objection handling"] == 0
 
 
-def test_voss_label_counts_as_handled():
-    m = Metrics()
+def test_voss_label_counts_as_handled_when_coaching_is_off():
+    m = Metrics(cards_mark_handled=False)
     m.add_objection("burned", "Burned by a past agency", 5)
     m.add_utterance(Utterance(REP, "It sounds like you got burned before.", 8, 2))
     assert m.objections[0].handled is True
@@ -710,7 +713,12 @@ def test_close_state_rules():
     assert c.active_path() == "none" and c.score() is None and c.outcome_label() == "No outcome yet"
     assert "start landing the plane now" in c.status_text(11, 10)
     c.apply_tracker({"path": "set_demo", "demo_time_confirmed": True, "demo_when": "Thu 2pm",
-                     "demo_format": "google_meet", "decision_maker": "sole", "invite_accept_asked": True})
+                     "demo_format": "google_meet", "decision_maker": "others_needed",
+                     "decision_maker_note": "franchisor must approve all marketing, process unknown so far",
+                     "decision_maker_confirmed": False, "invite_accept_asked": True})
+    assert c.outcome_label() == "Setting the demo (1 of 3)"          # unconfirmed DM doesn't count
+    assert c.detail("decision_maker").endswith("(not confirmed yet)") and "\u2026" not in c.detail("decision_maker")[:5]
+    c.apply_tracker({"path": "set_demo", "decision_maker": "sole", "decision_maker_confirmed": True})
     assert c.outcome_label() == "Setting the demo (2 of 3)" and c.score() == 80
     assert c.missing() == ["ask them to give reasonable notice if they need to reschedule"]
     assert c.detail("demo_time") == "Thu 2pm · Google Meet"
@@ -738,11 +746,13 @@ class _CloseFakeMessages(_FakeMessages):
             res = {"path": "none", "demo_time_confirmed": False, "demo_when": "", "demo_format": "unknown",
                    "decision_maker": "unknown", "decision_maker_note": "", "invite_accept_asked": False,
                    "reschedule_notice_asked": False, "otf_link_sent": False, "followup_set": False,
-                   "followup_when": "", "not_interested": False}
+                   "followup_when": "", "not_interested": False, "decision_maker_confirmed": False,
+                   "stage": "discovery", "conversation_mode": "business", "meeting_agreed": False}
             if "Thursday at two works" in content:
-                res.update(path="set_demo", demo_time_confirmed=True, demo_when="Thu 2pm", demo_format="google_meet")
+                res.update(path="set_demo", demo_time_confirmed=True, demo_when="Thu 2pm", demo_format="google_meet",
+                           stage="confirming", meeting_agreed=True)
             if "It's just me" in content:
-                res.update(decision_maker="sole")
+                res.update(decision_maker="sole", decision_maker_confirmed=True)
             if "accept it" in content:
                 res.update(invite_accept_asked=True)
 
@@ -781,7 +791,11 @@ def test_landing_the_plane_end_to_end(tmp_path):
     assert not c.complete() and "reschedule" in c.missing()[0]
     # The coach got the landing status, and the goodbye triggered the guard.
     contents = [k["messages"][0]["content"] for k in s.engine.client.messages.calls]
-    assert any("Landing the plane:" in t and "Live coach mode" in t for t in contents)
+    live_prompts = [t for t in contents if "Live coach mode" in t]
+    assert "Landing the plane:" not in live_prompts[0]            # discovery: no scheduling prompts
+    assert "Call stage: Cold call / Discovery" in live_prompts[0]
+    assert any("Landing the plane:" in t and "Call stage: Confirming" in t for t in live_prompts)
+    assert any(k == "stage" and d["stage"] == "confirming" for k, d in events)
     assert any("starting to wrap up the call" in t and "reschedule" in t for t in contents)
     assert any(k == "closing" for k, _ in events)
     metrics = json.loads((Path(s.store.dir) / "metrics.json").read_text())
@@ -794,3 +808,239 @@ def test_landing_the_plane_end_to_end(tmp_path):
     assert "Not done before the call ended" in summary_req
     from coach.storage import list_calls
     assert list_calls(str(tmp_path))[0]["outcome"] == "Setting the demo (2 of 3)"
+
+
+def test_one_outcome_path_at_a_time():
+    from coach.closing import CloseState
+    c = CloseState()
+    c.apply_tracker({"path": "set_demo", "demo_time_confirmed": True, "followup_set": True,
+                     "followup_when": "Fri Dec 11", "otf_link_sent": False})
+    d = c.to_dict()
+    assert d["path"] == "set_demo" and d["items"]["demo_time"]["done"]
+    assert not d["items"]["followup"]["done"] and not d["items"]["otf"]["done"]   # other paths never show done
+    c.mark("otf", True)                                    # Spencer switches to OTF
+    assert c.active_path() == "otf" and not c.to_dict()["items"]["demo_time"]["done"]
+    c.mark("demo_time", True)                              # ...and back: the OTF tick is dropped
+    assert c.active_path() == "set_demo" and "otf" not in c.manual
+
+
+# ================================================================ v2 (11/16 review)
+def _ev(sp, text, start, dur=None, final=True, speech_final=True):
+    import time as _time
+    from coach.stt.base import SttEvent
+    d = dur if dur is not None else max(0.4, len(text.split()) / 2.7)
+    return SttEvent(sp, text, final, start, d, _time.monotonic(), speech_final)
+
+
+def _v2_session(events, live=False, **cfgset):
+    import time as _time
+    cfg = load_config()
+    cfg["coach"]["live_mode"] = live
+    cfg["live_coach"]["turn_end_wait_ms"] = 150
+    for k, v in cfgset.items():
+        a, b = k.split("__")
+        cfg[a][b] = v
+    s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text")
+    s.running = True
+    s._resume_mono = _time.monotonic()
+    s.engine.style_notes = ""
+    return s
+
+
+def test_backchannels_merging_and_audio_order():
+    events = []
+
+    async def run():
+        s = _v2_session(events)
+        await s.on_stt(_ev(REP, "So walk me through how calls come in right now.", 0.0))
+        await s.on_stt(_ev(PROSPECT, "Mhmm.", 2.0))                                   # backchannel
+        await s.on_stt(_ev(REP, "And who answers the phone when you're on a roof?", 4.0))  # same speaker: merges
+        await s.on_stt(_ev(PROSPECT, "Usually me, or my wife if I'm stuck on a job.", 7.0))
+        # A late-arriving rep line that was actually spoken before the prospect's line:
+        await s.on_stt(_ev(REP, "Got it, makes sense.", 6.0))
+        return s
+
+    s = asyncio.run(run())
+    finals = s.transcript.finals
+    assert [u.t for u in finals] == sorted(u.t for u in finals)                 # sorted by audio time
+    first = finals[0]
+    assert first.speaker == REP and "who answers the phone" in first.text       # merged across "mhmm"
+    assert first.asides == [(PROSPECT, "Mhmm.")]                                # backchannel kept as an aside
+    assert "[Prospect: Mhmm.]" in s.transcript.text()
+    assert s.metrics.backchannels == 1 and s.metrics.prospect_words == len(
+        "Usually me, or my wife if I'm stuck on a job.".split())                 # "Mhmm" isn't talk
+    assert not any(u.text == "Mhmm." for u in finals)
+
+
+def test_cards_only_after_a_finished_prospect_turn():
+    events = []
+
+    async def run():
+        s = _v2_session(events, live=True)
+        s.engine.client = _FakeClient(REPLY)
+        await s.on_stt(_ev(PROSPECT, "We tried an agency and", 0, speech_final=True))   # fragment
+        await asyncio.sleep(0.05)
+        n_after_fragment = len(s.engine.client.messages.calls)
+        await s.on_stt(_ev(PROSPECT, "it was a waste of money.", 2, speech_final=True))  # completes the turn
+        await asyncio.sleep(0.3)
+        await s.on_stt(_ev(PROSPECT, "Yeah.", 5))                                          # backchannel: never a card
+        await asyncio.sleep(0.3)
+        return s, n_after_fragment
+
+    s, n_frag = asyncio.run(run())
+    calls = s.engine.client.messages.calls
+    assert n_frag == 0
+    assert len(calls) == 1 and 'We tried an agency and it was a waste of money.' in calls[0]["messages"][0]["content"]
+    assert any(k == "coach" and d.get("state") == "listening" for k, d in events)
+
+
+def test_stay_quiet_reply_becomes_a_listening_status():
+    events = []
+    quiet = "Say this next: (Listening)\nTactic: wait\nWatch-out: let them finish"
+
+    async def run():
+        s = _v2_session(events, live=True)
+        s.engine.client = _FakeClient(quiet)
+        await s.on_stt(_ev(PROSPECT, "Honestly the phone has been really quiet this fall.", 0))
+        await asyncio.sleep(0.3)
+        return s
+
+    s = asyncio.run(run())
+    assert s._coaching_count == 0
+    assert not any(k == "coach" and d.get("state") in ("done", "streaming") for k, d in events)
+    assert any(k == "coach" and d.get("state") == "listening" for k, d in events)
+
+
+def test_typed_input_is_ground_truth_and_labeled():
+    events = []
+
+    async def run():
+        s = _v2_session(events)
+        s.engine.client = _FakeClient(REPLY)
+        await s.on_stt(_ev(PROSPECT, "Send me something and I'll look at it.", 0))
+        await s.ask("He said his partner Fred Terry signs off on marketing")
+        await asyncio.sleep(0.2)
+        return s
+
+    s = asyncio.run(run())
+    typed = [u for u in s.transcript.finals if u.typed]
+    assert typed and "Spencer (typed): He said his partner Fred Terry" in s.transcript.text()
+    content = s.engine.client.messages.calls[-1]["messages"][0]["content"]
+    assert "ground truth" in content and "Fred Terry signs off" in content
+    assert s.metrics.rep_words == 0                                              # typed text isn't talk time
+    assert any(k == "line" and d.get("typed") for k, d in events)
+
+
+def test_context_has_last_card_covered_lines_and_confirmed_names():
+    events = []
+    s = _v2_session(events)
+    s.glossary = {"Prospect": "Fred Terry", "Company": "Terry Roofing"}
+    s._last_card_text = "I'll send the Meet link now."
+    s.transcript.add(Utterance(REP, "I just sent you the Google Meet link.", 1, 2))
+    ctx = s._context_block("live")
+    assert "Prospect: Fred Terry" in ctx and "Use ONLY these names" in ctx
+    assert "Already covered by Spencer" in ctx and "sent you the Google Meet link" in ctx
+    assert "Your last card to Spencer was" in ctx
+    assert "Call stage: Cold call / Discovery" in ctx and "Landing the plane:" not in ctx
+    s.set_stage("confirming")
+    assert "Landing the plane:" in s._context_block("live")
+    s.set_stage("presenting")
+    assert "checking-for-agreement" in s._context_block("live") and "Landing the plane:" not in s._context_block("live")
+
+
+def test_side_conversation_pauses_then_resumes():
+    events = []
+
+    async def run():
+        s = _v2_session(events, live=True)
+        s.engine.client = _FakeClient(REPLY)
+        s.stage_state.apply({"stage": "side", "conversation_mode": "side"}, 60)
+        s._stage_changed("discovery", "side")
+        await s.on_stt(_ev(PROSPECT, "Hold on, the guy is backing into the tow hitch out here.", 61))
+        await asyncio.sleep(0.3)
+        n_side = len(s.engine.client.messages.calls)
+        old, new = s.stage_state.apply({"stage": "discovery", "conversation_mode": "business"}, 90)
+        s._stage_changed(old, new)
+        await s.on_stt(_ev(PROSPECT, "Okay sorry, so the roofing calls have dropped off a lot.", 91))
+        await asyncio.sleep(0.3)
+        return s, n_side
+
+    s, n_side = asyncio.run(run())
+    assert n_side == 0
+    assert len(s.engine.client.messages.calls) == 1
+    states = [d.get("state") for k, d in events if k == "coach"]
+    assert "paused" in states and "resumed" in states
+
+
+def test_land_the_plane_suggested_only_after_sustained_derail_not_rapport():
+    from coach.stage import StageState
+    st = StageState()
+    st.apply({"stage": "discovery", "conversation_mode": "rapport"}, 100)
+    assert st.off_sale_seconds(400) == 0                      # rapport is never derailment
+    st.apply({"stage": "side", "conversation_mode": "side"}, 400)
+    assert st.off_sale_seconds(500) == 100
+    assert st.off_sale_seconds(590) >= 180 - 10
+    st.apply({"stage": "discovery", "conversation_mode": "business"}, 600)
+    assert st.off_sale_seconds(700) == 0
+
+
+def test_stage_pin_overrides_detection():
+    from coach.stage import StageState
+    st = StageState()
+    st.apply({"stage": "presenting", "conversation_mode": "business"}, 10)
+    assert st.effective_for(10) == "presenting"
+    st.pin("confirming")
+    st.apply({"stage": "discovery"}, 20)
+    assert st.effective_for(20) == "confirming"
+    st.pin(None)
+    assert st.effective_for(20) == "discovery"
+
+
+def test_metrics_v2_formulas():
+    m = Metrics()
+    # 55% rep talk at 203 wpm, like the 11/16 call
+    m.add_utterance(Utterance(REP, " ".join(["word"] * 203), 0, 60))
+    m.add_utterance(Utterance(PROSPECT, " ".join(["word"] * 120), 60, 49))
+    sc = m.scores()
+    assert m.rep_share == 55 and sc["Listening"] == 100 - 3 * 10           # target 30-45%
+    assert sc["Pacing"] == 100 - 2 * (203 - 165)                          # target 140-165
+    assert "target 140–165" in m.details()["Pacing"]
+    p = Metrics()
+    p.add_utterance(Utterance(REP, "And this shows who called you, right? Does that make sense?", 0, 4), stage="presenting")
+    assert p.checkins == 2 and p.questions == 0                           # presenting check-ins aren't discovery
+
+
+def test_selling_notes_proposed_after_call_and_saved_only_when_approved(tmp_path):
+    from coach import notes as notes_mod
+    cfg = load_config()
+    cfg["notes"]["style_file"] = str(tmp_path / "style.md")
+    n = notes_mod.new_proposal({"text": "Quote price only after budget is known.", "source": "typed",
+                                "timestamp": "12:30", "quote": "", "conflicts_with_transcript": False}, "2026-11-16_13-15")
+    assert n["status"] == "proposed" and notes_mod.load_style(cfg) == ""     # nothing saved yet
+    notes_mod.save_note(cfg, n["text"], n["call"], n["timestamp"])
+    style = notes_mod.load_style(cfg)
+    assert "- Quote price only after budget is known." in style and "call 2026-11-16_13-15 at 12:30" in style
+    flagged = notes_mod.new_proposal({"text": "He agreed to $700.", "conflicts_with_transcript": True,
+                                      "conflict_reason": "He said $500 at [06:13]."}, None)
+    assert flagged["status"] == "flagged" and "06:13" in flagged["reason"]
+    # Approved notes load into the coach's context, separate from the playbook.
+    eng = CoachEngine(cfg, PROMPTS, api_key_present=False)
+    eng.style_notes = style
+    blocks = eng.system_blocks()
+    assert blocks[-1]["text"].startswith("# Spencer's selling notes") and "cache_control" in blocks[-1]
+    assert all("cache_control" not in b for b in blocks[:-1])
+
+
+def test_notes_are_not_saved_during_the_call(tmp_path):
+    cfg_notes = tmp_path / "style.md"
+    events = []
+
+    async def run():
+        s = _v2_session(events, notes__style_file=str(cfg_notes))
+        s.add_coach_note("I never give pricing before budget")
+        return s
+
+    s = asyncio.run(run())
+    assert not cfg_notes.exists()
+    assert s.coach_notes[0]["text"] == "I never give pricing before budget"
+    assert any(k == "coach_notes" for k, _ in events)

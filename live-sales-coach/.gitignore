@@ -12,6 +12,7 @@ calls/*
 prompts/*.md
 !prompts/README.md
 web/spencer.png
+spencer-selling-style.md
 
 # Python
 __pycache__/

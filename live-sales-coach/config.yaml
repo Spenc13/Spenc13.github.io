@@ -45,6 +45,9 @@ stt:
     - retargeting
     - Map Pack
     - LSA
+    - Gemini
+    - ChatGPT
+    - Grok
 
 coach:
   model: claude-sonnet-5-5   # current Sonnet. Any Messages API model id works.
@@ -63,16 +66,25 @@ coach:
   post_call_max_tokens: 8000
 
 landing:
-  # "Landing the plane": every call should end with an outcome (set the demo,
-  # go on-the-fly with a Meet link, or set a later date / not interested).
-  nudge_after_minutes: 10    # coach nudges you to land it if no outcome is in progress by then
-  renudge_minutes: 5         # and again this often
-  tracker_delay_seconds: 4   # after closing talk, wait this long before re-checking the outcome
+  # "Land the plane" is hidden until you click its button. The coach suggests it
+  # only after a sustained off-sale stretch (rapport doesn't count).
+  derail_minutes: 3
+  tracker_delay_seconds: 4   # after closing/stage talk, wait this long before re-checking
+
+stage:
+  # Call stage (Cold / Discovery, Presenting, Confirming, Side conversation) is
+  # detected from the conversation; pin it from the header with one click.
+  check_every_seconds: 20
+
+notes:
+  # Approved selling notes (after each call) are saved here and loaded into every
+  # call. Kept on this computer only (gitignored).
+  style_file: spencer-selling-style.md
 
 live_coach:
   min_prospect_words: 3      # skip "yeah", "mm-hmm" (unless it's a question or an objection)
   min_gap_seconds: 2         # at most one new line every 2 seconds
-  turn_end_wait_ms: 900      # if speech-to-text doesn't mark the end of a turn, wait this long
+  turn_end_wait_ms: 1500     # a turn is finished after this much silence (or a complete sentence)
 
 triggers:
   auto: true

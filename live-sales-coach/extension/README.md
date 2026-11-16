@@ -2,6 +2,8 @@
 
 A small companion extension that runs **alongside Olly Phone**, which it doesn't change or replace. It also watches **Google Meet**: when you join a meeting the coach pops up, and when you leave, coaching ends. It only checks whether Meet's in-call controls are on screen and reads the meeting name from the tab title.
 
+It also reads the **name and company** from the HubSpot contact record you're calling from, so the coach uses confirmed names (read-only).
+
 It tells the Live Sales Coach app on your computer when a HubSpot/Aloware call:
 
 - **rings:** the coach shows "Dialer: calling (512) 555-0123"

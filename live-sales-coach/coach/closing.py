@@ -45,10 +45,15 @@ TRACKER_SCHEMA = {
         "followup_set": {"type": "boolean"},
         "followup_when": {"type": "string"},
         "not_interested": {"type": "boolean"},
+        "decision_maker_confirmed": {"type": "boolean"},
+        "stage": {"type": "string", "enum": ["discovery", "presenting", "confirming", "side"]},
+        "conversation_mode": {"type": "string", "enum": ["business", "rapport", "side"]},
+        "meeting_agreed": {"type": "boolean"},
     },
     "required": ["path", "demo_time_confirmed", "demo_when", "demo_format", "decision_maker",
                  "decision_maker_note", "invite_accept_asked", "reschedule_notice_asked",
-                 "otf_link_sent", "followup_set", "followup_when", "not_interested"],
+                 "otf_link_sent", "followup_set", "followup_when", "not_interested",
+                 "decision_maker_confirmed", "stage", "conversation_mode", "meeting_agreed"],
     "additionalProperties": False,
 }
 
@@ -66,6 +71,18 @@ TRACKER_PROMPT = (
     "- otf_link_sent: they agreed to go now and Spencer is sending or has sent a Google Meet link.\n"
     "- followup_set: a later follow-up date/time was agreed (followup_when in short words, else \"\").\n"
     "- not_interested: the prospect clearly said they are not interested.\n"
+    "- decision_maker_confirmed: the decision-maker answer was actually stated by the prospect (not guessed); "
+    "if an outside approval (franchisor, partner, lender) is mentioned but who/how isn't settled, false.\n"
+    "- stage, judged from the LAST couple of minutes: discovery (cold call or discovery: questions about their "
+    "business, problems, budget); presenting (a demo or presentation has started: Spencer is showing a screen, "
+    "walking through a package, pricing, or examples); confirming (the prospect has agreed to a meeting and they "
+    "are settling the date, invite, decision maker, or approvals); side (talk unrelated to the sale and not "
+    "rapport: someone else in the room, a personal errand, a long unrelated tangent).\n"
+    "- conversation_mode, for the last minute: business (anything about their business, marketing, the offer, "
+    "or the appointment), rapport (friendly small talk that builds the relationship), or side (off-topic, not "
+    "rapport).\n"
+    "- meeting_agreed: the prospect has already agreed to a meeting or demo time.\n"
+    "Spencer's typed notes are ground truth and override the transcript.\n"
     "Be strict: only mark something true if it clearly happened."
 )
 
@@ -88,6 +105,15 @@ CLOSE_HINT = re.compile(
 )
 
 
+def _clip(text: str, n: int) -> str:
+    """Shorten at a word boundary with an ellipsis (no half words)."""
+    text = " ".join(text.split())
+    if len(text) <= n:
+        return text
+    cut = text[:n].rsplit(" ", 1)[0].rstrip(",;:-")
+    return cut + "\u2026"
+
+
 @dataclass
 class CloseState:
     path: str = "none"
@@ -102,13 +128,14 @@ class CloseState:
     followup: bool = False
     followup_when: str = ""
     not_interested: bool = False
+    dm_confirmed: bool = False               # the decision-maker answer was actually stated
     manual: dict = field(default_factory=dict)   # item key -> True/False set by Spencer
 
     # ---- item status -------------------------------------------------
     def auto_done(self, key: str) -> bool:
         return {
             "demo_time": self.demo_time,
-            "decision_maker": self.decision_maker in ("sole", "others_needed"),
+            "decision_maker": self.decision_maker in ("sole", "others_needed") and self.dm_confirmed,
             "invite": self.invite_accept and self.reschedule_notice,
             "otf": self.otf,
             "followup": self.followup,
@@ -116,6 +143,10 @@ class CloseState:
         }[key]
 
     def done(self, key: str) -> bool:
+        """Done on the ACTIVE path only: one path at a time, so items on other paths
+        never show as done (no "set the demo" and "later date" at once)."""
+        if ITEMS[key][0] != self.active_path():
+            return False
         return self.manual[key] if key in self.manual else self.auto_done(key)
 
     def detail(self, key: str) -> str:
@@ -126,7 +157,8 @@ class CloseState:
             if self.decision_maker == "sole":
                 return "Sole decision maker"
             if self.decision_maker == "others_needed":
-                return "Also needs: " + (self.decision_maker_note or "someone else")
+                text = "Also needs: " + (self.decision_maker_note or "someone else")
+                return text if self.dm_confirmed else text + " (not confirmed yet)"
             return ""
         if key == "invite":
             if self.invite_accept or self.reschedule_notice:
@@ -186,18 +218,20 @@ class CloseState:
             self.path = r["path"]
         self.demo_time = self.demo_time or bool(r.get("demo_time_confirmed"))
         if r.get("demo_when"):
-            self.demo_when = str(r["demo_when"])[:60]
+            self.demo_when = _clip(str(r["demo_when"]), 60)
         if r.get("demo_format") in ("phone", "google_meet"):
             self.demo_format = r["demo_format"]
         if r.get("decision_maker") in ("sole", "others_needed"):
             self.decision_maker = r["decision_maker"]
-            self.decision_maker_note = str(r.get("decision_maker_note") or "")[:80]
+            self.decision_maker_note = _clip(str(r.get("decision_maker_note") or ""), 90)
+        if "decision_maker_confirmed" in r:
+            self.dm_confirmed = self.dm_confirmed or bool(r.get("decision_maker_confirmed"))
         self.invite_accept = self.invite_accept or bool(r.get("invite_accept_asked"))
         self.reschedule_notice = self.reschedule_notice or bool(r.get("reschedule_notice_asked"))
         self.otf = self.otf or bool(r.get("otf_link_sent"))
         self.followup = self.followup or bool(r.get("followup_set"))
         if r.get("followup_when"):
-            self.followup_when = str(r["followup_when"])[:60]
+            self.followup_when = _clip(str(r["followup_when"]), 60)
         self.not_interested = self.not_interested or bool(r.get("not_interested"))
 
     def mark(self, key: str, value: bool | None) -> None:
@@ -206,8 +240,14 @@ class CloseState:
             return
         if value is None:
             self.manual.pop(key, None)
-        else:
-            self.manual[key] = bool(value)
+            return
+        if value:
+            # Ticking something on another path switches paths: drop ticks elsewhere.
+            path = ITEMS[key][0]
+            for k in [k for k in self.manual if ITEMS[k][0] != path]:
+                del self.manual[k]
+            self.path = path
+        self.manual[key] = bool(value)
 
     # ---- outputs ----------------------------------------------------------
     def outcome_label(self) -> str:

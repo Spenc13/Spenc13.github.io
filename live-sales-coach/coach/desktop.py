@@ -21,6 +21,7 @@ from .hotkey import GlobalHotkey, pretty
 from .replay import script_title
 from .runner import AsyncRunner
 from .session import CallSession
+from .notes import load_style, new_proposal, save_note, style_path
 from .phone_bridge import PhoneBridge
 from .storage import call_path, calls_root, list_calls, load_call
 
@@ -111,6 +112,8 @@ class MainWindow(QMainWindow):
         self.runner.submit(self._warm_up())
         self.calls_dir = get(cfg, "storage.calls_dir", "calls")
         self.pending_call: dict | None = None
+        self.glossary_candidate: dict | None = None      # names from the open HubSpot record
+        self.notes: dict[int, dict] = {}                 # proposed selling notes awaiting review
         self.phone_linked = False
         self.phone_bridge: PhoneBridge | None = None
         self.phone_event.connect(self.handle_phone, Qt.QueuedConnection)
@@ -286,6 +289,16 @@ class MainWindow(QMainWindow):
         if not self.phone_linked:
             self.phone_linked = True
             self.bridge.post("phone_link", {"connected": True})
+        if kind == "context":
+            # Pre-call glossary from the HubSpot record that's open: confirmed names.
+            g = {"Prospect": ev.get("contact"), "Company": ev.get("company")}
+            g = {k: v for k, v in g.items() if v}
+            if g:
+                self.glossary_candidate = {"names": g, "at": time.monotonic()}
+                self.bridge.post("glossary", g)
+                if busy:
+                    self.runner.call(self.session.set_glossary, g)
+            return
         info = {k: ev.get(k) for k in ("phone", "contact", "direction", "callId") if ev.get(k)}
         src = "meet" if ev.get("source") == "meet" else "dialer"
         info["source"] = src
@@ -333,6 +346,83 @@ class MainWindow(QMainWindow):
                 elif not active:
                     self.runner.submit(self.session.end())     # session started by hand
 
+    # ------------------------------------------------------------ selling notes
+    def _all_notes(self) -> dict[int, dict]:
+        notes = dict(self.notes)
+        for n in (getattr(self.session, "proposed_notes", None) or []):
+            notes.setdefault(n["id"], n)
+        return notes
+
+    def _post_notes(self) -> None:
+        pending = [n for n in self._all_notes().values() if n["status"] in ("proposed", "flagged", "checking")]
+        saved = len([l for l in load_style(self.cfg).splitlines() if l.startswith("- ")])
+        self.bridge.post("notes_review", {"notes": pending, "saved_count": saved})
+
+    def add_coach_note(self, text: str) -> None:
+        """Spencer typed a standing rule. During a call it waits until the call ends;
+        otherwise it goes straight to review. Nothing is saved without approval."""
+        text = text.strip()
+        if not text:
+            return
+        if self.session and self.session.running:
+            self.runner.call(self.session.add_coach_note, text)
+            self.bridge.post("toast", {"level": "info", "text": "Noted. You'll approve it after the call."})
+            return
+        n = new_proposal({"text": text, "source": "typed", "timestamp": time.strftime("%H:%M")},
+                         getattr(getattr(self.session, "store", None), "name", None) if self.session else None)
+        self.notes[n["id"]] = n
+        self._post_notes()
+
+    def _transcript_for(self, note: dict) -> str:
+        if self.session and getattr(self.session, "store", None) and note.get("call") == self.session.store.dir.name:
+            return self.session.transcript.text()
+        d = call_path(self.calls_dir, note.get("call") or "")
+        try:
+            return (d / "transcript.txt").read_text(encoding="utf-8") if d else ""
+        except OSError:
+            return ""
+
+    def decide_note(self, note_id: int, action: str, text) -> None:
+        notes = self._all_notes()
+        n = notes.get(note_id)
+        if n is None:
+            return
+        self.notes[note_id] = n
+        if action == "reject":
+            n["status"] = "rejected"
+        elif action == "approve":
+            if n["status"] == "flagged":
+                self.bridge.post("toast", {"level": "error", "text": "This note conflicts with the transcript "
+                                            "(the transcript wins). Edit it to match, then approve."})
+                return
+            save_note(self.cfg, n["text"], n.get("call"), n.get("timestamp"))
+            n["status"] = "saved"
+            self.bridge.post("toast", {"level": "info", "text": "Saved to your selling notes. It loads into every call."})
+        elif action == "edit" and isinstance(text, str) and text.strip():
+            n["text"] = text.strip()
+            engine = getattr(self.session, "engine", None)
+            transcript = self._transcript_for(n)
+            if engine is None or engine.client is None or not transcript:
+                n["status"], n["flagged"], n["reason"] = "proposed", False, ""
+            else:
+                n["status"] = "checking"
+                fut = self.runner.submit(engine.verify_note(n["text"], transcript))
+
+                def checked(f, n=n):
+                    try:
+                        r = f.result()
+                    except Exception:
+                        r = {}
+                    if r.get("conflicts_with_transcript"):
+                        n.update(status="flagged", flagged=True, reason=r.get("conflict_reason", ""),
+                                 timestamp=r.get("timestamp") or n.get("timestamp"), quote=r.get("quote") or n.get("quote"))
+                    else:
+                        n.update(status="proposed", flagged=False, reason="",
+                                 timestamp=r.get("timestamp") or n.get("timestamp"), quote=r.get("quote") or n.get("quote"))
+                    self._post_notes()
+                fut.add_done_callback(checked)
+        self._post_notes()
+
     # ------------------------------------------------------------ commands from JS
     def handle_command(self, msg: dict) -> None:
         cmd = msg.get("cmd")
@@ -353,6 +443,7 @@ class MainWindow(QMainWindow):
                 "default_mode": default_mode,
                 "keys": keys_status(),
                 "prompts_ok": self.prompts is not None,
+                "saved_notes": len([l for l in load_style(self.cfg).splitlines() if l.startswith("- ")]),
                 "consent_mode": self.consent_mode,
                 "meet_consent_mode": self.meet_consent_mode,
                 "live_mode": bool(get(self.cfg, "coach.live_mode", True)),
@@ -364,6 +455,7 @@ class MainWindow(QMainWindow):
                            "coach": {"state": "ok" if keys_status()["anthropic"] else "down",
                                      "message": "" if keys_status()["anthropic"] else "ANTHROPIC_API_KEY not set"}},
             })
+            self._post_notes()
         elif cmd == "pick_replay":
             path, _ = QFileDialog.getOpenFileName(self, "Choose a replay file", str(APP_DIR / "samples"),
                                                   "Call recordings or scripts (*.wav *.txt)")
@@ -410,6 +502,24 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "swap_speakers" and self.session and self.session.running:
             self.runner.call(self.session.swap_speakers)
+        elif cmd == "set_stage" and self.session and self.session.running:
+            v = msg.get("stage")
+            self.runner.call(self.session.set_stage, None if v in (None, "auto") else str(v))
+        elif cmd == "coaching" and self.session and self.session.running:
+            self.runner.call(self.session.set_coaching, bool(msg.get("on")))
+        elif cmd == "land_open" and self.session and self.session.running:
+            self.runner.call(self.session.set_land_open, bool(msg.get("on")))
+            if msg.get("on"):
+                self.runner.submit(self.session.land_now())
+        elif cmd == "coach_note":
+            self.add_coach_note(str(msg.get("text", "")))
+        elif cmd == "note_decision":
+            self.decide_note(int(msg.get("id", 0)), str(msg.get("action", "")), msg.get("text"))
+        elif cmd == "open_style_file":
+            p = style_path(self.cfg)
+            if not p.exists():
+                p.write_text("# Spencer's selling notes\n\n", encoding="utf-8")
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
         elif cmd == "close_mark" and self.session and self.session.running:
             v = msg.get("value")
             self.runner.call(self.session.mark_close, str(msg.get("key", "")), None if v is None else bool(v))
@@ -459,9 +569,16 @@ class MainWindow(QMainWindow):
         fresh = self.pending_call and time.monotonic() - self.pending_call.get("at", 0) < 2 * 3600
         if mode == "live" and fresh:
             info = {k: v for k, v in self.pending_call.items() if k not in ("state", "at")}
+        gc = self.glossary_candidate
+        if mode == "live" and gc and time.monotonic() - gc["at"] < 15 * 60:
+            info = {**(info or {}), "glossary": dict(gc["names"])}
         missed = 0.0
         if info and self.pending_call.get("state") == "answered":
             missed = time.monotonic() - self.pending_call.get("at", time.monotonic())
+
+        for n in (getattr(self.session, "proposed_notes", None) or []):
+            if n["status"] in ("proposed", "flagged", "checking"):
+                self.notes.setdefault(n["id"], n)
 
         async def create_and_start():
             # Built on the background thread so the window never freezes.

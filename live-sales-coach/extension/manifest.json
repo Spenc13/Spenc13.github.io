@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Olly Coach Bridge",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Tells the Live Sales Coach app on this computer when a HubSpot/Aloware call or a Google Meet starts and ends. Runs alongside Olly Phone.",
   "host_permissions": [
     "https://app.hubspot.com/*",
@@ -42,6 +42,16 @@
       ],
       "js": [
         "meet.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://app.hubspot.com/*"
+      ],
+      "js": [
+        "hubspot-context.js"
       ],
       "run_at": "document_idle",
       "all_frames": false

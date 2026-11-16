@@ -24,9 +24,12 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 LIVE_INSTRUCTION = (
     "Live coach mode: Spencer will read your \"Say this next\" line out loud, word for word, right now. "
     "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words, "
-    "responding directly to what the prospect just said and moving the call forward. "
-    "No stage directions or quotation marks. If the prospect is mid-thought and Spencer should stay quiet, "
-    "write: Say this next: (Stay quiet. Let them finish.) Keep Tactic and Watch-out to a few words each."
+    "responding directly to what the prospect just said and fitting the call stage above. "
+    "Don't repeat a point he already made or ask for something already covered. No stage directions or "
+    "quotation marks. If the prospect hasn't actually finished their thought, write exactly: "
+    "Say this next: (Listening) . If the latest talk is a side conversation unrelated to the sale (someone "
+    "else in the room, a personal errand, an unrelated tangent; not rapport), write exactly: "
+    "Say this next: (Side conversation) . Keep Tactic and Watch-out to a few words each."
 )
 
 FORMAT_REMINDER = (
@@ -107,6 +110,7 @@ class CoachEngine:
         self.use_fallback = bool(get(cfg, "coach.server_fallback", True))
         self.live_thinking = get(cfg, "coach.live_thinking", "between_tools")
         self.prompts = prompts
+        self.style_notes = ""          # approved selling notes (spencer-selling-style.md)
         self.client = None
         if api_key_present:
             from anthropic import AsyncAnthropic
@@ -115,15 +119,17 @@ class CoachEngine:
 
     # ---- request building ---------------------------------------------
     def system_blocks(self) -> list[dict]:
-        return [
+        blocks = [
             {"type": "text", "text": self.prompts.instructions},
             {"type": "text", "text": "# Playbook\n\n" + self.prompts.playbook},
-            {
-                "type": "text",
-                "text": "# Offer reference\n\n" + self.prompts.offer,
-                "cache_control": {"type": "ephemeral"},
-            },
+            {"type": "text", "text": "# Offer reference\n\n" + self.prompts.offer},
         ]
+        if self.style_notes.strip():
+            blocks.append({"type": "text", "text": (
+                "# Spencer's selling notes (approved by Spencer; standing rules about how he sells)\n\n"
+                + self.style_notes.strip())})
+        blocks[-1]["cache_control"] = {"type": "ephemeral"}     # caches the whole stable prefix
+        return blocks
 
     def _common(self, max_tokens: int, effort: str | None = None, thinking: str | None = None) -> dict:
         kw: dict = {
@@ -141,12 +147,12 @@ class CoachEngine:
         return kw
 
     @staticmethod
-    def build_user_message(summary: str, recent: str, ask: str, landing: str = "") -> str:
+    def build_user_message(summary: str, recent: str, ask: str, context: str = "") -> str:
         parts = []
         parts.append("Call summary so far:\n" + (summary.strip() or "(call just started)"))
         parts.append("Recent transcript:\n" + (recent.strip() or "(nothing transcribed yet)"))
-        if landing:
-            parts.append(landing.strip())
+        if context:
+            parts.append(context.strip())
         parts.append(ask.strip())
         parts.append(FORMAT_REMINDER)
         return "\n\n".join(parts)
@@ -262,15 +268,27 @@ class CoachEngine:
                                 note: str = "") -> dict:
         if self.client is None:
             raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        moment = {
+            "type": "object",
+            "properties": {
+                "time": {"type": "string"},
+                "quote": {"type": "string"},
+                "missed": {"type": "string"},
+                "better_line": {"type": "string"},
+            },
+            "required": ["time", "quote", "missed", "better_line"],
+            "additionalProperties": False,
+        }
         schema = {
             "type": "object",
             "properties": {
                 "overview": {"type": "string"},
                 "key_wins": {"type": "array", "items": {"type": "string"}},
                 "missed_opportunities": {"type": "array", "items": {"type": "string"}},
+                "missed_moments": {"type": "array", "items": moment},
                 "next_steps": {"type": "array", "items": {"type": "string"}},
             },
-            "required": ["overview", "key_wins", "missed_opportunities", "next_steps"],
+            "required": ["overview", "key_wins", "missed_opportunities", "missed_moments", "next_steps"],
             "additionalProperties": False,
         }
         kw = self._common(self.post_call_max_tokens, effort="medium")
@@ -284,7 +302,11 @@ class CoachEngine:
                 f"Coaching cards shown during the call: {coaching_count}\n\n"
                 f"Full transcript:\n{transcript or '(empty)'}\n\n"
                 "Return: a 2-sentence overview; 2 to 4 key wins; 2 to 4 missed opportunities "
-                "(cite the moment); and 2 to 4 concrete next steps for Spencer with this prospect. "
+                "(cite the moment); missed_moments: up to 5 specific lines from the transcript where Spencer "
+                "should have asked a consequence question or checked budget (or skipped another key step), each "
+                "with its [mm:ss] time, the exact quote, what he missed, and the better line to use; and 2 to 4 "
+                "concrete next steps for Spencer with this prospect. "
+                "Spencer's typed lines (labeled \"Spencer (typed)\") are ground truth. "
                 "Use only facts from the transcript, playbook, and offer reference. "
                 "Do not invent prices, terms, or guarantees."
             ),
@@ -296,4 +318,70 @@ class CoachEngine:
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            return {"overview": raw.strip(), "key_wins": [], "missed_opportunities": [], "next_steps": []}
+            return {"overview": raw.strip(), "key_wins": [], "missed_opportunities": [], "missed_moments": [],
+                    "next_steps": []}
+
+    # ---- selling notes (after the call) --------------------------------------
+    NOTE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "source": {"type": "string", "enum": ["transcript", "typed"]},
+            "timestamp": {"type": "string"},
+            "quote": {"type": "string"},
+            "conflicts_with_transcript": {"type": "boolean"},
+            "conflict_reason": {"type": "string"},
+        },
+        "required": ["text", "source", "timestamp", "quote", "conflicts_with_transcript", "conflict_reason"],
+        "additionalProperties": False,
+    }
+
+    async def propose_notes(self, transcript: str, typed_rules: list[dict], existing: str) -> list[dict]:
+        """Propose updates to Spencer's selling notes, each citing a transcript timestamp."""
+        if self.client is None:
+            raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        schema = {"type": "object", "properties": {"notes": {"type": "array", "items": self.NOTE_SCHEMA}},
+                  "required": ["notes"], "additionalProperties": False}
+        rules = "\n".join(f"[{r['t']}] {r['text']}" for r in typed_rules) or "(none)"
+        kw = self._common(4000, effort="medium")
+        kw["output_config"]["format"] = {"type": "json_schema", "schema": schema}
+        kw["messages"] = [{"role": "user", "content": (
+            "The call has ended. Propose updates to Spencer's selling notes: short standing notes about how he "
+            "sells (habits that worked, habits to change, phrases that landed, rules he states) that will help "
+            "coach him on future calls. Propose at most 5 from the transcript, plus every rule Spencer typed.\n"
+            "- Each note cites the transcript timestamp [mm:ss] it came from and a short exact quote. Typed rules "
+            "use source \"typed\" and the time he typed them.\n"
+            "- Check every note against the transcript. If the transcript contradicts it, set "
+            "conflicts_with_transcript true and say why: the transcript wins.\n"
+            "- Don't repeat anything already in his existing notes.\n\n"
+            f"Existing notes:\n{existing.strip() or '(none yet)'}\n\n"
+            f"Rules Spencer typed during the call:\n{rules}\n\n"
+            f"Transcript:\n{transcript or '(empty)'}"
+        )}]
+        msg = await self._create(kw)
+        try:
+            return list(json.loads(self._text_of(msg)).get("notes") or [])
+        except json.JSONDecodeError:
+            return []
+
+    async def verify_note(self, text: str, transcript: str) -> dict:
+        """Check an edited note against the transcript (the transcript wins)."""
+        if self.client is None:
+            raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        schema = {"type": "object", "properties": {
+            "conflicts_with_transcript": {"type": "boolean"}, "conflict_reason": {"type": "string"},
+            "timestamp": {"type": "string"}, "quote": {"type": "string"}},
+            "required": ["conflicts_with_transcript", "conflict_reason", "timestamp", "quote"],
+            "additionalProperties": False}
+        kw = self._common(1500, effort="low")
+        kw["output_config"]["format"] = {"type": "json_schema", "schema": schema}
+        kw["messages"] = [{"role": "user", "content": (
+            f"Spencer wants to save this selling note: \"{text}\"\n"
+            "Does the transcript contradict it? If yes, set conflicts_with_transcript true and explain. Give the "
+            "[mm:ss] timestamp and exact quote that best supports or contradicts it (\"\" if none).\n\n"
+            f"Transcript:\n{transcript or '(empty)'}")}]
+        msg = await self._create(kw)
+        try:
+            return json.loads(self._text_of(msg))
+        except json.JSONDecodeError:
+            return {"conflicts_with_transcript": False, "conflict_reason": "", "timestamp": "", "quote": ""}
