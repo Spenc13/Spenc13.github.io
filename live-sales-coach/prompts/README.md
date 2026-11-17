@@ -12,3 +12,5 @@ under these exact names:
 | `offer-reference.md` | Growth / Strategic / Elite pricing and terms (loaded as context) |
 
 The app won't start a call until all three are present.
+
+**Optional:** `discovery-questions.md` holds your own discovery questions, in your wording. It's a bank, not a script. During Cold / Discovery the coach picks whichever question fits the moment and hasn't been answered yet, fills in the [brackets] with what the prospect said, and makes sure the decision-maker check happens before the presentation. Edit it anytime; it reloads when you restart the app.

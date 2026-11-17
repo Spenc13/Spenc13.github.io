@@ -40,6 +40,7 @@ These files are **gitignored on purpose**. This repository is public (it hosts y
 | `prompts/coach-instructions.md` | coach-instructions.md (download as Markdown or plain text) |
 | `prompts/playbook-hormozi-miner-voss.md` | playbook-hormozi-miner-voss.md |
 | `prompts/offer-reference.md` | offer-reference.md |
+| `prompts/discovery-questions.md` (optional) | discovery-questions.md, your discovery question bank |
 | `web/spencer.png` | spencer.png |
 
 The coach instructions are sent **verbatim** as the system prompt: everything below the `-----` line, as the file itself says. The playbook and offer reference are sent as context with every request. If a prompt file is missing, the app tells you and won't start a call. If `spencer.png` is missing, the avatar shows your initials.
@@ -116,7 +117,7 @@ The coach works out which stage the call is in from the conversation: whether a 
 
 | Stage | What the coach focuses on |
 |---|---|
-| **Cold / Discovery** | NEPQ discovery questions with a blue-collar bent (what one job profits them, which jobs they want more of, what they spend on marketing now and where); no pitching, no scheduling. Edit the list under `coach.discovery_questions` in `config.yaml` |
+| **Cold / Discovery** | your own **discovery questions** if `prompts/discovery-questions.md` exists (a bank, not a script: it picks whichever fits the moment, uses your wording, fills in the brackets, and makes sure the decision-maker check happens before the presentation); otherwise a built-in blue-collar set (`coach.discovery_questions` in `config.yaml`). No pitching, no scheduling |
 | **Presenting** | checking-for-agreement questions (target **about 25 per presentation**, counted live), recapping their problems in their words, transitions; no discovery questions |
 | **Confirming** | asking for the time **after a one-sentence pain recap in their own words**, the calendar invite, the decision maker and any approval steps (for example, a franchisor sign-off), and the reschedule-notice ask; no pitch content |
 | **Side conversation** | coaching **pauses** ("Side conversation: coaching paused") and resumes when the business topic returns |
