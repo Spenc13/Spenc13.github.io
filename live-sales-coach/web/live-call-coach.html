@@ -1114,7 +1114,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         break;
       case "call":
         setCallState(d.state);
-        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saved to the calls folder when it ends (calls that go nowhere aren't saved)";
+        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saved when it ends if an appointment is set or it runs 10+ minutes";
         break;
       case "health": onHealth(d); break;
       case "timer": $("timer").textContent = d.elapsed; break;
