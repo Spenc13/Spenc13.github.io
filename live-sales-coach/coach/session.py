@@ -322,6 +322,11 @@ class CallSession:
             await self.end()
 
     # ------------------------------------------------------------ landing the plane
+    def _appointment_set(self) -> bool:
+        """A demo date/time was agreed, or they went on-the-fly (presented right then)."""
+        c = self.closing
+        path = c.active_path()
+        return (path == "set_demo" and c.done("demo_time")) or (path == "otf" and c.done("otf"))
     def _summary_note(self) -> str:
         parts = [self.partial_note()]
         c = self.closing
@@ -614,7 +619,16 @@ class CallSession:
             "source": self.call_info.get("source"),
         }
         self._final_meta, self._final_snap = meta, snap
-        verdict = judge(self.transcript, self._accum, self.cfg.get("call_filter") or {})
+        filt = self.cfg.get("call_filter") or {}
+        short = self._accum < float(filt.get("min_minutes", 10)) * 60
+        if short and not self._appointment_set() and self.engine.client is not None and self.transcript.finals:
+            # One last check so a set made in the final seconds still counts.
+            try:
+                await asyncio.wait_for(self._run_tracker(), timeout=10)
+            except Exception:
+                pass
+            meta["outcome"] = self.closing.to_dict()
+        verdict = judge(self.transcript, self._accum, filt, is_set=self._appointment_set())
         meta["prospect_words"] = verdict.prospect_words
         if not verdict.keep:
             # A call that went nowhere: no files, no summary request. Kept in memory

@@ -130,11 +130,11 @@ recording:
   meet_consent_mode: ask
 
 call_filter:
-  # Calls that go nowhere (no answer, quick hang-up, voicemail) are not saved
-  # or graded. You can still keep one with "Save anyway" right after it ends.
-  min_seconds: 45            # shorter calls are discarded
-  min_prospect_words: 25     # the prospect must say at least this much
-  discard_voicemail: true    # discard calls that hit a voicemail greeting
+  # Only calls worth reviewing are saved: an appointment was set (a demo date and
+  # time agreed, or you went OTF), or the conversation lasted at least min_minutes.
+  # Everything else isn't saved or graded. "Save anyway" keeps one right after it ends.
+  min_minutes: 10
+  keep_if_set: true
 
 phone_bridge:
   # Link to the "Olly Coach Bridge" Chrome extension (extension/ folder).

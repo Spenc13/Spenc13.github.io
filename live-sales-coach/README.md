@@ -214,14 +214,13 @@ If nothing is running yet, **Ctrl+Shift+Space starts coaching from any app** (th
 
 You can press **Start call** at any point. If the dialer shows the call was answered more than 15 seconds earlier, the call is marked **Partial call (joined at m:ss)**. The coach and the post-call summary are told the beginning wasn't heard, so a "missing" intro isn't counted against you. The scores are labeled partial, and the caller's number is kept even if you canceled the "They picked up" prompt.
 
-### Calls that go nowhere aren't saved
+### Which calls are saved
 
-When a call ends, it's thrown away (no files and no summary charge) if any of these is true:
-- it was **under 45 seconds**
-- the prospect said **fewer than 25 words**
-- it hit a **voicemail greeting**
+A call is saved (folder, summary, and Past calls) only if:
+- **an appointment was set**: a demo date and time were agreed, or you went OTF and presented on the spot; or
+- **the conversation lasted 10 minutes or longer.**
 
-The summary panel then says why, with a **Save anyway** button if you want to keep it. You can change the limits under `call_filter` in `config.yaml`.
+Anything else isn't saved or graded, and costs no summary request. Right before deciding, the coach runs one last check, so a set made in the final seconds still counts. The summary panel says why a call wasn't saved, with a **Save anyway** button if you want to keep it. Change the length, or whether a set always counts, under `call_filter` in `config.yaml` (`min_minutes`, `keep_if_set`).
 
 ## 7. Replay mode (practice without a live call)
 
