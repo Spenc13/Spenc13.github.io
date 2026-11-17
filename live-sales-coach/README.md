@@ -222,6 +222,29 @@ A call is saved (folder, summary, and Past calls) only if:
 
 Anything else isn't saved or graded, and costs no summary request. Right before deciding, the coach runs one last check, so a set made in the final seconds still counts. The summary panel says why a call wasn't saved, with a **Save anyway** button if you want to keep it. Change the length, or whether a set always counts, under `call_filter` in `config.yaml` (`min_minutes`, `keep_if_set`).
 
+### Call breakdown (review past calls, get action steps)
+
+Click **Call breakdown** at the top (next to **Live coach**) to review calls after the fact.
+
+1. **Rep:** the name at the top (defaults to `rep_name`). Each rep gets their own action plan, so teammates can use the same app.
+2. **Add calls**, one or several:
+   - **+ Add recordings or transcripts**: MP3, M4A, WAV, AAC, OGG, WEBM, FLAC, MP4, or a `.txt`/`.md` transcript (`Name: what they said` per line, or this app's `[mm:ss] Rep: ...` format). Recordings are transcribed by Deepgram with speaker separation.
+   - **+ From Past calls**: any saved call.
+   - Check **Which speaker is the rep?** on each call. The coach guesses, and you can change it.
+3. **Break down calls.** For each call you get **What worked** (solid intros, great questions, a time locked in, who'll be on the demo confirmed...) and **What to improve**, each with the timestamp, your exact words, and what to try instead.
+4. **Add your take.** Under every improvement there's a box to explain why you said what you said, or what you think would have worked better. Use **Your thoughts on these calls** for anything else. The coach reads all of it. It accepts good reasons and pushes back when the original advice still holds.
+5. **Finish: get my action steps.** You get 3 to 5 steps for your next calls, each with why it matters, how to practice it, and what success looks like, plus any areas that need real training.
+
+**It remembers.** The steps are saved to that rep's **Action plan** (right panel). The next time that rep breaks down calls, the coach checks every step first: **improved**, **partly**, **not yet**, or **no chance to use it**.
+- Improved on two breakdowns in a row: the step is marked **Mastered**.
+- "Not yet" two breakdowns in a row: it's flagged **Needs training**, and the coach calls it out so you can get coaching from your manager.
+- "No chance to use it" doesn't count either way.
+- Steps that aren't carried into the new plan are retired. You keep a short history of each step.
+
+During live calls, the coach also knows your current action steps and nudges you toward them when the moment fits. Turn this off with `breakdown.live_focus: false`.
+
+Everything is saved on this computer in `breakdowns/<rep>/` (gitignored): a `breakdown.md` you can read or share, a `breakdown.json`, and the rep's `plan.json`. **Open folder** goes there.
+
 ## 7. Replay mode (practice without a live call)
 
 Replays run through the same pipeline as a live call: transcript, triggers, coach, scoring, summary, and saving. The dropdown lists the samples, or choose **Replay a file…**
@@ -281,8 +304,8 @@ The objection and buying-signal check is a fast local keyword list in `coach/tri
 ## 10. What leaves your computer
 
 - **Deepgram:** audio from your mic and from the call, for transcription.
-- **Anthropic:** the prompt files, a short running summary, and the last 4 minutes of transcript with each coaching request, plus the full transcript once for the post-call summary.
-- **Nothing else.** Calls are saved only in `calls/`, which is gitignored. Check your company's policy and your state's recording-consent rules. Some states require every party's consent.
+- **Anthropic:** the prompt files, a short running summary, and the last 4 minutes of transcript with each coaching request, plus the full transcript once for the post-call summary. Call breakdowns send the uploaded recording to Deepgram and the transcripts, your notes, and your action plan to Anthropic.
+- **Nothing else.** Calls are saved only in `calls/` and breakdowns in `breakdowns/`, both gitignored. Check your company's policy and your state's recording-consent rules. Some states require every party's consent.
 
 ## 11. When something is down
 

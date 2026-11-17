@@ -90,6 +90,12 @@ stage:
   # detected from the conversation; pin it from the header with one click.
   check_every_seconds: 20
 
+breakdown:
+  # Call Breakdown tab: uploaded calls, breakdowns, and each rep's action plan.
+  # Stays on this computer (gitignored).
+  dir: breakdowns
+  live_focus: true           # remind the live coach of your current action steps during calls
+
 notes:
   # Approved selling notes (after each call) are saved here and loaded into every
   # call. Kept on this computer only (gitignored).

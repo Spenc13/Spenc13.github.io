@@ -6,6 +6,7 @@
 # Call recordings, transcripts, and summaries stay on this computer
 calls/*
 !calls/.gitkeep
+breakdowns/
 
 # Private business material and personal photo. This repo is public (GitHub Pages),
 # so these stay local. Copy them in from Google Drive (see README).

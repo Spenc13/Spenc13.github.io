@@ -366,6 +366,29 @@ class CoachEngine:
             return {"overview": raw.strip(), "key_wins": [], "missed_opportunities": [], "missed_moments": [],
                     "turning_points": [], "next_steps": []}
 
+    # ---- call breakdown ------------------------------------------------------
+    async def _json_request(self, prompt: str, schema: dict, max_tokens: int, effort: str = "medium") -> dict:
+        if self.client is None:
+            raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        kw = self._common(max_tokens, effort=effort)
+        kw["output_config"]["format"] = {"type": "json_schema", "schema": schema}
+        kw["messages"] = [{"role": "user", "content": prompt}]
+        msg = await self._create(kw)
+        if getattr(msg, "stop_reason", None) == "refusal":
+            raise CoachUnavailable("The request was declined")
+        try:
+            return json.loads(self._text_of(msg))
+        except json.JSONDecodeError:
+            raise CoachUnavailable("The coach's reply couldn't be read; try again")
+
+    async def breakdown_analyze(self, rep: str, calls: list[dict], steps: list[dict]) -> dict:
+        from .breakdown import ANALYSIS_SCHEMA, analysis_prompt
+        return await self._json_request(analysis_prompt(rep, calls, steps), ANALYSIS_SCHEMA, 16000)
+
+    async def breakdown_finalize(self, rep: str, analysis: dict, reflections: dict, steps: list[dict]) -> dict:
+        from .breakdown import FINAL_SCHEMA, final_prompt
+        return await self._json_request(final_prompt(rep, analysis, reflections, steps), FINAL_SCHEMA, 8000)
+
     # ---- selling notes (after the call) --------------------------------------
     NOTE_SCHEMA = {
         "type": "object",

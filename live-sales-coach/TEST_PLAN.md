@@ -103,6 +103,15 @@ Call a teammate on **Google Meet**, or through your dialer for phone calls. Give
 - [ ] If your dialer announces recording: tick **Don't ask again** once. On the next dialer call, coaching starts by itself when the prospect answers.
 - [ ] **Call menu → Ask before each recording** turns the notice back on.
 
+## D4. Call breakdown
+
+- [ ] **Call breakdown** tab → **+ From Past calls** → pick a saved call. It appears with the right rep speaker.
+- [ ] **+ Add recordings or transcripts** → pick an MP3 from your dialer. It shows "transcribing...", then the call. Check **Which speaker is the rep?**
+- [ ] **Break down calls**: each call shows What worked and What to improve, with timestamps and quotes that match the call.
+- [ ] Type a reason under one improvement, then **Finish: get my action steps**. The reply addresses your reason, and the steps appear in **Action plan**.
+- [ ] Break down another call. **Progress on your earlier action steps** lists each step (improved / partly / not yet / no chance).
+- [ ] Start a replay on the Live coach tab: a card can reference your current action step.
+
 ## E. Go / no-go
 
 Go live with a real prospect only if:

@@ -184,6 +184,14 @@ class CallSession:
     async def start(self) -> None:
         self.started_at = datetime.now()
         self.engine.style_notes = load_style(self.cfg)       # approved notes, loaded fresh each call
+        self.focus_steps: list[str] = []
+        if get(self.cfg, "breakdown.live_focus", True):
+            try:
+                from .breakdown import active_steps, load_plan
+                plan = load_plan(self.cfg, get(self.cfg, "rep_name", "Spencer Faircloth"))
+                self.focus_steps = [s["text"] for s in active_steps(plan)][:5]
+            except Exception:
+                self.focus_steps = []
         self.proposed_notes: list[dict] = []
         self.store = CallStore(get(self.cfg, "storage.calls_dir", "calls"), self.started_at)
         self.running = True
@@ -524,6 +532,9 @@ class CallSession:
         else:
             parts.append("No confirmed prospect name yet: don't address the prospect by a name heard in the "
                          "transcript (it may be misheard).")
+        if getattr(self, "focus_steps", None) and st != "side":
+            parts.append("Spencer's current action steps (from his last call breakdown). When a moment fits one, "
+                         "nudge him toward it:\n" + "\n".join(f"- {t}" for t in self.focus_steps))
         if self.typed_notes:
             parts.append("Spencer typed during the call (ground truth, overrides the transcript):\n" +
                          "\n".join(f"[{n['t']}] {n['text']}" for n in self.typed_notes[-8:]))
