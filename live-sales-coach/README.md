@@ -263,10 +263,10 @@ Everything is computed from the transcript as the call goes. A score shows "–"
 
 | Bar | Computed from |
 |---|---|
-| Discovery | Your questions per 5 minutes (target 4), plus the share that are open (what, how, why) |
-| Listening | Your share of talk time from Deepgram's word timings. 100 inside 40–60%, minus 3 points per % outside |
-| Objection handling | Share of detected objections you met with a question or a Voss label ("It sounds like…") within 30 seconds |
-| Pacing | Your words per minute. 100 inside 140–170 wpm, minus 2 points per wpm outside |
+| Discovery | Real questions only (no tag questions or fragments), per 5 minutes outside presenting (target 4), weighted by how many are open (what, how, why) |
+| Listening | Your share of talk time from Deepgram's word timings. 100 inside 30–45%, minus 3 points per % outside |
+| Objection handling | Share of detected objections a coach card responded to (or, with coaching off, that you met with a question or a Voss label within 30 seconds) |
+| Pacing | Your words per minute. 100 inside 170–220 wpm (`metrics.wpm_target`), minus 2 points per wpm outside |
 | Next-step clarity | Asked (55), with a specific day or time (+20), and the prospect agreed (+25). Shows 25 if nothing has been asked by minute 5 |
 
 The objection and buying-signal check is a fast local keyword list in `coach/triggers.py`. It only decides **when** to call the coach. Claude decides **what** to say. Auto triggers are debounced: at most one every 8 seconds, and the same objection type at most once every 45 seconds. Both are configurable.
