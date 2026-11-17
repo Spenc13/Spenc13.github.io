@@ -29,23 +29,26 @@ class Verdict:
     voicemail: bool
 
 
-def judge(transcript: Transcript, seconds: float, cfg: dict | None = None) -> Verdict:
+def judge(transcript: Transcript, seconds: float, cfg: dict | None = None, is_set: bool = False) -> Verdict:
+    """Keep a call only if an appointment was set, or the conversation ran long enough
+    (10 minutes by default). Everything else is discarded unless Spencer clicks Save anyway."""
     cfg = cfg or {}
-    min_seconds = float(cfg.get("min_seconds", 45))
-    min_words = int(cfg.get("min_prospect_words", 25))
-    check_vm = bool(cfg.get("discard_voicemail", True))
+    min_minutes = float(cfg.get("min_minutes", 10))
+    keep_if_set = bool(cfg.get("keep_if_set", True))
 
     prospect = [u for u in transcript.finals if u.speaker == PROSPECT]
     words = sum(u.words for u in prospect)
     early = " ".join(u.text for u in prospect if u.t <= 45)
-    voicemail = check_vm and bool(VOICEMAIL.search(early))
+    voicemail = bool(VOICEMAIL.search(early))
 
     if not transcript.finals:
         return Verdict(False, "nothing was said", words, seconds, voicemail)
-    if voicemail and words < 80:
-        return Verdict(False, "it reached voicemail", words, seconds, voicemail)
-    if words < min_words:
-        return Verdict(False, f"the prospect only said {words} word{'s' if words != 1 else ''}", words, seconds, voicemail)
-    if seconds < min_seconds:
-        return Verdict(False, f"it lasted only {int(seconds)} seconds", words, seconds, voicemail)
-    return Verdict(True, "", words, seconds, voicemail)
+    if keep_if_set and is_set:
+        return Verdict(True, "", words, seconds, voicemail)
+    if seconds >= min_minutes * 60:
+        return Verdict(True, "", words, seconds, voicemail)
+    mins = f"{min_minutes:g} minute{'s' if min_minutes != 1 else ''}"
+    why = f"it was under {mins} and no appointment was set"
+    if voicemail:
+        why += " (it reached voicemail)"
+    return Verdict(False, why, words, seconds, voicemail)

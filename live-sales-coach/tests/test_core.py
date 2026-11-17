@@ -224,6 +224,7 @@ def test_replay_pipeline_saves_call(tmp_path):
     cfg["replay"]["speed"] = 40
     cfg["triggers"]["min_gap_seconds"] = 5
     cfg["coach"]["live_mode"] = False          # keyword-trigger mode
+    cfg["call_filter"]["min_minutes"] = 0      # this test checks saving, not the keep rule
     events = []
 
     def emit(kind, data):
@@ -305,19 +306,17 @@ def _t(lines):
 
 def test_call_filter():
     from coach.callfilter import judge
-    real = _t([(REP, "Hi Dana, what got you looking at marketing?", 0),
-               (PROSPECT, "Our leads have dried up and we need about six good kitchen jobs a month to keep both crews "
-                          "booked through the winter, honestly we are worried", 4)])
-    assert judge(real, 120).keep
-    assert not judge(_t([]), 30).keep
-    vm = judge(_t([(PROSPECT, "Hi, you've reached Mike's Roofing. Please leave a message after the tone.", 2),
-                   (REP, "Hey Mike, Spencer with Olly Olly, give me a call back.", 8)]), 50)
-    assert not vm.keep and vm.reason == "it reached voicemail"
-    hangup = judge(_t([(PROSPECT, "Not interested, thanks.", 1)]), 20)
-    assert not hangup.keep and "only said 3 words" in hangup.reason
-    short = judge(real, 20)
-    assert not short.keep and "20 seconds" in short.reason
-
+    talk = _t([(REP, "Hi Dana, what got you looking at marketing?", 0),
+               (PROSPECT, "Our leads have dried up and we need about six good kitchen jobs a month.", 4)])
+    short = judge(talk, 300)                                   # 5 minutes, nothing set
+    assert not short.keep and short.reason == "it was under 10 minutes and no appointment was set"
+    assert judge(talk, 600).keep                               # 10+ minutes: kept
+    assert judge(talk, 120, is_set=True).keep                   # a set: kept, however short
+    assert not judge(talk, 120, {"keep_if_set": False}, is_set=True).keep
+    assert judge(talk, 400, {"min_minutes": 5}).keep           # configurable
+    assert not judge(_t([]), 900).keep                         # nothing said
+    vm = judge(_t([(PROSPECT, "Hi, you've reached Mike's Roofing. Please leave a message after the tone.", 2)]), 50)
+    assert not vm.keep and "voicemail" in vm.reason
 
 def test_store_discard_and_keep(tmp_path):
     from coach.storage import CallStore, list_calls
@@ -354,7 +353,7 @@ def test_short_call_is_discarded_then_saved_anyway(tmp_path):
 
     s = asyncio.run(run())
     disc = [d for k, d in events if k == "summary" and d.get("state") == "discarded"]
-    assert disc and "only said 3 words" in disc[0]["reason"]
+    assert disc and disc[0]["reason"] == "it was under 10 minutes and no appointment was set"
     saved = [d for k, d in events if k == "summary" and d.get("state") == "done"]
     assert saved, "save anyway should write the call and summarize it"
     folder = Path(saved[0]["dir"])
@@ -501,6 +500,7 @@ def test_joined_mid_call_is_marked_everywhere(tmp_path):
     cfg = load_config()
     cfg["storage"]["calls_dir"] = str(tmp_path)
     cfg["replay"]["speed"] = 40
+    cfg["call_filter"]["min_minutes"] = 0
     cfg["coach"]["live_mode"] = True
 
     async def run():
@@ -1196,3 +1196,28 @@ def test_discovery_question_bank_loads_and_guides(tmp_path):
     assert "one job profit you, after materials" not in ctx        # his bank replaces the built-in list
     s.set_stage("presenting")
     assert "no required order" not in s._context_block("live")
+
+
+
+def test_short_call_with_a_set_is_kept(tmp_path):
+    """The landing practice replay is about a minute long but books Thursday at 2."""
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path)
+    cfg["replay"]["speed"] = 40
+    cfg["landing"]["tracker_delay_seconds"] = 0
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text",
+                        str(ROOT / "samples" / "set_demo_practice.txt"))
+        client = _FakeClient(REPLY)
+        client.messages = client.beta.messages = _CloseFakeMessages(REPLY)
+        s.engine.client = client
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=60)
+        return s
+
+    s = asyncio.run(run())
+    assert s._accum < 600 and s._appointment_set()
+    assert any(k == "summary" and d.get("state") == "done" for k, d in events)
+    assert not any(k == "summary" and d.get("state") == "discarded" for k, d in events)
