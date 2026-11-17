@@ -1003,8 +1003,12 @@ def test_metrics_v2_formulas():
     m.add_utterance(Utterance(PROSPECT, " ".join(["word"] * 120), 60, 49))
     sc = m.scores()
     assert m.rep_share == 55 and sc["Listening"] == 100 - 3 * 10           # target 30-45%
-    assert sc["Pacing"] == 100 - 2 * (203 - 165)                          # target 140-165
-    assert "target 140–165" in m.details()["Pacing"]
+    assert sc["Pacing"] == 100                                            # 203 wpm is inside 170-220
+    assert "target 170–220" in m.details()["Pacing"]
+    fast = Metrics()
+    fast.add_utterance(Utterance(REP, " ".join(["word"] * 240), 0, 60))
+    assert fast.scores()["Pacing"] == 100 - 2 * (240 - 220)
+    assert any("240 wpm" in r for r in fast.recommendations())
     p = Metrics()
     p.add_utterance(Utterance(REP, "And this shows who called you, right? Does that make sense?", 0, 4), stage="presenting")
     assert p.checkins == 2 and p.questions == 0                           # presenting check-ins aren't discovery
@@ -1044,3 +1048,124 @@ def test_notes_are_not_saved_during_the_call(tmp_path):
     assert not cfg_notes.exists()
     assert s.coach_notes[0]["text"] == "I never give pricing before budget"
     assert any(k == "coach_notes" for k, _ in events)
+
+
+
+# ---------------------------------------------------------------- 11/17 additions
+def test_one_question_per_line():
+    from coach.engine import one_question
+    assert one_question("Makes sense. How much does one job profit you? And how many do you need a month?") == \
+        "Makes sense. How much does one job profit you?"
+    assert one_question("What types of jobs are you after right now?") == "What types of jobs are you after right now?"
+    assert one_question("Totally fair, let's do that.") == "Totally fair, let's do that."
+
+
+def test_cards_are_trimmed_to_one_question():
+    events = []
+    two = ("Say this next: Got it. How much are you spending on marketing now? Where is that going?\n"
+           "Tactic: Miner: situation\nWatch-out: one at a time")
+
+    async def run():
+        s = _v2_session(events, live=True)
+        s.engine.client = _FakeClient(two)
+        await s.on_stt(_ev(PROSPECT, "We run a few Facebook ads but the phone is pretty quiet.", 0))
+        await asyncio.sleep(0.3)
+        return s
+
+    asyncio.run(run())
+    done = [d for k, d in events if k == "coach" and d.get("state") == "done"]
+    streamed = [d for k, d in events if k == "coach" and d.get("state") == "streaming"]
+    assert done and done[0]["say"] == "Got it. How much are you spending on marketing now?"
+    assert all(d["say"].count("?") <= 1 for d in streamed)
+
+
+def test_blue_collar_questions_in_discovery_and_configurable():
+    events = []
+    s = _v2_session(events)
+    ctx = s._context_block("live")
+    assert "How much does one job profit you" in ctx and "Where is that marketing money going" in ctx
+    s2 = _v2_session(events, coach__discovery_questions=["What's your average ticket on a re-roof?"])
+    ctx2 = s2._context_block("live")
+    assert "average ticket on a re-roof" in ctx2 and "one job profit" not in ctx2
+    s.set_stage("presenting")
+    assert "one job profit" not in s._context_block("live")          # only in discovery
+
+
+def test_pain_recap_before_asking_for_a_time():
+    events = []
+    s = _v2_session(events)
+    s.set_stage("confirming")
+    ctx = s._context_block("live")
+    assert "recap their pain in their own words" in ctx and "then ask for the time" in ctx
+    from coach.engine import LIVE_INSTRUCTION
+    assert "ONE question" in LIVE_INSTRUCTION and "recap of their pain" in LIVE_INSTRUCTION
+
+    async def run():
+        s.engine.client = _FakeClient(REPLY)
+        await s.land_now()
+        await asyncio.sleep(0.2)
+    asyncio.run(run())
+    assert "recap of their pain" in s.engine.client.messages.calls[-1]["messages"][0]["content"]
+
+
+def test_pace_target_from_config():
+    events = []
+    s = _v2_session(events, metrics__wpm_target=[180, 230])
+    assert s.metrics.wpm_target == (180, 230)
+
+
+# ---------------------------------------------------------------- momentum: keep going
+def test_momentum_guidance():
+    events = []
+    s = _v2_session(events)
+    s.stage_state.apply({"stage": "discovery", "conversation_mode": "business", "momentum": "productive"}, 30)
+    ctx = s._context_block("live")
+    assert "going well" in ctx and "Don't redirect" in ctx and "You're doing great." in ctx
+    s.stage_state.apply({"momentum": "stalled"}, 60)
+    assert "stalling" in s._context_block("live") and "going well" not in s._context_block("live")
+    s.stage_state.apply({"stage": "side", "conversation_mode": "side", "momentum": "productive"}, 90)
+    assert "going well" not in s._context_block("live")            # never during side talk
+
+
+def test_keep_going_cards_and_turning_points(tmp_path):
+    events = []
+    keep = ("Say this next: Great conversation. Mention the review tool, since he said customers check reviews first.\n"
+            "Tactic: Keep momentum\nWatch-out: Don't change course")
+
+    async def run():
+        s = _v2_session(events, live=True, storage__calls_dir=str(tmp_path))
+        s.engine.client = _FakeClient(keep)
+        s.stage_state.apply({"stage": "discovery", "conversation_mode": "business", "momentum": "productive"}, 0)
+        await s.on_stt(_ev(PROSPECT, "Honestly most of my customers check our Google reviews before they call.", 1))
+        await asyncio.sleep(0.3)
+        return s
+
+    s = asyncio.run(run())
+    done = [d for k, d in events if k == "coach" and d.get("state") == "done"]
+    assert done and done[0]["mode"] == "keep_going" and done[0]["say"].startswith("Great conversation.")
+    assert s._timeline and s._timeline[0]["mode"] == "keep_going"
+    from coach.engine import _timeline_text
+    assert "KEEP GOING (discovery): Great conversation." in _timeline_text(s._timeline)
+
+    from coach.storage import CallStore
+    st = CallStore(str(tmp_path))
+    st.write_summary({"overview": "o", "key_wins": [], "missed_opportunities": [], "missed_moments": [],
+                      "turning_points": [{"time": "12:30", "what_happened": "Tied reviews to his goal",
+                                          "worked": True, "why": "He'd just said customers check reviews"}],
+                      "next_steps": []}, {"title": "t"})
+    md = (st.dir / "summary.md").read_text()
+    assert "## Turning points" in md and "[12:30] Tied reviews to his goal: **Worked.**" in md
+    st.finalize(keep=False)
+
+
+def test_summary_request_includes_coaching_timeline():
+    cfg = load_config()
+    eng = CoachEngine(cfg, PROMPTS, api_key_present=False)
+    eng.client = _FakeClient(REPLY)
+    asyncio.run(eng.post_call_summary("[00:01] Rep: hi", {"overall": 70}, 1,
+                                      timeline=[{"t": "00:05", "mode": "keep_going", "stage": "discovery",
+                                                 "say": "Great conversation. Mention reviews."}]))
+    kw = eng.client.messages.calls[-1]
+    content = kw["messages"][0]["content"]
+    assert "[00:05] KEEP GOING (discovery): Great conversation." in content and "turning_points" in content
+    assert "turning_points" in kw["output_config"]["format"]["schema"]["required"]

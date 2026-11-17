@@ -35,7 +35,7 @@ AGREE = re.compile(
 )
 
 TALK_TARGET = (30, 45)        # % of talk time for the rep (the prospect should talk more)
-WPM_TARGET = (140, 165)
+WPM_TARGET = (170, 220)       # default; set metrics.wpm_target in config.yaml
 CHECKIN_TARGET = 25           # checking-for-agreement questions per presentation (playbook)
 QUESTIONS_PER_5_MIN = 4.0
 WORDS_PER_SECOND_EST = 2.7    # used only if STT gave no duration
@@ -91,6 +91,7 @@ class Metrics:
     _next_step_t: float | None = None
     elapsed: float = 0.0
     partial_after: float = 0.0     # >0: coaching joined this many seconds into the call
+    wpm_target: tuple = WPM_TARGET
     backchannels: int = 0          # "mhmm", "yeah"... (not counted as talk)
     checkins: int = 0              # checking-for-agreement questions while presenting
     presenting_seconds: float = 0.0
@@ -200,7 +201,7 @@ class Metrics:
         if w is None:
             s["Pacing"] = None
         else:
-            lo, hi = WPM_TARGET
+            lo, hi = self.wpm_target
             off = 0 if lo <= w <= hi else (lo - w if w < lo else w - hi)
             s["Pacing"] = max(0, 100 - 2 * off)
 
@@ -227,7 +228,7 @@ class Metrics:
             "Listening": (f"{self.rep_share}% you (target {TALK_TARGET[0]}\u2013{TALK_TARGET[1]}%)"
                           if self.rep_share is not None else ""),
             "Objection handling": f"{sum(o.handled for o in judged)}/{len(self.objections)} handled" if self.objections else "0 objections",
-            "Pacing": f"{self.wpm} wpm (target {WPM_TARGET[0]}\u2013{WPM_TARGET[1]})" if self.wpm else "",
+            "Pacing": f"{self.wpm} wpm (target {self.wpm_target[0]}\u2013{self.wpm_target[1]})" if self.wpm else "",
             "Next-step clarity": (self.outcome or {}).get("outcome") if self.close_score is not None else (
                 "agreed" if self.next_step_agreed else "specific time" if self.next_step_specific
                 else "asked" if self.next_step_asked else "not asked yet"
@@ -251,9 +252,9 @@ class Metrics:
         if missed:
             recs.append(f"“{missed[-1].label}” got a statement, not a question. Ask before you tell.")
         w = self.wpm
-        if w is not None and w > WPM_TARGET[1]:
+        if w is not None and w > self.wpm_target[1]:
             recs.append(f"Pace is {w} wpm. Slow down and pause after key points.")
-        elif w is not None and w < WPM_TARGET[0] - 20:
+        elif w is not None and w < self.wpm_target[0] - 20:
             recs.append(f"Pace is {w} wpm. Tighten it up a bit.")
         if self.close_score is None:          # the outcome tracker covers next steps when it's active
             if not self.next_step_asked and minutes >= 10:
@@ -273,7 +274,7 @@ class Metrics:
             "checkins": self.checkins,
             "checkin_target": CHECKIN_TARGET,
             "talk_target": list(TALK_TARGET),
-            "wpm_target": list(WPM_TARGET),
+            "wpm_target": list(self.wpm_target),
             "outcome": self.outcome,
             "rep_talk_seconds": round(self.rep_seconds, 1),
             "prospect_talk_seconds": round(self.prospect_seconds, 1),

@@ -32,7 +32,9 @@ STAGE_HINT = re.compile(
 GUIDANCE = {
     "discovery": (
         "Call stage: Cold call / Discovery. Ask NEPQ discovery questions (situation, problem, consequence, "
-        "qualifying, budget). Don't pitch features yet. Don't give scheduling advice unless the prospect raises it."
+        "qualifying, budget). Don't pitch features yet. Don't give scheduling advice unless the prospect raises it. "
+        "These are blue-collar home-service owners: favor plain, money-and-jobs questions like these (pick the one "
+        "that fits the moment and isn't already answered; adapt the wording):\n{questions}"
     ),
     "presenting": (
         "Call stage: Presenting. Spencer is presenting or demoing. Focus only on: checking-for-agreement "
@@ -40,13 +42,38 @@ GUIDANCE = {
         "their own words, and smooth transitions. Do NOT suggest discovery questions or scheduling."
     ),
     "confirming": (
-        "Call stage: Confirming an appointment. Focus only on locking the appointment: the calendar invite "
+        "Call stage: Confirming an appointment. When asking for the time, first recap their pain in their own "
+        "words (one sentence, from what they said on this call), then ask for the time, so the reason to show up "
+        "sticks. Focus only on locking the appointment: the calendar invite "
         "(ask them to accept it), the decision maker and any approval steps (for example a franchisor or partner "
         "that must sign off), and asking for reasonable notice if they need to reschedule, then a warm wrap. "
         "Do NOT suggest pitch content or discovery."
     ),
     "side": "Call stage: Side conversation. Don't coach.",
 }
+# Default blue-collar discovery questions (override with coach.discovery_questions in config.yaml).
+DISCOVERY_QUESTIONS = [
+    "How much does one job profit you, after materials and labor?",
+    "What types of jobs are you looking for more of right now?",
+    "How much are you investing in marketing right now?",
+    "Where is that marketing money going today?",
+    "Where do most of your jobs come from right now?",
+    "How many jobs a month do you need to keep your crews busy?",
+    "What does a slow month cost you?",
+    "Who answers the phone when you're out on a job?",
+    "What's your busy season, and what happens to calls in the slow season?",
+    "How far out are you willing to drive for the right job?",
+]
+
+KEEP_GOING = (
+    "Momentum: the conversation is going well (the prospect is engaged and it's moving forward). Don't "
+    "redirect Spencer or change his approach, so he keeps his train of thought. Start \"Say this next\" with brief "
+    "encouragement (\"You're doing great.\" or \"Great conversation.\") and then ONE point to mention next, tied to "
+    "something the prospect just said (\"Mention the review tool, since he said customers check reviews.\")."
+)
+STALLED = ("Momentum: the conversation is stalling (circling, short answers, or an objection left hanging). Help "
+           "Spencer move it forward with one clear question.")
+
 RAPPORT = ("The conversation is rapport / small talk right now. Match it briefly and naturally; "
            "never push the sale or suggest closing during rapport.")
 
@@ -57,6 +84,7 @@ class StageState:
     pinned: str | None = None
     mode: str = "business"            # business | rapport | side
     meeting_agreed: bool = False
+    momentum: str = "neutral"         # productive | neutral | stalled
     side_since: float | None = None   # call seconds when the current off-sale stretch began
     _quick_side_until: float = -1.0   # live coach flagged a side conversation (until the next check)
 
@@ -87,6 +115,8 @@ class StageState:
         if md in ("business", "rapport", "side"):
             self.mode = md
         self.meeting_agreed = self.meeting_agreed or bool(r.get("meeting_agreed"))
+        if r.get("momentum") in ("productive", "neutral", "stalled"):
+            self.momentum = r["momentum"]
         off_sale = self.auto == "side" or self.mode == "side"
         if off_sale:
             if self.side_since is None:
@@ -103,9 +133,15 @@ class StageState:
         """How long the conversation has been off the sale (rapport doesn't count)."""
         return 0.0 if self.side_since is None else max(0.0, now - self.side_since)
 
-    def guidance(self, now: float, checkins: int, target: int) -> str:
+    def guidance(self, now: float, checkins: int, target: int, questions: list[str] | None = None) -> str:
         st = self.effective_for(now)
-        text = GUIDANCE[st].format(target=target, done=checkins)
+        qs = "\n".join(f"- {q}" for q in (questions or DISCOVERY_QUESTIONS))
+        text = GUIDANCE[st].format(target=target, done=checkins, questions=qs)
         if self.mode == "rapport" and st != "side":
             text += " " + RAPPORT
+        if st != "side":
+            if self.momentum == "productive":
+                text += "\n" + KEEP_GOING
+            elif self.momentum == "stalled":
+                text += "\n" + STALLED
         return text

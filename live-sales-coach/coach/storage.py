@@ -80,6 +80,14 @@ class CallStore:
                 lines.append(f"## {title}")
                 lines += [f"- {x}" for x in summary.get(key) or []] or ["- (none)"]
                 lines.append("")
+            turns = summary.get("turning_points") or []
+            if turns:
+                lines.append("## Turning points")
+                for tp in turns:
+                    mark = "Worked" if tp.get("worked") else "Didn't work"
+                    lines.append(f"- [{str(tp.get('time', '')).strip('[]')}] {tp.get('what_happened', '')}: "
+                                 f"**{mark}.** {tp.get('why', '')}")
+                lines.append("")
             moments = summary.get("missed_moments") or []
             if moments:
                 lines.append("## Specific moments to fix")

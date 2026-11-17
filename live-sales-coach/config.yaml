@@ -62,8 +62,22 @@ coach:
   live_mode: true
   live_thinking: between_tools   # fastest: no extended thinking (Sonnet 5.5). Or "adaptive".
   transcript_window_minutes: 4   # last N minutes of transcript sent with each request
+  # Discovery questions the coach favors in the Cold / Discovery stage. Edit freely;
+  # leave empty ([]) to use the built-in blue-collar set.
+  discovery_questions:
+    - How much does one job profit you, after materials and labor?
+    - What types of jobs are you looking for more of right now?
+    - How much are you investing in marketing right now?
+    - Where is that marketing money going today?
+    - Where do most of your jobs come from right now?
+    - How many jobs a month do you need to keep your crews busy?
+    - What does a slow month cost you?
+    - Who answers the phone when you're out on a job?
   summary_refresh_seconds: 90    # how often the running summary absorbs older lines
   post_call_max_tokens: 8000
+
+metrics:
+  wpm_target: [170, 220]     # your speaking pace target (words per minute)
 
 landing:
   # "Land the plane" is hidden until you click its button. The coach suggests it

@@ -23,8 +23,11 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 LIVE_INSTRUCTION = (
     "Live coach mode: Spencer will read your \"Say this next\" line out loud, word for word, right now. "
-    "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words, "
-    "responding directly to what the prospect just said and fitting the call stage above. "
+    "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words "
+    "(up to 40 when asking for a time or appointment), responding directly to what the prospect just said "
+    "and fitting the call stage above. Ask exactly ONE question: never two questions in the same line, and "
+    "no compound questions joined with \"and\" or \"or else\". When the line asks for a time or appointment, "
+    "open with a one-sentence recap of their pain in their own words, then ask for the time. "
     "Don't repeat a point he already made or ask for something already covered. No stage directions or "
     "quotation marks. If the prospect hasn't actually finished their thought, write exactly: "
     "Say this next: (Listening) . If the latest talk is a side conversation unrelated to the sale (someone "
@@ -69,6 +72,25 @@ def parse_coach(text: str) -> dict[str, str]:
 _WORD = re.compile(r"[a-z0-9']+")
 _STOP = {"the", "and", "that", "this", "with", "your", "you", "what", "would", "have", "about", "just",
          "it's", "that's", "there", "they", "them", "then", "from", "like", "know", "really", "so", "for"}
+
+
+def _timeline_text(timeline: list | None, limit: int = 60) -> str:
+    """Coaching cards shown during the call, for the post-call breakdown."""
+    if not timeline:
+        return "Coaching timeline: (none)"
+    label = {"keep_going": "KEEP GOING", "redirect": "REDIRECT", "coach": "COACH"}
+    rows = [f"[{c['t']}] {label.get(c.get('mode'), 'COACH')} ({c.get('stage') or '?'}): {c.get('say', '')}"
+            for c in timeline[-limit:]]
+    return "Coaching timeline (what the coach told Spencer, and whether he was on a roll):\n" + "\n".join(rows)
+
+
+def one_question(say: str) -> str:
+    """Keep at most one question in a line: everything up to and including the first
+    question mark. Statements before it stay ("Makes sense. What does one job profit you?")."""
+    i = say.find("?")
+    if i == -1 or "?" not in say[i + 1:]:
+        return say
+    return say[: i + 1].rstrip()
 
 
 def said_it(suggestion: str, spoken: str) -> bool:
@@ -265,9 +287,20 @@ class CoachEngine:
             return {}
 
     async def post_call_summary(self, transcript: str, metrics: dict, coaching_count: int,
-                                note: str = "") -> dict:
+                                note: str = "", timeline: list | None = None) -> dict:
         if self.client is None:
             raise CoachUnavailable("ANTHROPIC_API_KEY is not set")
+        turning = {
+            "type": "object",
+            "properties": {
+                "time": {"type": "string"},
+                "what_happened": {"type": "string"},
+                "worked": {"type": "boolean"},
+                "why": {"type": "string"},
+            },
+            "required": ["time", "what_happened", "worked", "why"],
+            "additionalProperties": False,
+        }
         moment = {
             "type": "object",
             "properties": {
@@ -286,9 +319,11 @@ class CoachEngine:
                 "key_wins": {"type": "array", "items": {"type": "string"}},
                 "missed_opportunities": {"type": "array", "items": {"type": "string"}},
                 "missed_moments": {"type": "array", "items": moment},
+                "turning_points": {"type": "array", "items": turning},
                 "next_steps": {"type": "array", "items": {"type": "string"}},
             },
-            "required": ["overview", "key_wins", "missed_opportunities", "missed_moments", "next_steps"],
+            "required": ["overview", "key_wins", "missed_opportunities", "missed_moments", "turning_points",
+                         "next_steps"],
             "additionalProperties": False,
         }
         kw = self._common(self.post_call_max_tokens, effort="medium")
@@ -299,13 +334,18 @@ class CoachEngine:
                 "The call has ended. Review it as Spencer's coach.\n\n"
                 + (note + "\n\n" if note else "") +
                 f"Computed call metrics (JSON):\n{json.dumps(metrics, indent=2)}\n\n"
-                f"Coaching cards shown during the call: {coaching_count}\n\n"
+                f"Coaching cards shown during the call: {coaching_count}\n"
+                + _timeline_text(timeline) + "\n\n"
                 f"Full transcript:\n{transcript or '(empty)'}\n\n"
                 "Return: a 2-sentence overview; 2 to 4 key wins; 2 to 4 missed opportunities "
                 "(cite the moment); missed_moments: up to 5 specific lines from the transcript where Spencer "
                 "should have asked a consequence question or checked budget (or skipped another key step), each "
                 "with its [mm:ss] time, the exact quote, what he missed, and the better line to use; and 2 to 4 "
                 "concrete next steps for Spencer with this prospect. "
+                "turning_points: 3 to 5 key moments (with [mm:ss]) where the call moved forward or stalled: what "
+                "happened, whether it worked, and why. Use the coaching timeline (when the coach said keep going vs "
+                "redirect, and what it suggested) and Spencer's typed notes to explain what he was going for and "
+                "why it landed or didn't. "
                 "Spencer's typed lines (labeled \"Spencer (typed)\") are ground truth. "
                 "Use only facts from the transcript, playbook, and offer reference. "
                 "Do not invent prices, terms, or guarantees."
@@ -319,7 +359,7 @@ class CoachEngine:
             return json.loads(raw)
         except json.JSONDecodeError:
             return {"overview": raw.strip(), "key_wins": [], "missed_opportunities": [], "missed_moments": [],
-                    "next_steps": []}
+                    "turning_points": [], "next_steps": []}
 
     # ---- selling notes (after the call) --------------------------------------
     NOTE_SCHEMA = {
