@@ -128,6 +128,13 @@ The coach works out which stage the call is in from the conversation: whether a 
 - **One question per line.** The coach never stacks two questions in one card, and the app trims any card that tries to down to its first question.
 - **Pain recap before the ask.** Whenever a card asks for a time or appointment, it opens with one sentence recapping the prospect's pain in their own words, then asks, so the reason to show up sticks. This also applies to **✈ Land it** and the Confirming stage.
 
+### When you're on a roll
+
+The coach judges whether the conversation is **productive** (the prospect is engaged and it's moving forward), **neutral**, or **stalled**:
+- **Productive:** it doesn't redirect you, so you keep your train of thought. Cards turn green with **✓ Keep going**, and give brief encouragement plus **one point to mention**, tied to what the prospect just said (for example: "Great conversation. Mention the review tool, since he said customers check reviews first").
+- **Stalled:** cards go back to helping you move it forward with one clear question.
+- **After the call:** the summary sees every card and whether it said keep going or redirect, plus your typed notes. It adds **Turning points**, the key moments, each with whether it worked and **why**.
+
 ### How cards are timed
 
 A card is generated only after a **finished prospect turn**: a complete sentence at a pause, or about **1.5 s of silence**. It's never generated on a fragment. While they're still talking, the coaching panel shows **Listening…**. Each request includes:

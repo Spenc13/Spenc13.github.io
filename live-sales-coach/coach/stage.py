@@ -65,6 +65,15 @@ DISCOVERY_QUESTIONS = [
     "How far out are you willing to drive for the right job?",
 ]
 
+KEEP_GOING = (
+    "Momentum: the conversation is going well (the prospect is engaged and it's moving forward). Don't "
+    "redirect Spencer or change his approach, so he keeps his train of thought. Start \"Say this next\" with brief "
+    "encouragement (\"You're doing great.\" or \"Great conversation.\") and then ONE point to mention next, tied to "
+    "something the prospect just said (\"Mention the review tool, since he said customers check reviews.\")."
+)
+STALLED = ("Momentum: the conversation is stalling (circling, short answers, or an objection left hanging). Help "
+           "Spencer move it forward with one clear question.")
+
 RAPPORT = ("The conversation is rapport / small talk right now. Match it briefly and naturally; "
            "never push the sale or suggest closing during rapport.")
 
@@ -75,6 +84,7 @@ class StageState:
     pinned: str | None = None
     mode: str = "business"            # business | rapport | side
     meeting_agreed: bool = False
+    momentum: str = "neutral"         # productive | neutral | stalled
     side_since: float | None = None   # call seconds when the current off-sale stretch began
     _quick_side_until: float = -1.0   # live coach flagged a side conversation (until the next check)
 
@@ -105,6 +115,8 @@ class StageState:
         if md in ("business", "rapport", "side"):
             self.mode = md
         self.meeting_agreed = self.meeting_agreed or bool(r.get("meeting_agreed"))
+        if r.get("momentum") in ("productive", "neutral", "stalled"):
+            self.momentum = r["momentum"]
         off_sale = self.auto == "side" or self.mode == "side"
         if off_sale:
             if self.side_since is None:
@@ -127,4 +139,9 @@ class StageState:
         text = GUIDANCE[st].format(target=target, done=checkins, questions=qs)
         if self.mode == "rapport" and st != "side":
             text += " " + RAPPORT
+        if st != "side":
+            if self.momentum == "productive":
+                text += "\n" + KEEP_GOING
+            elif self.momentum == "stalled":
+                text += "\n" + STALLED
         return text

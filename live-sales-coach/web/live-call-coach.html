@@ -309,6 +309,8 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .coach-card.error { border-color: rgba(255,107,107,0.5); background: rgba(255,107,107,0.06); }
 .coach-card.thinking .say { color: var(--muted); }
 .coach-card.live .say { font-size: 19px; line-height: 1.4; }
+.coach-card.keep { border-color: rgba(56,217,169,0.55); background: linear-gradient(180deg, rgba(56,217,169,0.10), rgba(56,217,169,0.02)); }
+.coach-card .keep-tag { color: var(--good); font-weight: 600; }
 .coach-card.used { opacity: 0.55; border-color: var(--line); background: var(--panel-2); }
 .coach-card .used-tag { display: inline-block; margin-left: 6px; color: var(--good); font-weight: 600; }
 .live-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; font-weight: 600; font-size: 12px;
@@ -641,6 +643,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <div class="sum miss"><h3>Missed opportunities</h3><ul id="miss"><li class="muted">Nothing yet.</li></ul></div>
       <div class="sum next"><h3>Next steps</h3><ul id="next"><li class="muted">Nothing yet.</li></ul></div>
     </div>
+    <div class="moments" id="turns" hidden><h3>Turning points</h3><div id="turnList"></div></div>
     <div class="moments" id="moments" hidden><h3>Specific moments to fix</h3><div id="momentList"></div></div>
   </section>
 
@@ -789,8 +792,12 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     var box = $("coachFeed");
     box.innerHTML = "";
     var card = el("div", "coach-card" + (c.state === "error" ? " error" : "") + (c.state === "thinking" ? " thinking" : "") +
-      ($("liveMode").checked ? " live" : ""));
-    card.appendChild(el("div", "q", c.question ? ("Say this next · " + c.question) : "Say this next"));
+      ($("liveMode").checked ? " live" : "") + (c.mode === "keep_going" ? " keep" : ""));
+    var qd = el("div", "q");
+    if (c.mode === "keep_going") qd.appendChild(el("span", "keep-tag", "✓ Keep going · "));
+    qd.appendChild(document.createTextNode(c.question ? ((c.mode === "keep_going" ? "" : "Say this next · ") + c.question)
+                                                      : (c.mode === "keep_going" ? "" : "Say this next")));
+    card.appendChild(qd);
     if (c.state === "error") {
       card.appendChild(el("p", "say", c.error || "Coach unavailable."));
       card.appendChild(el("div", "meta", "The transcript and scoring keep running."));
@@ -1019,6 +1026,18 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       mlist.appendChild(d);
     });
     $("moments").hidden = !(sum.missed_moments || []).length;
+    var tl = $("turnList");
+    tl.innerHTML = "";
+    (sum.turning_points || []).forEach(function (t) {
+      var d = el("div", "moment");
+      var head = el("b", null, "[" + String(t.time || "").replace(/[\[\]]/g, "") + "] " + (t.worked ? "Worked" : "Didn't work"));
+      head.style.color = t.worked ? "var(--good)" : "var(--warn)";
+      d.appendChild(head);
+      d.appendChild(el("div", null, t.what_happened || ""));
+      d.appendChild(el("div", "muted", "Why: " + (t.why || "")));
+      tl.appendChild(d);
+    });
+    $("turns").hidden = !(sum.turning_points || []).length;
   }
 
   // ---------------------------------------------------------------- reset
@@ -1051,6 +1070,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("landSuggest").hidden = true;
     coachPaused = false; setCoachStatus("");
     $("moments").hidden = true;
+    $("turns").hidden = true;
     onStage({ stage: "discovery", pinned: null, label: "Cold / Discovery" });
     $("coachingOn").checked = true;
     $("sumOpen").hidden = true;

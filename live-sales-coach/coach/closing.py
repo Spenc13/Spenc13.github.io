@@ -49,11 +49,12 @@ TRACKER_SCHEMA = {
         "stage": {"type": "string", "enum": ["discovery", "presenting", "confirming", "side"]},
         "conversation_mode": {"type": "string", "enum": ["business", "rapport", "side"]},
         "meeting_agreed": {"type": "boolean"},
+        "momentum": {"type": "string", "enum": ["productive", "neutral", "stalled"]},
     },
     "required": ["path", "demo_time_confirmed", "demo_when", "demo_format", "decision_maker",
                  "decision_maker_note", "invite_accept_asked", "reschedule_notice_asked",
                  "otf_link_sent", "followup_set", "followup_when", "not_interested",
-                 "decision_maker_confirmed", "stage", "conversation_mode", "meeting_agreed"],
+                 "decision_maker_confirmed", "stage", "conversation_mode", "meeting_agreed", "momentum"],
     "additionalProperties": False,
 }
 
@@ -82,6 +83,10 @@ TRACKER_PROMPT = (
     "or the appointment), rapport (friendly small talk that builds the relationship), or side (off-topic, not "
     "rapport).\n"
     "- meeting_agreed: the prospect has already agreed to a meeting or demo time.\n"
+    "- momentum, for the last couple of minutes: productive (the prospect is engaged and sharing real detail, "
+    "and the conversation is moving toward their problem, the value, or a next step; natural rapport counts), "
+    "stalled (going in circles, short or disengaged answers, an objection left hanging, or drifting off the "
+    "sale), or neutral.\n"
     "Spencer's typed notes are ground truth and override the transcript.\n"
     "Be strict: only mark something true if it clearly happened."
 )

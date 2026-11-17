@@ -107,6 +107,7 @@ class CallSession:
         self.coach_notes: list[dict] = []          # standing-rule notes typed during the call (saved after)
         self.glossary: dict = dict(self.call_info.get("glossary") or {})
         self._last_card_text = ""
+        self._timeline: list[dict] = []           # cards shown, for the post-call breakdown
         self.discovery_questions = list(get(cfg, "coach.discovery_questions", []) or []) or None
         wt = get(cfg, "metrics.wpm_target", None)
         if isinstance(wt, (list, tuple)) and len(wt) == 2:
@@ -651,7 +652,8 @@ class CallSession:
         else:
             try:
                 summary = await self.engine.post_call_summary(full, snap, self._coaching_count,
-                                                              note=self._summary_note())
+                                                              note=self._summary_note(),
+                                                              timeline=self._timeline)
             except CoachUnavailable as e:
                 err = str(e)
             except Exception as e:
@@ -998,7 +1000,9 @@ class CallSession:
             parsed["say"] = one_question(say)      # never two questions in one line
             if parsed["say"] and "latency" not in first_card:
                 first_card["latency"] = time.monotonic() - anchor
-            self.emit("coach", {"state": "streaming", "question": req.question, **parsed,
+            self.emit("coach", {"state": "streaming", "question": req.question,
+                                "mode": "keep_going" if (self.stage_state.momentum == "productive"
+                                                         and req.reason == "live") else "coach", **parsed,
                                 "latency_s": round(first_card.get("latency", 0), 2) or None})
 
         try:
@@ -1056,6 +1060,11 @@ class CallSession:
             "cache_read_tokens": result.get("cache_read_tokens"),
             "cache_write_tokens": result.get("cache_write_tokens"),
         }
+        mode = "keep_going" if (self.stage_state.momentum == "productive" and req.reason == "live") else (
+            "redirect" if self.stage_state.momentum == "stalled" else "coach")
+        record["mode"] = mode
+        self._timeline.append({"t": record["call_time"], "mode": mode, "stage": record.get("stage"),
+                               "reason": req.reason, "say": say})
         self._coaching_count += 1
         say = parsed.get("say", "")
         self._last_say = "" if say.startswith("(") else say
@@ -1063,7 +1072,7 @@ class CallSession:
         self._coaching_log.append(record)
         if self.store:
             self.store.log_coaching(record, stamp=False)
-        self.emit("coach", {"state": "done", "question": req.question, "live": req.fast, **parsed,
+        self.emit("coach", {"state": "done", "question": req.question, "live": req.fast, "mode": mode, **parsed,
                             "latency_s": record["latency_s"], "latency_complete_s": record["latency_complete_s"],
                             "measured_from": "prospect stopped talking" if req.spoke_end_mono else "your request",
                             "stt_latency_s": (req.detection or {}).get("stt_latency_s"),

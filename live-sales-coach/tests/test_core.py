@@ -1112,3 +1112,60 @@ def test_pace_target_from_config():
     events = []
     s = _v2_session(events, metrics__wpm_target=[180, 230])
     assert s.metrics.wpm_target == (180, 230)
+
+
+# ---------------------------------------------------------------- momentum: keep going
+def test_momentum_guidance():
+    events = []
+    s = _v2_session(events)
+    s.stage_state.apply({"stage": "discovery", "conversation_mode": "business", "momentum": "productive"}, 30)
+    ctx = s._context_block("live")
+    assert "going well" in ctx and "Don't redirect" in ctx and "You're doing great." in ctx
+    s.stage_state.apply({"momentum": "stalled"}, 60)
+    assert "stalling" in s._context_block("live") and "going well" not in s._context_block("live")
+    s.stage_state.apply({"stage": "side", "conversation_mode": "side", "momentum": "productive"}, 90)
+    assert "going well" not in s._context_block("live")            # never during side talk
+
+
+def test_keep_going_cards_and_turning_points(tmp_path):
+    events = []
+    keep = ("Say this next: Great conversation. Mention the review tool, since he said customers check reviews first.\n"
+            "Tactic: Keep momentum\nWatch-out: Don't change course")
+
+    async def run():
+        s = _v2_session(events, live=True, storage__calls_dir=str(tmp_path))
+        s.engine.client = _FakeClient(keep)
+        s.stage_state.apply({"stage": "discovery", "conversation_mode": "business", "momentum": "productive"}, 0)
+        await s.on_stt(_ev(PROSPECT, "Honestly most of my customers check our Google reviews before they call.", 1))
+        await asyncio.sleep(0.3)
+        return s
+
+    s = asyncio.run(run())
+    done = [d for k, d in events if k == "coach" and d.get("state") == "done"]
+    assert done and done[0]["mode"] == "keep_going" and done[0]["say"].startswith("Great conversation.")
+    assert s._timeline and s._timeline[0]["mode"] == "keep_going"
+    from coach.engine import _timeline_text
+    assert "KEEP GOING (discovery): Great conversation." in _timeline_text(s._timeline)
+
+    from coach.storage import CallStore
+    st = CallStore(str(tmp_path))
+    st.write_summary({"overview": "o", "key_wins": [], "missed_opportunities": [], "missed_moments": [],
+                      "turning_points": [{"time": "12:30", "what_happened": "Tied reviews to his goal",
+                                          "worked": True, "why": "He'd just said customers check reviews"}],
+                      "next_steps": []}, {"title": "t"})
+    md = (st.dir / "summary.md").read_text()
+    assert "## Turning points" in md and "[12:30] Tied reviews to his goal: **Worked.**" in md
+    st.finalize(keep=False)
+
+
+def test_summary_request_includes_coaching_timeline():
+    cfg = load_config()
+    eng = CoachEngine(cfg, PROMPTS, api_key_present=False)
+    eng.client = _FakeClient(REPLY)
+    asyncio.run(eng.post_call_summary("[00:01] Rep: hi", {"overall": 70}, 1,
+                                      timeline=[{"t": "00:05", "mode": "keep_going", "stage": "discovery",
+                                                 "say": "Great conversation. Mention reviews."}]))
+    kw = eng.client.messages.calls[-1]
+    content = kw["messages"][0]["content"]
+    assert "[00:05] KEEP GOING (discovery): Great conversation." in content and "turning_points" in content
+    assert "turning_points" in kw["output_config"]["format"]["schema"]["required"]
