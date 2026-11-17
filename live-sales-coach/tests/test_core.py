@@ -1169,3 +1169,30 @@ def test_summary_request_includes_coaching_timeline():
     content = kw["messages"][0]["content"]
     assert "[00:05] KEEP GOING (discovery): Great conversation." in content and "turning_points" in content
     assert "turning_points" in kw["output_config"]["format"]["schema"]["required"]
+
+
+# ---------------------------------------------------------------- Spencer's discovery questions
+def test_discovery_question_bank_loads_and_guides(tmp_path):
+    import shutil
+    from coach.config import PROMPT_FILES, load_prompts
+    for f in PROMPT_FILES.values():
+        (tmp_path / f).write_text("x", encoding="utf-8")
+    p = load_prompts(tmp_path)
+    assert p.discovery == ""                                       # optional
+    (tmp_path / "discovery-questions.md").write_text(
+        "How long have you been in business?\nHow much does a job like that bring in for you?", encoding="utf-8")
+    p = load_prompts(tmp_path)
+    assert "How long have you been in business?" in p.discovery
+
+    cfg = load_config()
+    eng = CoachEngine(cfg, p, api_key_present=False)
+    assert any("Spencer's discovery questions" in b["text"] and "not a sequence" in b["text"]
+               for b in eng.system_blocks())
+
+    events = []
+    s = CallSession(cfg, p, lambda k, d: events.append((k, d)), "replay_text")
+    ctx = s._context_block("live")
+    assert "not a script, so there's no required order" in ctx and "decision-maker check" in ctx
+    assert "one job profit you, after materials" not in ctx        # his bank replaces the built-in list
+    s.set_stage("presenting")
+    assert "no required order" not in s._context_block("live")

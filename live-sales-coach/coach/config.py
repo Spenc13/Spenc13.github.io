@@ -18,6 +18,10 @@ PROMPT_FILES = {
     "playbook": "playbook-hormozi-miner-voss.md",
     "offer": "offer-reference.md",
 }
+# Optional: Spencer's own discovery questions (a bank to draw from, not a sequence).
+OPTIONAL_PROMPT_FILES = {
+    "discovery": "discovery-questions.md",
+}
 
 
 def load_env() -> None:
@@ -50,6 +54,7 @@ class Prompts:
     instructions: str
     playbook: str
     offer: str
+    discovery: str = ""          # Spencer's discovery questions (optional)
 
 
 class MissingPrompts(Exception):
@@ -75,10 +80,12 @@ def load_prompts(prompts_dir: Path = PROMPTS_DIR) -> Prompts:
             + ". Download them from Google Drive (see prompts/README.md)."
         )
     read = lambda key: (prompts_dir / PROMPT_FILES[key]).read_text(encoding="utf-8")
+    disc = prompts_dir / OPTIONAL_PROMPT_FILES["discovery"]
     return Prompts(
         instructions=_instructions_body(read("instructions")),
         playbook=read("playbook").strip(),
         offer=read("offer").strip(),
+        discovery=disc.read_text(encoding="utf-8").strip() if disc.exists() else "",
     )
 
 

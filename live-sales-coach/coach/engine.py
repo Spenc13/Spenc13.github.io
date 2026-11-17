@@ -146,6 +146,11 @@ class CoachEngine:
             {"type": "text", "text": "# Playbook\n\n" + self.prompts.playbook},
             {"type": "text", "text": "# Offer reference\n\n" + self.prompts.offer},
         ]
+        if getattr(self.prompts, "discovery", "").strip():
+            blocks.append({"type": "text", "text": (
+                "# Spencer's discovery questions (his own questions and wording; a bank to draw from, "
+                "not a sequence)\n\n"
+                + self.prompts.discovery.strip())})
         if self.style_notes.strip():
             blocks.append({"type": "text", "text": (
                 "# Spencer's selling notes (approved by Spencer; standing rules about how he sells)\n\n"

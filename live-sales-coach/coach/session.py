@@ -506,7 +506,8 @@ class CallSession:
         """Stage focus, confirmed names, typed ground truth, what's covered, last card."""
         el = self.elapsed()
         st = self.stage()
-        parts = [self.stage_state.guidance(el, self.metrics.checkins, 25, self.discovery_questions)]
+        parts = [self.stage_state.guidance(el, self.metrics.checkins, 25, self.discovery_questions,
+                                           script=bool(getattr(self.prompts, "discovery", "").strip()))]
         if st == "confirming" or self.land_open or reason in ("land", "wrap_guard"):
             parts.append(self.closing.status_text(el / 60, 1e9))
         names = {k: v for k, v in self.glossary.items() if v}

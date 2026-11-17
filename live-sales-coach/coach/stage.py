@@ -65,6 +65,17 @@ DISCOVERY_QUESTIONS = [
     "How far out are you willing to drive for the right job?",
 ]
 
+SCRIPT_GUIDANCE = (
+    "Call stage: Cold call / Discovery. Spencer's own discovery questions are in your context: a bank to draw "
+    "from, not a script, so there's no required order. Pick whichever question fits this moment best and "
+    "hasn't been answered yet (check the transcript and \"Already covered\"), and use his wording. Fill the "
+    "[brackets] with what the prospect actually said (their service, job counts, job value, competitor names). "
+    "When you know the extra jobs they want and what a job is worth, the revenue-gap question is a strong one "
+    "(extra jobs x job value = money left on the table per week or month). Where a line lists several questions, "
+    "use just one. His questions mark the decision-maker check as critical, so make sure it gets asked at some "
+    "point before the presentation. Don't pitch features yet."
+)
+
 KEEP_GOING = (
     "Momentum: the conversation is going well (the prospect is engaged and it's moving forward). Don't "
     "redirect Spencer or change his approach, so he keeps his train of thought. Start \"Say this next\" with brief "
@@ -133,10 +144,14 @@ class StageState:
         """How long the conversation has been off the sale (rapport doesn't count)."""
         return 0.0 if self.side_since is None else max(0.0, now - self.side_since)
 
-    def guidance(self, now: float, checkins: int, target: int, questions: list[str] | None = None) -> str:
+    def guidance(self, now: float, checkins: int, target: int, questions: list[str] | None = None,
+                 script: bool = False) -> str:
         st = self.effective_for(now)
         qs = "\n".join(f"- {q}" for q in (questions or DISCOVERY_QUESTIONS))
-        text = GUIDANCE[st].format(target=target, done=checkins, questions=qs)
+        if st == "discovery" and script:
+            text = SCRIPT_GUIDANCE
+        else:
+            text = GUIDANCE[st].format(target=target, done=checkins, questions=qs)
         if self.mode == "rapport" and st != "side":
             text += " " + RAPPORT
         if st != "side":
