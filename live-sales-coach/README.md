@@ -116,12 +116,17 @@ The coach works out which stage the call is in from the conversation: whether a 
 
 | Stage | What the coach focuses on |
 |---|---|
-| **Cold / Discovery** | NEPQ discovery questions (situation, problem, consequence, budget); no pitching, no scheduling |
+| **Cold / Discovery** | NEPQ discovery questions with a blue-collar bent (what one job profits them, which jobs they want more of, what they spend on marketing now and where); no pitching, no scheduling. Edit the list under `coach.discovery_questions` in `config.yaml` |
 | **Presenting** | checking-for-agreement questions (target **about 25 per presentation**, counted live), recapping their problems in their words, transitions; no discovery questions |
-| **Confirming** | the calendar invite, the decision maker and any approval steps (for example, a franchisor sign-off), and the reschedule-notice ask; no pitch content |
+| **Confirming** | asking for the time **after a one-sentence pain recap in their own words**, the calendar invite, the decision maker and any approval steps (for example, a franchisor sign-off), and the reschedule-notice ask; no pitch content |
 | **Side conversation** | coaching **pauses** ("Side conversation: coaching paused") and resumes when the business topic returns |
 
 **Scheduling prompts only appear in Confirming.** Rapport small talk isn't a side conversation, and the coach never pushes to close during rapport. **Coaching on** turns cards off entirely; the transcript and scores keep running. **Every turn** switches between a line after every finished prospect turn and keyword-only cards.
+
+### Card rules
+
+- **One question per line.** The coach never stacks two questions in one card, and the app trims any card that tries to down to its first question.
+- **Pain recap before the ask.** Whenever a card asks for a time or appointment, it opens with one sentence recapping the prospect's pain in their own words, then asks, so the reason to show up sticks. This also applies to **✈ Land it** and the Confirming stage.
 
 ### How cards are timed
 
@@ -154,7 +159,7 @@ When you call from a HubSpot record, the companion extension reads the contact's
 - **Lines are sorted by audio time,** and consecutive lines from the same speaker merge into one turn.
 - **Backchannels** ("mhmm", "yeah", "right?") aren't turns. They show as a small aside on the other person's line, and don't count toward talk time or trigger cards.
 - **Listening:** target **30–45% you**.
-- **Pacing:** target **140–165 wpm**.
+- **Pacing:** target **170–220 wpm** (change it with `metrics.wpm_target` in `config.yaml`).
 - **Discovery:** counts **real questions** only. Tag questions and fragments don't count, and open questions are weighted more.
 - **Objections:** count as handled when a coach card responded to them.
 - **The outcome follows one path at a time.**

@@ -23,8 +23,11 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 LIVE_INSTRUCTION = (
     "Live coach mode: Spencer will read your \"Say this next\" line out loud, word for word, right now. "
-    "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words, "
-    "responding directly to what the prospect just said and fitting the call stage above. "
+    "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words "
+    "(up to 40 when asking for a time or appointment), responding directly to what the prospect just said "
+    "and fitting the call stage above. Ask exactly ONE question: never two questions in the same line, and "
+    "no compound questions joined with \"and\" or \"or else\". When the line asks for a time or appointment, "
+    "open with a one-sentence recap of their pain in their own words, then ask for the time. "
     "Don't repeat a point he already made or ask for something already covered. No stage directions or "
     "quotation marks. If the prospect hasn't actually finished their thought, write exactly: "
     "Say this next: (Listening) . If the latest talk is a side conversation unrelated to the sale (someone "
@@ -69,6 +72,15 @@ def parse_coach(text: str) -> dict[str, str]:
 _WORD = re.compile(r"[a-z0-9']+")
 _STOP = {"the", "and", "that", "this", "with", "your", "you", "what", "would", "have", "about", "just",
          "it's", "that's", "there", "they", "them", "then", "from", "like", "know", "really", "so", "for"}
+
+
+def one_question(say: str) -> str:
+    """Keep at most one question in a line: everything up to and including the first
+    question mark. Statements before it stay ("Makes sense. What does one job profit you?")."""
+    i = say.find("?")
+    if i == -1 or "?" not in say[i + 1:]:
+        return say
+    return say[: i + 1].rstrip()
 
 
 def said_it(suggestion: str, spoken: str) -> bool:

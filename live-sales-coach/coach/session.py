@@ -21,7 +21,8 @@ from typing import Callable
 import numpy as np
 
 from .config import Prompts, get, keys_status
-from .engine import LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, parse_coach, said_it
+from .engine import (LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailable, one_question,
+                     parse_coach, said_it)
 from .metrics import Metrics
 from .callfilter import judge
 from .notes import load_style, new_proposal
@@ -106,6 +107,10 @@ class CallSession:
         self.coach_notes: list[dict] = []          # standing-rule notes typed during the call (saved after)
         self.glossary: dict = dict(self.call_info.get("glossary") or {})
         self._last_card_text = ""
+        self.discovery_questions = list(get(cfg, "coach.discovery_questions", []) or []) or None
+        wt = get(cfg, "metrics.wpm_target", None)
+        if isinstance(wt, (list, tuple)) and len(wt) == 2:
+            self.metrics.wpm_target = (int(wt[0]), int(wt[1]))
         self._last_land_nudge = -1e9            # call seconds
         self._last_wrap_guard = -1e9
         self._tracker_task: asyncio.Task | None = None
@@ -393,7 +398,8 @@ class CallSession:
         if path == "none":
             ask = ("Time to land the plane. Give Spencer the exact line to transition to setting the demo "
                    "(date and time by phone or Google Meet), or to going on-the-fly now with a Google Meet link "
-                   "if they seem to have time.")
+                   "if they seem to have time. Open with a one-sentence recap of their pain in their own words "
+                   "from this call, then ask for the time.")
         else:
             missing = c.missing(path)
             ask = ("Help Spencer land the plane. Still needed: " + "; ".join(missing) + ". Give him the exact "
@@ -499,7 +505,7 @@ class CallSession:
         """Stage focus, confirmed names, typed ground truth, what's covered, last card."""
         el = self.elapsed()
         st = self.stage()
-        parts = [self.stage_state.guidance(el, self.metrics.checkins, 25)]
+        parts = [self.stage_state.guidance(el, self.metrics.checkins, 25, self.discovery_questions)]
         if st == "confirming" or self.land_open or reason in ("land", "wrap_guard"):
             parts.append(self.closing.status_text(el / 60, 1e9))
         names = {k: v for k, v in self.glossary.items() if v}
@@ -731,7 +737,8 @@ class CallSession:
         flip = {REP: PROSPECT, PROSPECT: REP}
         for u in self.transcript.finals:
             u.speaker = flip[u.speaker]
-        m = Metrics(partial_after=self.metrics.partial_after, close_score=self.metrics.close_score,
+        m = Metrics(partial_after=self.metrics.partial_after, wpm_target=self.metrics.wpm_target,
+                    close_score=self.metrics.close_score,
                     close_recs=list(self.metrics.close_recs), outcome=self.metrics.outcome)
         for u in self.transcript.finals:
             m.add_utterance(u)
@@ -988,6 +995,7 @@ class CallSession:
             say = parsed["say"].lstrip()
             if not say or say.startswith("("):
                 return
+            parsed["say"] = one_question(say)      # never two questions in one line
             if parsed["say"] and "latency" not in first_card:
                 first_card["latency"] = time.monotonic() - anchor
             self.emit("coach", {"state": "streaming", "question": req.question, **parsed,
@@ -1016,7 +1024,8 @@ class CallSession:
         parsed = parse_coach(result["text"])
         if result.get("stop_reason") == "refusal":
             parsed = {"say": "(The coach declined this one. Ask again in different words.)", "tactic": "", "watch": ""}
-        say = parsed.get("say", "")
+        parsed["say"] = one_question(parsed.get("say", ""))
+        say = parsed["say"]
         if say.startswith("(") and result.get("stop_reason") != "refusal":
             # Not a card: show a small status instead of "stay quiet".
             if "side" in say.lower():

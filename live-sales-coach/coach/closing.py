@@ -283,7 +283,9 @@ class CloseState:
         """Context for every coach request."""
         path = self.active_path()
         lines = [
-            "Landing the plane: Spencer must end the call with one outcome. (1) Set the demo: a specific date "
+            "Landing the plane: Spencer must end the call with one outcome. Whenever he asks for a time or an "
+            "appointment, the line opens with a one-sentence recap of the prospect's pain in their own words, "
+            "then the ask, so the reason to show up sticks. (1) Set the demo: a specific date "
             "and time by phone or Google Meet; confirm they're the only decision maker or get the other decision "
             "maker on the invite; ask them to accept the calendar invite and to give reasonable notice if they "
             "need to reschedule. (2) Go on-the-fly: if they have time now, send a Google Meet link and present. "
