@@ -1221,3 +1221,158 @@ def test_short_call_with_a_set_is_kept(tmp_path):
     assert s._accum < 600 and s._appointment_set()
     assert any(k == "summary" and d.get("state") == "done" for k, d in events)
     assert not any(k == "summary" and d.get("state") == "discarded" for k, d in events)
+
+
+# ================================================================ Call breakdown
+def test_breakdown_reads_transcripts_and_guesses_the_rep():
+    from coach import breakdown as bd
+    rows = bd.parse_text("Mike Johnson: Hello?\nSpencer: Hey Mike, this is Spencer with Olly Olly. Got a minute?\n"
+                         "Mike Johnson: Sure.\n")
+    assert bd.guess_rep(rows, "Spencer Faircloth") == "Spencer"
+    diar = [{"t": 0, "speaker": "Speaker 1", "text": "Hello, Mike's Roofing."},
+            {"t": 2, "speaker": "Speaker 2", "text": "Hi Mike, my name is Spencer, calling from Olly Olly. How are calls coming in?"}]
+    assert bd.guess_rep(diar, "Spencer Faircloth") == "Speaker 2"
+    ours = bd.parse_text("[00:05] Rep: What made you take the call?\n[00:09] Prospect: Phones are slow.\n"
+                         "[00:12] Spencer (typed): note\n")
+    assert len(ours) == 2 and ours[0]["t"] == 5
+    assert bd.normalize(ours, "Rep").splitlines()[1] == "[00:09] Prospect: Phones are slow."
+
+
+def test_breakdown_plan_progress_rules():
+    from coach import breakdown as bd
+    plan = {"rep": "Spencer", "steps": [
+        {"id": "s1", "text": "Pain recap before the ask", "status": "active", "history": []},
+        {"id": "s2", "text": "Ask budget before pricing", "status": "active", "history": []}]}
+    bd.apply_progress(plan, [{"step_id": "s1", "status": "improved"}, {"step_id": "s2", "status": "not_yet"}], "b1")
+    assert [s["status"] for s in plan["steps"]] == ["active", "active"]
+    ch = bd.apply_progress(plan, [{"step_id": "s1", "status": "improved"}, {"step_id": "s2", "status": "not_yet"}], "b2")
+    assert plan["steps"][0]["status"] == "mastered" and plan["steps"][1]["status"] == "needs_training"
+    assert {c["to"] for c in ch} == {"mastered", "needs_training"}
+    bd.apply_progress(plan, [{"step_id": "s2", "status": "no_opportunity"}], "b3")       # doesn't count either way
+    assert plan["steps"][1]["status"] == "needs_training"
+    bd.apply_final_steps(plan, [{"step": "Ask budget before pricing", "carry_over_id": "s2"},
+                                {"step": "One question at a time", "why": "w", "how_to_practice": "h",
+                                 "success_looks_like": "s", "carry_over_id": ""}], ["s2"], "b3")
+    ids = {s["id"]: s for s in plan["steps"]}
+    assert ids["s2"]["status"] == "needs_training"                                   # carried over, same step
+    assert any(s["text"] == "One question at a time" and s["status"] == "active" for s in plan["steps"])
+    assert len([s for s in plan["steps"] if s["text"] == "Ask budget before pricing"]) == 1
+
+
+class _BdFakeMessages(_FakeMessages):
+    def __init__(self):
+        super().__init__(REPLY)
+        self.round = 0
+
+    async def create(self, **kw):
+        self.calls.append(kw)
+        content = kw["messages"][0]["content"]
+        if "Break down these sales calls" in content:
+            self.round += 1
+            step_progress = []
+            if "s1:" in content:
+                step_progress = [{"step_id": "s1", "step": "Pain recap before the ask", "status": "improved",
+                                  "evidence": "Recapped crews before asking for Thursday", "time": "00:40"}]
+            res = {"overview": "Good discovery, rushed close.", "patterns": [], "step_progress": step_progress,
+                   "calls": [{"call_id": 1, "title": "Roofer", "strengths": [
+                       {"time": "00:12", "category": "discovery_question", "quote": "What happens if retail stays slow?",
+                        "why": "Consequence question"}],
+                       "improvements": [{"time": "00:44", "category": "confirmation", "quote": "Can you accept it?",
+                                         "issue": "No reschedule ask", "try_instead": "If anything comes up, can you give me a day's notice?"}]}]}
+        else:
+            res = {"response_to_rep": "Fair point on the timing.", "training_flags": [], "carry_over": [],
+                   "action_steps": [{"step": "Pain recap before the ask", "why": "Makes the reason stick",
+                                     "how_to_practice": "Say their pain back first", "success_looks_like": "Recap on every ask",
+                                     "carry_over_id": ""}]}
+
+        class B:
+            type = "text"
+            text = json.dumps(res)
+
+        class M:
+            stop_reason = "end_turn"
+            content = [B()]
+        return M()
+
+
+def test_breakdown_end_to_end(tmp_path):
+    import time as _time
+    from coach import breakdown as bd
+    from coach.breakdown_controller import BreakdownController
+    from coach.runner import AsyncRunner
+    import coach.breakdown_controller as bc
+
+    cfg = load_config()
+    cfg["breakdown"]["dir"] = str(tmp_path / "bd")
+    fake = _BdFakeMessages()
+
+    class Eng(CoachEngine):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            client = _FakeClient(REPLY)
+            client.messages = client.beta.messages = fake
+            self.client = client
+    orig = bc.CoachEngine
+    bc.CoachEngine = Eng
+    posts = []
+    runner = AsyncRunner()
+    try:
+        c = BreakdownController(cfg, PROMPTS, lambda k, d: posts.append((k, d)), runner, True)
+        c.set_rep("Spencer Faircloth")
+        call = tmp_path / "roofer.txt"
+        call.write_text((ROOT / "samples" / "set_demo_practice.txt").read_text(), encoding="utf-8")
+        c.add_paths([str(call)])
+
+        def wait(cond, t=10):
+            end = _time.time() + t
+            while not cond() and _time.time() < end:
+                _time.sleep(0.05)
+            assert cond()
+        wait(lambda: c.calls)
+        assert c.calls[0]["rep"] == "Rep"
+        c.analyze(); wait(lambda: c.analysis and not c.busy)
+        imp = c.analysis["calls"][0]["improvements"][0]
+        assert imp["id"] == 1
+        c.reflect("1", "I was rushing because he had a crew waiting.")
+        c.reflect("general", "I want to slow down at the close.")
+        c.finalize(); wait(lambda: c.final and not c.busy)
+        plan = bd.load_plan(cfg, "Spencer Faircloth")
+        assert [s["text"] for s in plan["steps"]] == ["Pain recap before the ask"]
+        saved = list((tmp_path / "bd" / "spencer-faircloth").glob("*/breakdown.md"))
+        md = saved[0].read_text()
+        assert "Rep's take: I was rushing" in md and "Action steps for the next calls" in md
+        prompt = fake.calls[-1]["messages"][0]["content"]
+        assert "I was rushing because he had a crew waiting." in prompt and "slow down at the close" in prompt
+
+        # Next time: the earlier step is checked.
+        c.reset(); c.add_paths([str(call)]); wait(lambda: c.calls)
+        c.analyze(); wait(lambda: c.analysis and not c.busy)
+        assert "s1: Pain recap before the ask" in fake.calls[-1]["messages"][0]["content"]
+        plan = bd.load_plan(cfg, "Spencer Faircloth")
+        assert plan["steps"][0]["history"][-1]["status"] == "improved"
+        snap = c.snapshot()
+        assert snap["history"] and snap["plan"][0]["text"] == "Pain recap before the ask"
+    finally:
+        bc.CoachEngine = orig
+        runner.stop()
+
+
+def test_live_coach_knows_current_action_steps(tmp_path):
+    from coach import breakdown as bd
+    cfg = load_config()
+    cfg["breakdown"]["dir"] = str(tmp_path)
+    bd.save_plan(cfg, {"rep": cfg["rep_name"], "steps": [
+        {"id": "s1", "text": "Recap pain before asking for the time", "status": "active", "history": []},
+        {"id": "s2", "text": "Old step", "status": "retired", "history": []}]})
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text",
+                        str(ROOT / "samples" / "set_demo_practice.txt"))
+        await s.start()
+        ctx = s._context_block("live")
+        await s.end()
+        return ctx
+
+    ctx = asyncio.run(run())
+    assert "current action steps" in ctx and "Recap pain before asking for the time" in ctx and "Old step" not in ctx

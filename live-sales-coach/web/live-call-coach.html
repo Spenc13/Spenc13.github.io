@@ -352,6 +352,32 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
 .call-row .controls { gap: 12px; }
 .call-row .select { max-width: 260px; }
 .btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+/* Call breakdown tab */
+.tabs-top { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
+.tabs-top button { background: none; border: 0; border-radius: 8px; padding: 7px 12px; font-weight: 600; font-size: 13px; color: var(--muted); }
+.tabs-top button.on { background: var(--accent-soft); color: var(--fg); }
+.bd-call { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.bd-call-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.bd-call-top strong { flex: 1 1 200px; }
+.bd-who { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.bd-who .select { max-width: 100%; flex: 1 1 260px; }
+.bd-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.bd-step { background: var(--panel-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: grid; gap: 4px; }
+.bd-step .tag { justify-self: start; }
+.tag.good { color: var(--good); background: rgba(56,217,169,0.12); }
+.tag.warn { color: var(--warn); background: rgba(245,196,81,0.12); }
+.bd-cols { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 900px) { .bd-cols { grid-template-columns: 1fr 1fr; } }
+.bd-col-h { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.bd-col-h.good { color: var(--good); } .bd-col-h.fix { color: var(--warn); }
+.bd-moment { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px; border-left: 3px solid var(--line); }
+.bd-moment.good { border-left-color: var(--good); } .bd-moment.fix { border-left-color: var(--warn); }
+.bd-moment b { text-transform: capitalize; }
+.bd-take { width: 100%; min-height: 54px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 8px 10px; font: inherit; font-size: 13px; margin: 0 0 12px; }
+#bdResults h3 { font-size: 14px; margin: 16px 0 8px; }
+.bd-progress { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
+.bd-change { font-size: 13px; margin: 6px 0; color: var(--fg); }
+.bd-steps { padding-left: 20px; display: grid; gap: 10px; font-size: 13px; }
 /* v2: stage bar, statuses, notes */
 .stage-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-top: 14px; }
 .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; flex-wrap: wrap; }
@@ -447,6 +473,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <p>Olly Olly · Discovery, demo, and close support</p>
     </div>
     <button id="callsBtn" class="btn calls-btn" type="button"><span aria-hidden="true">🗂</span> Past calls</button>
+    <div class="tabs-top" role="tablist"><button id="tabLive" class="on" type="button">Live coach</button><button id="tabBd" type="button">Call breakdown</button></div>
     <div class="top-spacer"></div>
     <div class="user">
       <div class="avatar"><img id="avatarImg" src="spencer.png" alt="Spencer Faircloth" onerror="this.outerHTML='<div class=&quot;initials&quot;>SF</div>'"></div>
@@ -456,7 +483,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       </div>
     </div>
   </div>
-  <div class="call-row">
+  <div class="call-row" id="callRow">
     <label class="search" aria-label="Ask the coach a question">
       <span class="muted" aria-hidden="true">⌕</span>
       <input id="ask" type="text" placeholder="Type anything: what you said, what they said, what was missed, or a question" autocomplete="off">
@@ -472,7 +499,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       <button id="endBtn" class="btn danger" hidden>End call</button>
     </div>
   </div>
-  <div class="stage-row">
+  <div class="stage-row" id="stageRow">
     <span class="stage-label">Stage</span>
     <div class="seg" id="stageSeg" role="group" aria-label="Call stage">
       <button type="button" data-stage="auto" class="on" title="Detect the stage from the conversation">Auto</button>
@@ -488,7 +515,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   </div>
 </header>
 
-<div class="healthbar" aria-live="polite">
+<div class="healthbar" id="healthbar" aria-live="polite">
   <span id="sttPill" class="pill idle"><span class="dot"></span><span id="sttText">Speech-to-text: idle</span></span>
   <span id="coachPill" class="pill idle"><span class="dot"></span><span id="coachText">Coach: ready</span></span>
   <span id="latPill" class="pill idle"><span id="latText">Latency: –</span></span>
@@ -498,7 +525,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   <label class="toggle"><input type="checkbox" id="onTop"> Stay on top</label>
 </div>
 
-<main class="grid">
+<main class="grid" id="liveView">
 
   <!-- Live transcript -->
   <section class="card span-4" aria-labelledby="t-h">
@@ -647,6 +674,33 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     <div class="moments" id="moments" hidden><h3>Specific moments to fix</h3><div id="momentList"></div></div>
   </section>
 
+</main>
+
+<main class="grid" id="bdView" hidden>
+  <section class="card span-8" aria-labelledby="bd-h">
+    <div class="card-head"><h2 id="bd-h">Call breakdown</h2><span class="muted" id="bdBusy" style="font-size:12px;"></span></div>
+    <div class="notes-input"><input id="bdRep" type="text" placeholder="Rep name" autocomplete="off" title="Each rep has their own action plan"></div>
+    <div id="bdCalls"></div>
+    <div class="bd-actions">
+      <button class="btn" id="bdAddFiles" type="button">+ Add recordings or transcripts</button>
+      <button class="btn" id="bdAddPast" type="button">+ From Past calls</button>
+      <select class="select" id="bdPastSel" hidden></select>
+    </div>
+    <div class="bd-actions">
+      <button class="btn primary" id="bdAnalyze" type="button" disabled>Break down calls</button>
+      <button class="btn small" id="bdNew" type="button">New breakdown</button>
+    </div>
+  </section>
+  <section class="card span-4" aria-labelledby="plan-h">
+    <div class="card-head"><h2 id="plan-h">Action plan</h2><button class="btn small" id="bdFolder" type="button">Open folder</button></div>
+    <div id="bdPlan"></div>
+    <div class="label muted" style="font-size:12px;margin:12px 0 6px;">Past breakdowns</div>
+    <div id="bdHistory" style="font-size:12px;display:grid;gap:4px;"></div>
+  </section>
+  <section class="card span-12" id="bdResultsCard" hidden aria-labelledby="bdr-h">
+    <div class="card-head"><h2 id="bdr-h">Breakdown</h2></div>
+    <div id="bdResults"></div>
+  </section>
 </main>
 
 <footer id="footer">Calls are saved only on this computer, in the calls folder. Coaching uses Claude; transcription uses Deepgram.</footer>
@@ -1138,6 +1192,8 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         break;
       case "audio_devices": renderAudioPick(d); break;
       case "closing": renderClosing(d); break;
+      case "bd_state": renderBd(d); break;
+      case "bd_past": onBdPast(d); break;
       case "stage": onStage(d); break;
       case "land_suggest": onLandSuggest(d); break;
       case "coach_notes": onPendingNotes(d); break;
@@ -1257,6 +1313,175 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("noteInput").addEventListener("keydown", function (e) { if (e.key === "Enter") addNote(); });
     $("notesOpen").addEventListener("click", function () { send("open_style_file"); });
     showLand(false);
+  }
+
+  // ---------------------------------------------------------------- call breakdown tab
+  var bdState = null, bdPast = [];
+  function setView(v) {
+    var bdv = v === "breakdown";
+    ["callRow", "stageRow", "healthbar", "liveView", "footer"].forEach(function (id) { var n = $(id); if (n) n.hidden = bdv; });
+    $("bdView").hidden = !bdv;
+    $("tabLive").className = bdv ? "" : "on";
+    $("tabBd").className = bdv ? "on" : "";
+    if (bdv) send("bd_init");
+  }
+  function bdStatusPill(s) {
+    return { active: ["Active", ""], needs_training: ["🚩 Needs training", "warn"], mastered: ["✓ Mastered", "good"] }[s] || [s, ""];
+  }
+  function renderBd(d) {
+    bdState = d;
+    if (document.activeElement !== $("bdRep")) $("bdRep").value = d.rep || "";
+    // calls
+    var list = $("bdCalls");
+    list.innerHTML = "";
+    (d.calls || []).forEach(function (c) {
+      var row = el("div", "bd-call");
+      var top = el("div", "bd-call-top");
+      top.appendChild(el("strong", null, c.title));
+      top.appendChild(el("span", "muted", c.source + (c.minutes ? " · " + c.minutes + " min" : "")));
+      var rm = el("button", "btn small", "Remove"); rm.type = "button";
+      rm.addEventListener("click", function () { send("bd_remove", { id: c.id }); });
+      top.appendChild(rm);
+      row.appendChild(top);
+      if ((c.speakers || []).length > 1 && !(c.speakers.length === 2 && c.speakers.some(function (s) { return s.label === "Rep"; }))) {
+        var who = el("label", "bd-who");
+        who.appendChild(document.createTextNode("Which speaker is the rep? "));
+        var sel = el("select", "select");
+        c.speakers.forEach(function (s) {
+          var o = el("option", null, s.label + (s.sample ? ": “" + s.sample.slice(0, 70) + "…”" : ""));
+          o.value = s.label; if (s.label === c.rep) o.selected = true; sel.appendChild(o);
+        });
+        sel.addEventListener("change", function () { send("bd_speaker", { id: c.id, label: sel.value }); });
+        who.appendChild(sel);
+        row.appendChild(who);
+      }
+      list.appendChild(row);
+    });
+    (d.pending || []).forEach(function (p) { list.appendChild(el("div", "bd-call muted", p.path + ": " + p.status)); });
+    if (!list.children.length) list.appendChild(el("p", "muted", "Add one or more calls: recordings (MP3, M4A, WAV…), transcripts (.txt), or calls from Past calls."));
+    $("bdAnalyze").disabled = !d.can_analyze;
+    $("bdAnalyze").textContent = d.busy || ("Break down " + ((d.calls || []).length || "") + " call" + ((d.calls || []).length === 1 ? "" : "s"));
+    $("bdBusy").textContent = d.busy || "";
+    // plan
+    var pl = $("bdPlan");
+    pl.innerHTML = "";
+    (d.plan || []).forEach(function (s) {
+      var it = el("div", "bd-step");
+      var pill = bdStatusPill(s.status);
+      it.appendChild(el("span", "tag " + pill[1], pill[0]));
+      it.appendChild(el("div", null, s.text));
+      if ((s.history || []).length) it.appendChild(el("small", "muted", "Checked " + s.history.length + "×: " + s.history.map(function (h) { return h.status.replace("_", " "); }).join(" → ")));
+      pl.appendChild(it);
+    });
+    if (!pl.children.length) pl.appendChild(el("p", "muted", "No action steps yet. Finish a breakdown to get your first ones."));
+    var hist = $("bdHistory");
+    hist.innerHTML = "";
+    (d.history || []).forEach(function (h) { hist.appendChild(el("div", "muted", h.date + " · " + h.calls + " call" + (h.calls === 1 ? "" : "s") + (h.finished ? " · finished" : ""))); });
+    renderBdResults(d);
+  }
+  function moment(m, good) {
+    var d = el("div", "bd-moment " + (good ? "good" : "fix"));
+    d.appendChild(el("b", null, "[" + m.time + "] " + String(m.category || "").replace(/_/g, " ")));
+    d.appendChild(el("div", null, "“" + m.quote + "”"));
+    if (good) d.appendChild(el("div", "muted", m.why));
+    else {
+      d.appendChild(el("div", "muted", m.issue));
+      d.appendChild(el("div", null, "Try: “" + m.try_instead + "”"));
+    }
+    return d;
+  }
+  function reflectBox(key, placeholder) {
+    var ta = el("textarea", "bd-take");
+    ta.placeholder = placeholder;
+    ta.value = (bdState.reflections || {})[key] || "";
+    ta.disabled = !!bdState.final;
+    ta.addEventListener("blur", function () { send("bd_reflect", { key: key, text: ta.value }); });
+    return ta;
+  }
+  function renderBdResults(d) {
+    var box = $("bdResults");
+    box.innerHTML = "";
+    var a = d.analysis;
+    $("bdResultsCard").hidden = !a;
+    if (!a) return;
+    if (a.overview) box.appendChild(el("p", "overview", a.overview));
+    if ((a.step_progress || []).length) {
+      box.appendChild(el("h3", null, "Progress on your earlier action steps"));
+      a.step_progress.forEach(function (p) {
+        var cls = { improved: "good", partial: "", not_yet: "warn", no_opportunity: "" }[p.status] || "";
+        var r = el("div", "bd-progress");
+        r.appendChild(el("span", "tag " + cls, p.status.replace("_", " ")));
+        r.appendChild(el("span", null, p.step + (p.evidence ? ": " + p.evidence : "") + (p.time ? " [" + p.time + "]" : "")));
+        box.appendChild(r);
+      });
+      (d.changes || []).forEach(function (c) {
+        box.appendChild(el("div", "bd-change", (c.to === "mastered" ? "✓ Mastered: " : c.to === "needs_training" ? "🚩 Needs more coaching: " : "Back on track: ") + c.text));
+      });
+    }
+    (a.calls || []).forEach(function (c) {
+      box.appendChild(el("h3", null, c.title));
+      var cols = el("div", "bd-cols");
+      var g = el("div"); g.appendChild(el("div", "bd-col-h good", "What worked"));
+      (c.strengths || []).forEach(function (m) { g.appendChild(moment(m, true)); });
+      var f = el("div"); f.appendChild(el("div", "bd-col-h fix", "What to improve · add your take"));
+      (c.improvements || []).forEach(function (m) {
+        f.appendChild(moment(m, false));
+        f.appendChild(reflectBox(String(m.id), "Why did you say it this way? What do you think would have worked better?"));
+      });
+      cols.appendChild(g); cols.appendChild(f);
+      box.appendChild(cols);
+    });
+    if ((a.patterns || []).length) {
+      box.appendChild(el("h3", null, "Patterns across calls"));
+      var ul = el("ul"); a.patterns.forEach(function (p) { ul.appendChild(el("li", null, p)); }); box.appendChild(ul);
+    }
+    box.appendChild(el("h3", null, "Your thoughts on these calls"));
+    box.appendChild(reflectBox("general", "Anything else? What were you going for, what felt off, what do you want to work on?"));
+    var fin = d.final;
+    if (!fin) {
+      var b = el("button", "btn primary", d.busy && d.busy.indexOf("action") !== -1 ? d.busy : "Finish: get my action steps");
+      b.type = "button"; b.disabled = !!d.busy;
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(document.querySelectorAll(".bd-take"), function (t) { t.blur(); });
+        setTimeout(function () { send("bd_finalize"); }, 150);
+      });
+      box.appendChild(b);
+      return;
+    }
+    box.appendChild(el("h3", null, "Coach's response"));
+    box.appendChild(el("p", null, fin.response_to_rep));
+    box.appendChild(el("h3", null, "Your action steps for the next calls"));
+    var ol = el("ol", "bd-steps");
+    (fin.action_steps || []).forEach(function (s) {
+      var li = el("li");
+      li.appendChild(el("strong", null, s.step));
+      li.appendChild(el("div", "muted", "Why: " + s.why));
+      li.appendChild(el("div", null, "Practice: " + s.how_to_practice));
+      li.appendChild(el("div", "muted", "Success looks like: " + s.success_looks_like));
+      ol.appendChild(li);
+    });
+    box.appendChild(ol);
+    (fin.training_flags || []).forEach(function (t) { box.appendChild(el("div", "bd-change", "🚩 Needs more coaching: " + t.area + ". " + t.reason)); });
+    box.appendChild(el("p", "muted", "Saved to " + d.rep + "'s action plan. Next time, the coach checks whether these improved."));
+  }
+  function wireBd() {
+    $("tabLive").addEventListener("click", function () { setView("live"); });
+    $("tabBd").addEventListener("click", function () { setView("breakdown"); });
+    $("bdRep").addEventListener("change", function () { send("bd_set_rep", { rep: this.value }); });
+    $("bdAddFiles").addEventListener("click", function () { send("bd_add_files"); });
+    $("bdAddPast").addEventListener("click", function () { send("bd_past_list"); });
+    $("bdPastSel").addEventListener("change", function () { if (this.value) { send("bd_add_past", { name: this.value }); this.value = ""; } });
+    $("bdAnalyze").addEventListener("click", function () { send("bd_analyze"); });
+    $("bdNew").addEventListener("click", function () { send("bd_new"); });
+    $("bdFolder").addEventListener("click", function () { send("bd_open_folder"); });
+  }
+  function onBdPast(d) {
+    var sel = $("bdPastSel");
+    sel.innerHTML = "";
+    var o0 = el("option", null, (d.calls || []).length ? "Pick a past call…" : "No saved calls yet"); o0.value = ""; sel.appendChild(o0);
+    (d.calls || []).forEach(function (c) { var o = el("option", null, c.title + " · " + c.started.slice(0, 16).replace("T", " ") + (c.length ? " · " + c.length : "")); o.value = c.name; sel.appendChild(o); });
+    sel.hidden = false;
+    sel.focus();
   }
 
   // ---------------------------------------------------------------- landing the plane
@@ -1591,6 +1816,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   renderSuggestions();
   renderClosing(null);
   wireV2();
+  wireBd();
   $("landBtn").addEventListener("click", function () {
     if (callState !== "live" && callState !== "paused") { toast("Start a call first."); return; }
     send("land_now");

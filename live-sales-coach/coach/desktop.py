@@ -21,6 +21,8 @@ from .hotkey import GlobalHotkey, pretty
 from .replay import script_title
 from .runner import AsyncRunner
 from .session import CallSession
+from .breakdown import root as breakdown_root, slug as rep_slug
+from .breakdown_controller import BreakdownController
 from .notes import load_style, new_proposal, save_note, style_path
 from .phone_bridge import PhoneBridge
 from .storage import call_path, calls_root, list_calls, load_call
@@ -346,6 +348,49 @@ class MainWindow(QMainWindow):
                 elif not active:
                     self.runner.submit(self.session.end())     # session started by hand
 
+    # ------------------------------------------------------------ call breakdown
+    @property
+    def breakdown(self) -> BreakdownController:
+        if getattr(self, "_breakdown", None) is None:
+            self._breakdown = BreakdownController(self.cfg, self.prompts, self.bridge.post, self.runner,
+                                                  keys_status()["anthropic"])
+        return self._breakdown
+
+    def handle_breakdown(self, cmd: str, msg: dict) -> None:
+        b = self.breakdown
+        if cmd == "bd_init":
+            b.publish()
+        elif cmd == "bd_set_rep":
+            b.set_rep(str(msg.get("rep", "")))
+        elif cmd == "bd_add_files":
+            paths, _ = QFileDialog.getOpenFileNames(
+                self, "Add calls to break down", str(Path.home()),
+                "Calls (*.mp3 *.m4a *.wav *.aac *.ogg *.webm *.flac *.mp4 *.txt *.md);;All files (*)")
+            b.add_paths(paths)
+        elif cmd == "bd_past_list":
+            self.bridge.post("bd_past", {"calls": list_calls(self.calls_dir)})
+        elif cmd == "bd_add_past":
+            d = call_path(self.calls_dir, str(msg.get("name", "")))
+            if d is not None:
+                b.add_paths([str(d)])
+        elif cmd == "bd_speaker":
+            b.set_rep_speaker(int(msg.get("id", 0)), str(msg.get("label", "")))
+        elif cmd == "bd_remove":
+            b.remove(int(msg.get("id", 0)))
+        elif cmd == "bd_analyze":
+            b.analyze()
+        elif cmd == "bd_reflect":
+            b.reflect(str(msg.get("key", "")), str(msg.get("text", "")))
+        elif cmd == "bd_finalize":
+            b.finalize()
+        elif cmd == "bd_new":
+            b.reset()
+            b.publish()
+        elif cmd == "bd_open_folder":
+            d = breakdown_root(self.cfg) / rep_slug(b.rep)
+            d.mkdir(parents=True, exist_ok=True)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(d)))
+
     # ------------------------------------------------------------ selling notes
     def _all_notes(self) -> dict[int, dict]:
         notes = dict(self.notes)
@@ -502,6 +547,8 @@ class MainWindow(QMainWindow):
                 self.bridge.post("toast", {"level": "error", "text": "No summary saved for that call."})
         elif cmd == "swap_speakers" and self.session and self.session.running:
             self.runner.call(self.session.swap_speakers)
+        elif cmd.startswith("bd_"):
+            self.handle_breakdown(cmd, msg)
         elif cmd == "set_stage" and self.session and self.session.running:
             v = msg.get("stage")
             self.runner.call(self.session.set_stage, None if v in (None, "auto") else str(v))
