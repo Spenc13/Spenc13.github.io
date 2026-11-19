@@ -216,11 +216,22 @@ You can press **Start call** at any point. If the dialer shows the call was answ
 
 ### Which calls are saved
 
-A call is saved (folder, summary, and Past calls) only if:
-- **an appointment was set**: a demo date and time were agreed, or you went OTF and presented on the spot; or
-- **the conversation lasted 10 minutes or longer.**
+- **An appointment was set** (a demo date and time agreed, or you went OTF): saved, however short.
+- **3 minutes or longer:** saved automatically.
+- **Between 2 and 3 minutes:** the summary panel asks **Save call** or **Don't save**.
+- **Under 2 minutes** (no answer, voicemail, a quick hang-up): not saved, and no summary is written. **Save anyway** still keeps one right after it ends.
 
-Anything else isn't saved or graded, and costs no summary request. Right before deciding, the coach runs one last check, so a set made in the final seconds still counts. The summary panel says why a call wasn't saved, with a **Save anyway** button if you want to keep it. Change the length, or whether a set always counts, under `call_filter` in `config.yaml` (`min_minutes`, `keep_if_set`).
+Right before deciding, the coach runs one last check, so a set made in the final seconds still counts. Change the times under `call_filter` in `config.yaml` (`min_minutes`, `auto_save_minutes`, `keep_if_set`).
+
+### Reading the room (when they want off the phone)
+
+The coach tries to keep good conversations going, but it takes the hint:
+
+- **They say once they have to go** ("I'm on a job", "bad time", "I gotta run") or that they're not interested: an amber **Wrap it up** card. No new discovery questions. It offers one quick callback time, or just a warm wrap if a time is already set.
+- **They say it again**, repeat that they're not interested, tell you to stop calling, or get upset: a **Wrap it up · Time to end the call** card with one polite line to end the call (no question, no rebuttal). After that the coach stays quiet for the rest of the call.
+- **The appointment is set and you start saying goodbye:** the coach stops. No "one more question". Anything still unticked stays visible in the Landing the plane panel, but it won't push you.
+- **If the prospect re-engages** and starts sharing real detail again, the coach picks back up.
+- **After the call:** the summary doesn't count it against you that you ended a call the prospect wanted to end.
 
 ### Call breakdown (review past calls, get action steps)
 

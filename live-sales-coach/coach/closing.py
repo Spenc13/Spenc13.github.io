@@ -50,11 +50,13 @@ TRACKER_SCHEMA = {
         "conversation_mode": {"type": "string", "enum": ["business", "rapport", "side"]},
         "meeting_agreed": {"type": "boolean"},
         "momentum": {"type": "string", "enum": ["productive", "neutral", "stalled"]},
+        "prospect_wants_out": {"type": "boolean"},
     },
     "required": ["path", "demo_time_confirmed", "demo_when", "demo_format", "decision_maker",
                  "decision_maker_note", "invite_accept_asked", "reschedule_notice_asked",
                  "otf_link_sent", "followup_set", "followup_when", "not_interested",
-                 "decision_maker_confirmed", "stage", "conversation_mode", "meeting_agreed", "momentum"],
+                 "decision_maker_confirmed", "stage", "conversation_mode", "meeting_agreed", "momentum",
+                 "prospect_wants_out"],
     "additionalProperties": False,
 }
 
@@ -87,6 +89,10 @@ TRACKER_PROMPT = (
     "and the conversation is moving toward their problem, the value, or a next step; natural rapport counts), "
     "stalled (going in circles, short or disengaged answers, an objection left hanging, or drifting off the "
     "sale), or neutral.\n"
+    "- prospect_wants_out, for the last minute: true if the prospect is trying to end the call: they've said "
+    "more than once that they have to go or are busy, firmly repeated they're not interested, told Spencer to stop "
+    "calling, sound annoyed or angry, or keep giving one-word answers while trying to leave. False if they're "
+    "engaged, even if they mentioned being busy earlier and then kept talking.\n"
     "Spencer's typed notes are ground truth and override the transcript.\n"
     "Be strict: only mark something true if it clearly happened."
 )

@@ -26,9 +26,10 @@ from .engine import (LIVE_INSTRUCTION, CoachEngine, CoachRequest, CoachUnavailab
 from .metrics import Metrics
 from .callfilter import judge
 from .notes import load_style, new_proposal
-from .stage import LABELS as STAGE_LABELS, STAGE_HINT, StageState
+from .stage import KEEP_GOING, LABELS as STAGE_LABELS, STAGE_HINT, STALLED, StageState
 from .turns import is_backchannel, is_checkin, is_complete
 from .closing import CLOSE_HINT, WRAP_UP, CloseState
+from .exit import ExitState
 from .storage import CallStore
 from .stt import make_stream
 from .stt.base import SttEvent
@@ -114,6 +115,7 @@ class CallSession:
             self.metrics.wpm_target = (int(wt[0]), int(wt[1]))
         self._last_land_nudge = -1e9            # call seconds
         self._last_wrap_guard = -1e9
+        self.exit = ExitState()
         self._tracker_task: asyncio.Task | None = None
         self._tracker_token = 0
         self._tracker_rerun = False
@@ -335,6 +337,11 @@ class CallSession:
         c = self.closing
         path = c.active_path()
         return (path == "set_demo" and c.done("demo_time")) or (path == "otf" and c.done("otf"))
+    def _meeting_set(self) -> bool:
+        c = self.closing
+        return self._appointment_set() or self.stage_state.meeting_agreed or \
+            (c.active_path() == "later" and c.done("followup"))
+
     def _summary_note(self) -> str:
         parts = [self.partial_note()]
         c = self.closing
@@ -342,8 +349,13 @@ class CallSession:
         missing = c.missing() if c.active_path() != "none" else []
         if missing:
             out += " Not done before the call ended: " + "; ".join(missing) + "."
-        parts.append(out + " Treat a missing outcome or missing steps as a key missed opportunity, and "
-                     "make the first next step about closing that loop.")
+        if self.exit.level() >= 1:
+            parts.append(out + " The prospect asked to get off the phone or said they weren't interested; "
+                         "ending the call politely at that point was correct. Don't count steps after that point "
+                         "as missed opportunities, and don't suggest Spencer should have kept them on the line.")
+        else:
+            parts.append(out + " Treat a missing outcome or missing steps as a key missed opportunity, and "
+                         "make the first next step about closing that loop.")
         return "\n".join(p for p in parts if p)
 
     def _closing_changed(self, before_label: str, before_complete: bool) -> None:
@@ -400,6 +412,7 @@ class CallSession:
             return
         before = (self.closing.outcome_label(), self.closing.complete())
         self.closing.apply_tracker(res)
+        self.exit.apply_tracker(res)
         self._closing_changed(*before)
         old, new = self.stage_state.apply(res, self.elapsed())
         self._emit_stage()
@@ -427,8 +440,8 @@ class CallSession:
         """Spencer is saying goodbye: if the outcome isn't nailed down, say what's missing first."""
         el = self.elapsed()
         c = self.closing
-        if c.complete() or el - self._last_wrap_guard < 45 or el < 30:
-            return
+        if c.complete() or self._last_wrap_guard > 0 or el < 30 or self.exit.level() >= 1:
+            return                                   # once per call; never when they want to go
         if self.stage() != "confirming" and not self.land_open:
             return                                   # scheduling prompts only while confirming
         self._last_wrap_guard = el
@@ -521,6 +534,11 @@ class CallSession:
         st = self.stage()
         parts = [self.stage_state.guidance(el, self.metrics.checkins, 25, self.discovery_questions,
                                            script=bool(getattr(self.prompts, "discovery", "").strip()))]
+        hint = self.exit.guidance(self._meeting_set()) if st != "side" else ""
+        if hint:
+            # Reading the room beats "keep the conversation going".
+            parts[0] = parts[0].replace("\n" + KEEP_GOING, "").replace("\n" + STALLED, "")
+            parts.append(hint)
         if st == "confirming" or self.land_open or reason in ("land", "wrap_guard"):
             parts.append(self.closing.status_text(el / 60, 1e9))
         names = {k: v for k, v in self.glossary.items() if v}
@@ -625,13 +643,14 @@ class CallSession:
             "echo_lines_dropped": self.echo_dropped,
             "speakers_swapped": self._swap,
             "outcome": self.closing.to_dict(),
+            "prospect_wanted_out": self.exit.to_dict(),
             "phone": self.call_info.get("phone"),
             "direction": self.call_info.get("direction"),
             "source": self.call_info.get("source"),
         }
         self._final_meta, self._final_snap = meta, snap
         filt = self.cfg.get("call_filter") or {}
-        short = self._accum < float(filt.get("min_minutes", 10)) * 60
+        short = self._accum < max(float(filt.get("min_minutes", 2)), float(filt.get("auto_save_minutes", 3))) * 60
         if short and not self._appointment_set() and self.engine.client is not None and self.transcript.finals:
             # One last check so a set made in the final seconds still counts.
             try:
@@ -646,7 +665,7 @@ class CallSession:
             # until the next call so "Save anyway" still works.
             self.store.finalize(keep=False)
             self.discarded_reason = verdict.reason
-            self.emit("summary", {"state": "discarded", "reason": verdict.reason, "meta": meta})
+            self.emit("summary", {"state": "ask" if verdict.ask else "discarded", "reason": verdict.reason, "meta": meta})
             self.emit("call", {"state": "ended", "title": self.title, "mode": self.mode})
             if self.coach_notes:
                 await self._propose_notes(None)
@@ -881,7 +900,12 @@ class CallSession:
         if CLOSE_HINT.search(ev.text) or STAGE_HINT.search(ev.text):
             self._schedule_tracker(delay=min(self.tracker_delay, 2.0))
         if sp == REP and WRAP_UP.search(ev.text):
-            await self._wrap_up_guard()
+            if self._meeting_set() or self.exit.level() >= 1 or self.closing.done("not_interested"):
+                self.exit.wrapping = True                # done: no more questions
+                if self._turn_timer and not self._turn_timer.done():
+                    self._turn_timer.cancel()
+            else:
+                await self._wrap_up_guard()
 
         if sp == REP:
             if self._last_say and said_it(self._last_say, live_turn.text):
@@ -891,6 +915,14 @@ class CallSession:
                 self._turn_timer.cancel()          # Spencer already answered that turn
 
         if sp == PROSPECT:
+            lvl = self.exit.hear_prospect(ev.text, ev.start)
+            if lvl and self.coaching_on:
+                await self._exit_card(lvl, ev.text, ev.spoke_end_mono)
+                self.emit("metrics", self.metrics.snapshot())
+                return
+            if self.exit.quiet():
+                self.emit("metrics", self.metrics.snapshot())
+                return
             det = detect(ev.text)
             if det:
                 if det.kind == OBJECTION:
@@ -920,6 +952,23 @@ class CallSession:
                     ))
         self.emit("metrics", self.metrics.snapshot())
 
+    # ------------------------------------------------------------ reading the room
+    async def _exit_card(self, level: int, text: str, spoke_end_mono: float) -> None:
+        """The prospect wants off the phone: say how to end it, right away."""
+        if self._turn_timer and not self._turn_timer.done():
+            self._turn_timer.cancel()
+        self._turn_det = None
+        if level >= 2:
+            self.exit.firm_sent = True
+        self._last_live_fire = self.elapsed()
+        self.debouncer.note_manual(self.elapsed())
+        short = text if len(text) <= 70 else "\u2026" + text[-68:]
+        await self.request_coach(CoachRequest(
+            reason="exit",
+            question=("Time to end the call" if level >= 2 else "They need to go") + f": \u201c{short}\u201d",
+            prompt=f'The prospect just said: "{text}"\n\n{LIVE_INSTRUCTION}',
+            spoke_end_mono=spoke_end_mono, fast=True))
+
     # ------------------------------------------------------------ live coach
     def _schedule_live(self, turn: Utterance, wait: float, received: float) -> None:
         if self._turn_timer and not self._turn_timer.done():
@@ -929,7 +978,7 @@ class CallSession:
     async def _live_after(self, turn: Utterance, wait: float, received: float) -> None:
         if wait > 0:
             await asyncio.sleep(wait)
-        if not self.running or not self.live_mode or not self.coaching_on:
+        if not self.running or not self.live_mode or not self.coaching_on or self.exit.quiet():
             return
         if self.stage() == "side":
             self.emit("coach", {"state": "paused", "reason": "Side conversation: coaching paused"})
@@ -1027,8 +1076,10 @@ class CallSession:
             if parsed["say"] and "latency" not in first_card:
                 first_card["latency"] = time.monotonic() - anchor
             self.emit("coach", {"state": "streaming", "question": req.question,
-                                "mode": "keep_going" if (self.stage_state.momentum == "productive"
-                                                         and req.reason == "live") else "coach", **parsed,
+                                "mode": "wrap" if req.reason == "exit" else
+                                        "keep_going" if (self.stage_state.momentum == "productive"
+                                                         and req.reason == "live" and not self.exit.level()) else "coach",
+                                **parsed,
                                 "latency_s": round(first_card.get("latency", 0), 2) or None})
 
         try:
