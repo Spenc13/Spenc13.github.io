@@ -136,10 +136,13 @@ recording:
   meet_consent_mode: ask
 
 call_filter:
-  # Only calls worth reviewing are saved: an appointment was set (a demo date and
-  # time agreed, or you went OTF), or the conversation lasted at least min_minutes.
-  # Everything else isn't saved or graded. "Save anyway" keeps one right after it ends.
-  min_minutes: 10
+  # Which calls are saved:
+  #   - an appointment was set (demo date and time agreed, or you went OTF): saved
+  #   - auto_save_minutes or longer: saved automatically
+  #   - between min_minutes and auto_save_minutes: the app asks you (Save / Don't save)
+  #   - shorter than min_minutes: not saved ("Save anyway" keeps one right after it ends)
+  min_minutes: 2
+  auto_save_minutes: 3
   keep_if_set: true
 
 phone_bridge:

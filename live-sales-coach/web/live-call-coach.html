@@ -311,6 +311,8 @@ footer { margin-top: 16px; color: var(--muted); font-size: 12px; }
 .coach-card.live .say { font-size: 19px; line-height: 1.4; }
 .coach-card.keep { border-color: rgba(56,217,169,0.55); background: linear-gradient(180deg, rgba(56,217,169,0.10), rgba(56,217,169,0.02)); }
 .coach-card .keep-tag { color: var(--good); font-weight: 600; }
+.coach-card.wrap { border-color: rgba(255,184,77,0.6); background: linear-gradient(180deg, rgba(255,184,77,0.10), rgba(255,184,77,0.02)); }
+.coach-card .wrap-tag { color: #ffb84d; font-weight: 600; }
 .coach-card.used { opacity: 0.55; border-color: var(--line); background: var(--panel-2); }
 .coach-card .used-tag { display: inline-block; margin-left: 6px; color: var(--good); font-weight: 600; }
 .live-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; font-weight: 600; font-size: 12px;
@@ -662,6 +664,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         <button class="btn small" id="sumCopy" hidden>Copy summary</button>
         <button class="btn small" id="sumOpen" hidden>Open folder</button>
         <button class="btn small" id="sumKeep" hidden>Save anyway</button>
+        <button class="btn small" id="sumSkip" hidden>Don't save</button>
       </div>
     </div>
     <p class="overview" id="overview" hidden></p>
@@ -846,11 +849,13 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     var box = $("coachFeed");
     box.innerHTML = "";
     var card = el("div", "coach-card" + (c.state === "error" ? " error" : "") + (c.state === "thinking" ? " thinking" : "") +
-      ($("liveMode").checked ? " live" : "") + (c.mode === "keep_going" ? " keep" : ""));
+      ($("liveMode").checked ? " live" : "") + (c.mode === "keep_going" ? " keep" : c.mode === "wrap" ? " wrap" : ""));
     var qd = el("div", "q");
     if (c.mode === "keep_going") qd.appendChild(el("span", "keep-tag", "✓ Keep going · "));
-    qd.appendChild(document.createTextNode(c.question ? ((c.mode === "keep_going" ? "" : "Say this next · ") + c.question)
-                                                      : (c.mode === "keep_going" ? "" : "Say this next")));
+    if (c.mode === "wrap") qd.appendChild(el("span", "wrap-tag", "⏹ Wrap it up · "));
+    var plain = c.mode === "keep_going" || c.mode === "wrap";
+    qd.appendChild(document.createTextNode(c.question ? ((plain ? "" : "Say this next · ") + c.question)
+                                                      : (plain ? "" : "Say this next")));
     card.appendChild(qd);
     if (c.state === "error") {
       card.appendChild(el("p", "say", c.error || "Coach unavailable."));
@@ -1043,6 +1048,17 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
       ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "Working…")); });
       return;
     }
+    if (s.state === "ask") {
+      lastCallName = null;
+      $("sumMeta").textContent = "Save this call?";
+      $("overview").hidden = false;
+      $("overview").textContent = "This call " + s.reason + ". Do you want it recorded and saved (transcript, summary, Past calls)?";
+      ["wins", "miss", "next"].forEach(function (id) { $(id).innerHTML = ""; $(id).appendChild(el("li", "muted", "–")); });
+      $("sumOpen").hidden = true; $("sumCopy").hidden = true;
+      $("sumKeep").textContent = "Save call"; $("sumKeep").hidden = false; $("sumSkip").hidden = false;
+      return;
+    }
+    $("sumSkip").hidden = true; $("sumKeep").textContent = "Save anyway";
     if (s.state === "discarded") {
       lastCallName = null;
       $("sumMeta").textContent = "Not saved";
@@ -1129,7 +1145,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
     $("coachingOn").checked = true;
     $("sumOpen").hidden = true;
     $("sumCopy").hidden = true;
-    $("sumKeep").hidden = true;
+    $("sumKeep").hidden = true; $("sumSkip").hidden = true;
   }
 
   // ---------------------------------------------------------------- events from Python
@@ -1168,7 +1184,7 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
         break;
       case "call":
         setCallState(d.state);
-        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saved when it ends if an appointment is set or it runs 10+ minutes";
+        if (d.state === "live" && d.title) $("footer").textContent = d.title + " · saved when it ends if an appointment is set or it runs 3+ minutes (2–3 minutes: you choose)";
         break;
       case "health": onHealth(d); break;
       case "timer": $("timer").textContent = d.elapsed; break;
@@ -1767,7 +1783,11 @@ header { display: block; padding-bottom: 18px; margin-bottom: 18px; }
   $("callsModal").addEventListener("click", function (e) { if (e.target === this) this.hidden = true; });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") $("callsModal").hidden = true; });
   $("sumOpen").addEventListener("click", function () { if (lastCallName) send("open_folder", { name: lastCallName }); });
-  $("sumKeep").addEventListener("click", function () { $("sumKeep").hidden = true; send("keep_call"); });
+  $("sumKeep").addEventListener("click", function () { $("sumKeep").hidden = true; $("sumSkip").hidden = true; send("keep_call"); });
+  $("sumSkip").addEventListener("click", function () {
+    $("sumKeep").hidden = true; $("sumSkip").hidden = true;
+    $("sumMeta").textContent = "Not saved"; $("overview").textContent = "Not saved. No files were written.";
+  });
   $("sumCopy").addEventListener("click", function () { if (lastCallName) send("copy_summary", { name: lastCallName }); });
   $("mode").addEventListener("change", function () {
     if (this.value === "pick") send("pick_replay");

@@ -225,6 +225,7 @@ def test_replay_pipeline_saves_call(tmp_path):
     cfg["triggers"]["min_gap_seconds"] = 5
     cfg["coach"]["live_mode"] = False          # keyword-trigger mode
     cfg["call_filter"]["min_minutes"] = 0      # this test checks saving, not the keep rule
+    cfg["call_filter"]["auto_save_minutes"] = 0
     events = []
 
     def emit(kind, data):
@@ -308,12 +309,15 @@ def test_call_filter():
     from coach.callfilter import judge
     talk = _t([(REP, "Hi Dana, what got you looking at marketing?", 0),
                (PROSPECT, "Our leads have dried up and we need about six good kitchen jobs a month.", 4)])
-    short = judge(talk, 300)                                   # 5 minutes, nothing set
-    assert not short.keep and short.reason == "it was under 10 minutes and no appointment was set"
-    assert judge(talk, 600).keep                               # 10+ minutes: kept
-    assert judge(talk, 120, is_set=True).keep                   # a set: kept, however short
-    assert not judge(talk, 120, {"keep_if_set": False}, is_set=True).keep
-    assert judge(talk, 400, {"min_minutes": 5}).keep           # configurable
+    short = judge(talk, 90)                                    # under 2 minutes, nothing set
+    assert not short.keep and not short.ask and short.reason == "it was under 2 minutes and no appointment was set"
+    mid = judge(talk, 150)                                     # 2-3 minutes: ask
+    assert not mid.keep and mid.ask and mid.reason == "it ran 2:30 with no appointment set"
+    assert judge(talk, 180).keep                               # 3+ minutes: saved automatically
+    assert judge(talk, 60, is_set=True).keep                   # a set: kept, however short
+    assert not judge(talk, 60, {"keep_if_set": False}, is_set=True).keep
+    assert judge(talk, 400, {"min_minutes": 5, "auto_save_minutes": 6}).keep   # configurable
+    assert judge(talk, 330, {"min_minutes": 5, "auto_save_minutes": 6}).ask
     assert not judge(_t([]), 900).keep                         # nothing said
     vm = judge(_t([(PROSPECT, "Hi, you've reached Mike's Roofing. Please leave a message after the tone.", 2)]), 50)
     assert not vm.keep and "voicemail" in vm.reason
@@ -353,7 +357,7 @@ def test_short_call_is_discarded_then_saved_anyway(tmp_path):
 
     s = asyncio.run(run())
     disc = [d for k, d in events if k == "summary" and d.get("state") == "discarded"]
-    assert disc and disc[0]["reason"] == "it was under 10 minutes and no appointment was set"
+    assert disc and disc[0]["reason"] == "it was under 2 minutes and no appointment was set"
     saved = [d for k, d in events if k == "summary" and d.get("state") == "done"]
     assert saved, "save anyway should write the call and summarize it"
     folder = Path(saved[0]["dir"])
@@ -501,6 +505,7 @@ def test_joined_mid_call_is_marked_everywhere(tmp_path):
     cfg["storage"]["calls_dir"] = str(tmp_path)
     cfg["replay"]["speed"] = 40
     cfg["call_filter"]["min_minutes"] = 0
+    cfg["call_filter"]["auto_save_minutes"] = 0
     cfg["coach"]["live_mode"] = True
 
     async def run():
@@ -796,7 +801,9 @@ def test_landing_the_plane_end_to_end(tmp_path):
     assert "Call stage: Cold call / Discovery" in live_prompts[0]
     assert any("Landing the plane:" in t and "Call stage: Confirming" in t for t in live_prompts)
     assert any(k == "stage" and d["stage"] == "confirming" for k, d in events)
-    assert any("starting to wrap up the call" in t and "reschedule" in t for t in contents)
+    # A time is set, so his goodbye ends the coaching: no "one more thing" nudge.
+    assert not any("starting to wrap up the call" in t for t in contents)
+    assert s.exit.wrapping
     assert any(k == "closing" for k, _ in events)
     metrics = json.loads((Path(s.store.dir) / "metrics.json").read_text())
     assert metrics["outcome"]["outcome"] == "Setting the demo (2 of 3)"
@@ -1376,3 +1383,78 @@ def test_live_coach_knows_current_action_steps(tmp_path):
 
     ctx = asyncio.run(run())
     assert "current action steps" in ctx and "Recap pain before asking for the time" in ctx and "Old step" not in ctx
+
+
+# ================================================================ Reading the room
+def test_exit_signals_levels():
+    from coach.exit import ExitState
+    e = ExitState()
+    assert e.hear_prospect("Our phones have been slow since spring.", 10) == 0
+    assert e.hear_prospect("Hey man, I'm on a roof right now.", 20) == 1
+    assert "callback" in e.guidance(False) and e.level() == 1 and not e.quiet()
+    assert e.hear_prospect("Look, I really gotta go.", 30) == 2
+    assert "End the call now" in e.guidance(False)
+    e.firm_sent = True
+    assert e.quiet()
+    h = ExitState()
+    assert h.hear_prospect("Stop calling me!", 5) == 2
+    n = ExitState()
+    n.hear_prospect("Not interested.", 5)
+    assert n.level() == 1
+    n.hear_prospect("I told you, we're all set.", 9)
+    assert n.level() == 2
+    # The tracker can clear it when they re-engage.
+    n.apply_tracker({"prospect_wants_out": False, "momentum": "productive"})
+    assert n.level() == 0
+    w = ExitState(wrapping=True)
+    assert w.quiet() and "Don't suggest another question" in w.guidance(True)
+    assert "already agreed" in ExitState().guidance(True)
+
+
+def test_prospect_who_has_to_go_gets_a_wrap_card_then_quiet(tmp_path):
+    script = tmp_path / "busy.txt"
+    script.write_text(
+        "Rep: Hey Mike, Spencer with Olly Olly. How are calls coming in for the roofing side?\n"
+        "Prospect: Honestly I'm on a job right now, I gotta go.\n"
+        "Rep: Totally get it, when's a better time?\n"
+        "Prospect: I said I gotta go man.\n"
+        "Rep: No problem.\n"
+        "Prospect: Yeah, and we're not really looking for marketing at all right now anyway.\n")
+    cfg = load_config()
+    cfg["storage"]["calls_dir"] = str(tmp_path / "calls")
+    cfg["replay"]["speed"] = 40
+    cfg["live_coach"]["min_gap_seconds"] = 0
+    events = []
+
+    async def run():
+        s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text", str(script))
+        s.engine.client = _FakeClient(REPLY)
+        await s.start()
+        await asyncio.wait_for(s.wait_ended(), timeout=30)
+        return s
+
+    s = asyncio.run(run())
+    calls = s.engine.client.messages.calls
+    prompts = [c["messages"][0]["content"] if isinstance(c["messages"][0]["content"], str)
+               else json.dumps(c["messages"][0]["content"]) for c in calls]
+    coaching = [p for p in prompts if "Spencer will read" in p or "The prospect just" in p]
+    assert any("Take the hint" in p for p in coaching)            # first "gotta go": soft
+    assert any("End the call now" in p for p in coaching)          # second: firm
+    firm_i = max(i for i, p in enumerate(coaching) if "End the call now" in p)
+    assert all("not really looking" not in p for p in coaching[firm_i + 1:])   # then quiet
+    wraps = [d for k, d in events if k == "coach" and d.get("mode") == "wrap"]
+    assert wraps and "Time to end the call" in wraps[-1]["question"]
+    assert s.exit.level() == 2
+
+
+def test_no_more_questions_after_the_set_and_goodbye():
+    from coach.exit import ExitState
+    cfg = load_config()
+    events = []
+    s = CallSession(cfg, PROMPTS, lambda k, d: events.append((k, d)), "replay_text",
+                    str(ROOT / "samples" / "set_demo_practice.txt"))
+    s.stage_state.meeting_agreed = True
+    assert "already agreed" in s._context_block("live")
+    s.exit = ExitState(wrapping=True)
+    ctx = s._context_block("live")
+    assert "Don't suggest another question" in ctx and "Keep going" not in ctx

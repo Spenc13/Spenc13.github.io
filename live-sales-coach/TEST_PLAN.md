@@ -103,6 +103,14 @@ Call a teammate on **Google Meet**, or through your dialer for phone calls. Give
 - [ ] If your dialer announces recording: tick **Don't ask again** once. On the next dialer call, coaching starts by itself when the prospect answers.
 - [ ] **Call menu → Ask before each recording** turns the notice back on.
 
+## D3b. Saving and reading the room
+
+- [ ] End a replay or call under 2 minutes: "Not saved", with **Save anyway**.
+- [ ] End one between 2 and 3 minutes: "Save this call?" with **Save call** / **Don't save**. Both work.
+- [ ] A call of 3+ minutes saves by itself.
+- [ ] Practice call: have your colleague say "I'm on a job, I gotta go". You get an amber **Wrap it up** card with no new discovery question. They say it again: **Time to end the call**, then no more cards.
+- [ ] Set a time, then say "Thanks, talk soon": no more question cards.
+
 ## D4. Call breakdown
 
 - [ ] **Call breakdown** tab → **+ From Past calls** → pick a saved call. It appears with the right rep speaker.
