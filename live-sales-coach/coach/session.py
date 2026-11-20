@@ -109,6 +109,7 @@ class CallSession:
         self.glossary: dict = dict(self.call_info.get("glossary") or {})
         self._last_card_text = ""
         self._timeline: list[dict] = []           # cards shown, for the post-call breakdown
+        self._last_timeline: dict | None = None
         self.discovery_questions = list(get(cfg, "coach.discovery_questions", []) or []) or None
         wt = get(cfg, "metrics.wpm_target", None)
         if isinstance(wt, (list, tuple)) and len(wt) == 2:
@@ -431,8 +432,8 @@ class CallSession:
         if path == "none":
             ask = ("Time to land the plane. Give Spencer the exact line to transition to setting the demo "
                    "(date and time by phone or Google Meet), or to going on-the-fly now with a Google Meet link "
-                   "if they seem to have time. Open with a one-sentence recap of their pain in their own words "
-                   "from this call, then ask for the time.")
+                   "if they seem to have time. Unless Spencer already recapped for this ask, open with a one-sentence "
+                   "recap of their pain in their own words from this call, then ask for the time.")
         else:
             missing = c.missing(path)
             ask = ("Help Spencer land the plane. Still needed: " + "; ".join(missing) + ". Give him the exact "
@@ -916,6 +917,8 @@ class CallSession:
         if sp == REP:
             if self._last_say and said_it(self._last_say, live_turn.text):
                 self._last_say = ""
+                if self._last_timeline is not None:
+                    self._last_timeline["used"] = True       # the review won't count it against him
                 self.emit("coach", {"state": "used"})
             if len(ev.text.split()) >= 3 and self._turn_timer and not self._turn_timer.done():
                 self._turn_timer.cancel()          # Spencer already answered that turn
@@ -1146,8 +1149,9 @@ class CallSession:
         mode = "keep_going" if (self.stage_state.momentum == "productive" and req.reason == "live") else (
             "redirect" if self.stage_state.momentum == "stalled" else "coach")
         record["mode"] = mode
-        self._timeline.append({"t": record["call_time"], "mode": mode, "stage": record.get("stage"),
-                               "reason": req.reason, "say": say})
+        self._last_timeline = {"t": record["call_time"], "mode": "wrap" if req.reason == "exit" else mode,
+                               "stage": record.get("stage"), "reason": req.reason, "say": say, "used": False}
+        self._timeline.append(self._last_timeline)
         self._coaching_count += 1
         say = parsed.get("say", "")
         self._last_say = "" if say.startswith("(") else say
