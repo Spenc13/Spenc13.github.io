@@ -406,12 +406,18 @@ class CallAudioFollower(Capture):
 
     def start(self) -> None:
         started = {}
-        for idx, cap in self.caps.items():
+        # The default speaker first, so call audio flows even if another device is slow.
+        order = sorted(self.caps, key=lambda i: i != self.active)
+        for idx in order:
+            cap = self.caps[idx]
+            t0 = self._time.monotonic()
             try:
                 cap.start()
                 started[idx] = cap
+                log.info("speaker %s opened in %.1fs", self.names[idx], self._time.monotonic() - t0)
             except Exception as e:
-                log.info("couldn't open speaker %s: %s", self.names[idx], type(e).__name__)
+                log.info("couldn't open speaker %s after %.1fs: %s", self.names[idx],
+                         self._time.monotonic() - t0, type(e).__name__)
         if not started:
             raise RuntimeError("Couldn't open any speaker for call audio")
         self.caps = started

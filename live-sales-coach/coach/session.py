@@ -290,9 +290,12 @@ class CallSession:
                 if s is not None:
                     loop.call_soon_threadsafe(s.feed, pcm)
 
+            t_open = time.monotonic()
             try:
-                cap = opener(audio_cfg, on_chunk)
+                # Off the event loop: a slow audio driver can't hold up the rest of Start.
+                cap = await asyncio.to_thread(opener, audio_cfg, on_chunk)
             except Exception as e:
+                log.warning("%s audio open failed after %.1fs: %s", LABELS[speaker], time.monotonic() - t_open, e)
                 self._set_health("stt", "down", f"{LABELS[speaker]} audio device: {e}")
                 self.emit("toast", {"level": "error", "text": f"{LABELS[speaker]} audio: {e}"})
                 continue
@@ -307,10 +310,13 @@ class CallSession:
             self._tasks.append(asyncio.create_task(stream.run()))
             stream.set_paused(False)
             try:
-                cap.start()
+                await asyncio.to_thread(cap.start)
             except Exception as e:
+                log.warning("%s audio start failed: %s", LABELS[speaker], e)
                 self._set_health("stt", "down", f"{LABELS[speaker]} audio device: {e}")
                 continue
+            log.info("%s audio ready in %.1fs (%s @ %s Hz)", LABELS[speaker], time.monotonic() - t_open,
+                     cap.device_name, cap.rate)
             self._captures.append(cap)
             if speaker == PROSPECT:
                 self._loopback_name = cap.device_name
