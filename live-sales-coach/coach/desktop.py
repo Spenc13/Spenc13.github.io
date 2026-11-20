@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QIODevice, QObject, QSettings, Qt, QUrl, Signal, Slot
+from PySide6.QtCore import QFile, QIODevice, QObject, QSettings, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineScript, QWebEngineSettings
@@ -26,6 +26,7 @@ from .breakdown_controller import BreakdownController
 from .notes import load_style, new_proposal, save_note, style_path
 from .phone_bridge import PhoneBridge
 from .storage import call_path, calls_root, list_calls, load_call
+from .watchdog import LOG_DIR, FreezeWatch, setup_file_log
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +108,12 @@ class MainWindow(QMainWindow):
         self.cfg = cfg
         self.start_replay = start_replay
         self.runner = AsyncRunner()
+        # Freeze recorder: if this window stops responding, logs/freeze-log.txt says why.
+        self.freeze = FreezeWatch()
+        self._beat = QTimer(self)
+        self._beat.timeout.connect(self.freeze.beat)
+        self._beat.start(500)
+        self.freeze.beat()
         self.session: CallSession | None = None
         self._starting = False
         # Do the slow one-time setup now, in the background, so Start is instant:
@@ -170,6 +177,10 @@ class MainWindow(QMainWindow):
         rescan = QAction("Rescan audio devices", self)
         rescan.triggered.connect(self.rescan_audio)
         view_menu.addAction(rescan)
+        logs = QAction("Open logs folder (for troubleshooting)", self)
+        logs.triggered.connect(lambda: (LOG_DIR.mkdir(exist_ok=True),
+                                        QDesktopServices.openUrl(QUrl.fromLocalFile(str(LOG_DIR)))))
+        view_menu.addAction(logs)
         call_menu = self.menuBar().addMenu("&Call")
         self.combo = hotkey_for_platform(cfg)
         ask_action = QAction(f"Start coaching / ask about the last few seconds ({pretty(self.combo)})", self)
@@ -248,6 +259,8 @@ class MainWindow(QMainWindow):
             if mode == "dialer" else "You'll confirm the recording notice before each call again.")})
 
     def closeEvent(self, event) -> None:
+        self._beat.stop()
+        self.freeze.stop()
         self.settings.setValue("geometry", self.saveGeometry())
         if self.session and self.session.running:
             fut = self.runner.submit(self.session.end())
@@ -637,6 +650,7 @@ class MainWindow(QMainWindow):
             await s.start()
 
         self._starting = True
+        self.freeze.mark(f"Start call ({mode})")
         fut = self.runner.submit(create_and_start())
 
         def done(f):
@@ -652,6 +666,7 @@ def run_desktop(cfg: dict, start_replay: str | None = None) -> int:
     QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QApplication(sys.argv)
     app.setApplicationName("Live Sales Coach")
+    setup_file_log()
     win = MainWindow(cfg, start_replay)
     win.show()
     return app.exec()
