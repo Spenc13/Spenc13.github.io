@@ -21,14 +21,34 @@ log = logging.getLogger(__name__)
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
+# One rulebook for the live coach AND the post-call review, so the review never marks
+# Spencer down for doing what the coach told him to do.
+RECAP_RULE = (
+    "Pain recap (restating the prospect's problem in their own words) belongs at only three moments: "
+    "(1) once, right before asking for the appointment; (2) once in the final confirmation after the time is "
+    "set; (3) during a presentation, when tying a feature back to their problem. Not after every answer: in "
+    "discovery, a short acknowledgment (\"Gotcha.\" / \"Makes sense.\") and the next question is enough; don't "
+    "restate what they just said. If Spencer already recapped for this ask, don't recap again."
+)
+SHARED_RULES = (
+    "Coaching rules (the live coach and the post-call review use the same ones):\n"
+    "- One question per line. An either/or choice of times (\"Thursday at 10 or Friday at 2?\", \"now, or later "
+    "this week?\") is ONE question, not a compound question.\n"
+    "- " + RECAP_RULE + "\n"
+    "- When the prospect wants off the phone (says they have to go, firmly not interested, upset), ending the "
+    "call politely is correct.\n"
+    "- Once the appointment is set and confirmed, wrapping up is correct; no extra questions are needed."
+)
+
 LIVE_INSTRUCTION = (
     "Live coach mode: Spencer will read your \"Say this next\" line out loud, word for word, right now. "
     "Write it as his exact spoken words: first person, natural and conversational, 10 to 30 words "
     "(up to 40 when asking for a time or appointment), responding directly to what the prospect just said "
     "and fitting the call stage above. Ask at most ONE question: never two questions in the same line, and "
     "no compound questions joined with \"and\" or \"or else\". No question at all when the prospect wants to go or "
-    "the call is wrapping up: then the line just ends the call politely. When the line asks for a time or appointment, "
-    "open with a one-sentence recap of their pain in their own words, then ask for the time. "
+    "the call is wrapping up: then the line just ends the call politely. " + RECAP_RULE + " When the line "
+    "asks for a time or appointment and no recap was given for it yet, open with a one-sentence recap of their pain "
+    "in their own words, then ask for the time. "
     "Don't repeat a point he already made or ask for something already covered. No stage directions or "
     "quotation marks. If the prospect hasn't actually finished their thought, write exactly: "
     "Say this next: (Listening) . If the latest talk is a side conversation unrelated to the sale (someone "
@@ -72,17 +92,19 @@ def parse_coach(text: str) -> dict[str, str]:
 
 _WORD = re.compile(r"[a-z0-9']+")
 _STOP = {"the", "and", "that", "this", "with", "your", "you", "what", "would", "have", "about", "just",
-         "it's", "that's", "there", "they", "them", "then", "from", "like", "know", "really", "so", "for"}
+         "it's", "that's", "there", "they", "them", "then", "from", "like", "know", "really", "so", "for", "are", "not", "can", "how", "but", "was", "all", "any", "our", "one", "get", "got", "yes", "yeah", "okay", "gotcha"}
 
 
 def _timeline_text(timeline: list | None, limit: int = 60) -> str:
     """Coaching cards shown during the call, for the post-call breakdown."""
     if not timeline:
         return "Coaching timeline: (none)"
-    label = {"keep_going": "KEEP GOING", "redirect": "REDIRECT", "coach": "COACH"}
-    rows = [f"[{c['t']}] {label.get(c.get('mode'), 'COACH')} ({c.get('stage') or '?'}): {c.get('say', '')}"
+    label = {"keep_going": "KEEP GOING", "redirect": "REDIRECT", "coach": "COACH", "wrap": "WRAP UP"}
+    rows = [f"[{c['t']}] {label.get(c.get('mode'), 'COACH')} ({c.get('stage') or '?'})"
+            f"{' SPENCER SAID THIS' if c.get('used') else ''}: {c.get('say', '')}"
             for c in timeline[-limit:]]
-    return "Coaching timeline (what the coach told Spencer, and whether he was on a roll):\n" + "\n".join(rows)
+    return ("Coaching timeline (what the coach told Spencer, and whether he was on a roll). Lines marked SPENCER "
+            "SAID THIS were read from the coach's card:\n" + "\n".join(rows))
 
 
 def one_question(say: str) -> str:
@@ -98,12 +120,13 @@ def said_it(suggestion: str, spoken: str) -> bool:
     """Did Spencer (roughly) say the suggested line? Matches on content words."""
     if suggestion.strip().startswith("("):        # "(Stay quiet...)" isn't a line to say
         return False
-    want = [w for w in _WORD.findall(suggestion.lower()) if len(w) > 3 and w not in _STOP]
+    want = {w for w in _WORD.findall(suggestion.lower()) if len(w) > 2 and w not in _STOP}
     if len(want) < 3:
         return False
     got = set(_WORD.findall(spoken.lower()))
-    hits = sum(1 for w in set(want) if w in got)
-    return hits >= 3 and hits / len(set(want)) >= 0.5
+    hits = sum(1 for w in want if w in got)
+    need = 3 if len(want) >= 6 else 2          # short lines ("Thursday at ten or Friday at two?")
+    return hits >= need and hits / len(want) >= 0.5
 
 
 @dataclass
@@ -353,6 +376,12 @@ class CoachEngine:
                 "redirect, and what it suggested) and Spencer's typed notes to explain what he was going for and "
                 "why it landed or didn't. "
                 "Spencer's typed lines (labeled \"Spencer (typed)\") are ground truth. "
+                + SHARED_RULES + "\n"
+                "Judge Spencer by these same rules. Never list as a missed opportunity, missed moment, or "
+                "stalled turning point anything these rules call for, or anything Spencer said by following a "
+                "coach card (marked SPENCER SAID THIS, or clearly matching a card shown just before). Those "
+                "were the coach's call, not his mistake. Don't suggest a better line that contradicts the rules "
+                "(for example, adding a pain recap after every answer). "
                 "Use only facts from the transcript, playbook, and offer reference. "
                 "Do not invent prices, terms, or guarantees."
             ),

@@ -332,6 +332,11 @@ FINAL_SCHEMA = {
 }
 
 
+def _shared_rules() -> str:
+    from .engine import SHARED_RULES
+    return SHARED_RULES
+
+
 def analysis_prompt(rep: str, calls: list[dict], steps: list[dict]) -> str:
     plan = "\n".join(f"- {s['id']}: {s['text']} (status: {s['status']})" for s in steps) or "(none yet: first breakdown)"
     body = []
@@ -348,7 +353,8 @@ def analysis_prompt(rep: str, calls: list[dict], steps: list[dict]) -> str:
         "Then step_progress: for EACH of his earlier action steps below, judge from these calls whether he "
         "improved, partly improved, hasn't yet, or had no opportunity to show it, with evidence and a timestamp. "
         "Return an empty list if there are no earlier steps.\n"
-        "Be specific and fair; never invent quotes.\n\n"
+        "Be specific and fair; never invent quotes.\n"
+        + _shared_rules() + "\nJudge by these rules: never call something an issue that they call for.\n\n"
         f"His earlier action steps:\n{plan}\n\n" + "\n\n".join(body)
     )
 

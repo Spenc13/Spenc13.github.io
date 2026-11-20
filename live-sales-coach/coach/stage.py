@@ -32,17 +32,17 @@ STAGE_HINT = re.compile(
 GUIDANCE = {
     "discovery": (
         "Call stage: Cold call / Discovery. Ask NEPQ discovery questions (situation, problem, consequence, "
-        "qualifying, budget). Don't pitch features yet. Don't give scheduling advice unless the prospect raises it. "
+        "qualifying, budget). No pain recaps here: acknowledge briefly and ask the next question. Don't pitch features yet. Don't give scheduling advice unless the prospect raises it. "
         "These are blue-collar home-service owners: favor plain, money-and-jobs questions like these (pick the one "
         "that fits the moment and isn't already answered; adapt the wording):\n{questions}"
     ),
     "presenting": (
         "Call stage: Presenting. Spencer is presenting or demoing. Focus only on: checking-for-agreement "
-        "questions (aim for about {target} per presentation; {done} so far), recapping the prospect's problems in "
+        "questions (aim for about {target} per presentation; {done} so far), tying features back to the prospect's problems in "
         "their own words, and smooth transitions. Do NOT suggest discovery questions or scheduling."
     ),
     "confirming": (
-        "Call stage: Confirming an appointment. When asking for the time, first recap their pain in their own "
+        "Call stage: Confirming an appointment. When first asking for the time (if no recap was given yet), recap their pain in their own "
         "words (one sentence, from what they said on this call), then ask for the time, so the reason to show up "
         "sticks. Focus only on locking the appointment: the calendar invite "
         "(ask them to accept it), the decision maker and any approval steps (for example a franchisor or partner "
@@ -68,7 +68,7 @@ DISCOVERY_QUESTIONS = [
 SCRIPT_GUIDANCE = (
     "Call stage: Cold call / Discovery. Spencer's own discovery questions are in your context: a bank to draw "
     "from, not a script, so there's no required order. Pick whichever question fits this moment best and "
-    "hasn't been answered yet (check the transcript and \"Already covered\"), and use his wording. Fill the "
+    "hasn't been answered yet (check the transcript and \"Already covered\"), and use his wording. No pain recaps in discovery: acknowledge briefly and ask. Fill the "
     "[brackets] with what the prospect actually said (their service, job counts, job value, competitor names). "
     "When you know the extra jobs they want and what a job is worth, the revenue-gap question is a strong one "
     "(extra jobs x job value = money left on the table per week or month). Where a line lists several questions, "

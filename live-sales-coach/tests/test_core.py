@@ -1458,3 +1458,42 @@ def test_no_more_questions_after_the_set_and_goodbye():
     s.exit = ExitState(wrapping=True)
     ctx = s._context_block("live")
     assert "Don't suggest another question" in ctx and "Keep going" not in ctx
+
+
+# ================================================================ One rulebook for coach and review
+def test_review_uses_the_coach_rules_and_knows_what_spencer_read():
+    from coach.engine import LIVE_INSTRUCTION, SHARED_RULES, _timeline_text
+    assert "Not after every answer" in LIVE_INSTRUCTION
+    t = _timeline_text([{"t": "02:51", "mode": "coach", "stage": "confirming", "used": True,
+                         "say": "Does Thursday at 10 or Friday at 2 work better?"},
+                        {"t": "01:10", "mode": "coach", "stage": "discovery", "say": "x"}])
+    assert "[02:51] COACH (confirming) SPENCER SAID THIS:" in t and "[01:10] COACH (discovery): x" in t
+    assert "either/or choice of times" in SHARED_RULES
+
+    async def run():
+        eng = CoachEngine(load_config(), PROMPTS, True)
+        eng.client = _FakeClient(REPLY)
+        fake = _CloseFakeMessages(REPLY)
+        eng.client.messages = eng.client.beta.messages = fake
+        try:
+            await eng.post_call_summary("[00:01] Rep: hi", {}, 1, timeline=[{"t": "00:05", "say": "Hi", "used": True}])
+        except Exception:
+            pass
+        return fake.calls[-1]["messages"][0]["content"]
+    prompt = asyncio.run(run())
+    assert SHARED_RULES in prompt and "SPENCER SAID THIS" in prompt and "coach's call, not his mistake" in prompt
+
+
+def test_card_spencer_reads_is_marked_used():
+    cfg = load_config()
+    s = CallSession(cfg, PROMPTS, lambda k, d: None, "replay_text", str(ROOT / "samples" / "set_demo_practice.txt"))
+    s._last_say = "Would Thursday at ten or Friday at two be better for you?"
+    s._last_timeline = {"t": "03:06", "say": s._last_say, "used": False}
+    s._timeline.append(s._last_timeline)
+    from coach.stt.base import SttEvent
+    import time as _t
+    ev = SttEvent(speaker=REP, text="Would Thursday at ten or maybe Friday at two be good for you?",
+                  final=True, start=186.0, duration=4.0, spoke_end_mono=_t.monotonic(), speech_final=True)
+    s.running = True
+    asyncio.run(s.on_stt(ev))
+    assert s._timeline[-1]["used"]
